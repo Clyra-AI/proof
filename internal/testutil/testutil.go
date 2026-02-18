@@ -20,12 +20,18 @@ func RepoRoot(t *testing.T) string {
 func BuildBinary(t *testing.T, root string) string {
 	t.Helper()
 	bin := filepath.Join(t.TempDir(), "proof")
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
 	// #nosec G204 -- test helper executes a fixed go build command.
 	cmd := exec.Command("go", "build", "-o", bin, "./cmd/proof")
 	cmd.Dir = root
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("build binary: %v: %s", err, string(out))
+	}
+	if _, err := os.Stat(bin); err != nil {
+		t.Fatalf("build binary output not found at %s: %v", bin, err)
 	}
 	return bin
 }

@@ -1,6 +1,7 @@
 package signing
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -17,11 +18,17 @@ type CosignVerifyOpts struct {
 	CertificateIssuer   string
 }
 
+var ErrDependencyMissing = errors.New("dependency missing")
+
 var cosignLookPath = exec.LookPath
 var cosignRun = func(args ...string) ([]byte, error) {
 	// #nosec G204 -- executable is fixed to cosign; args are assembled from controlled flags/paths.
 	cmd := exec.Command("cosign", args...)
 	return cmd.CombinedOutput()
+}
+
+func IsDependencyMissing(err error) bool {
+	return errors.Is(err, ErrDependencyMissing)
 }
 
 func SignRecordCosign(r *record.Record, keyPath string) (*record.Record, error) {
@@ -52,7 +59,7 @@ func SignDigestCosign(digest string, keyPath string) (Signature, error) {
 		return Signature{}, fmt.Errorf("cosign key path is required")
 	}
 	if _, err := cosignLookPath("cosign"); err != nil {
-		return Signature{}, fmt.Errorf("cosign binary not found: %w", err)
+		return Signature{}, fmt.Errorf("%w: cosign binary not found: %v", ErrDependencyMissing, err)
 	}
 	tmpDir, err := os.MkdirTemp("", "proof-cosign-")
 	if err != nil {
@@ -111,7 +118,7 @@ func VerifyDigestCosign(sig Signature, digest string, opts CosignVerifyOpts) err
 		return fmt.Errorf("cosign verification requires --cosign-key or --cosign-cert")
 	}
 	if _, err := cosignLookPath("cosign"); err != nil {
-		return fmt.Errorf("cosign binary not found: %w", err)
+		return fmt.Errorf("%w: cosign binary not found: %v", ErrDependencyMissing, err)
 	}
 	if strings.TrimSpace(sig.SignedDigest) == "" {
 		return fmt.Errorf("signed digest is required")

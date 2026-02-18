@@ -506,6 +506,17 @@ func TestSignDigestCosignErrorBranches(t *testing.T) {
 	require.ErrorContains(t, err, "cosign binary not found")
 }
 
+func TestIsDependencyMissing(t *testing.T) {
+	origLookPath := cosignLookPath
+	t.Cleanup(func() { cosignLookPath = origLookPath })
+
+	cosignLookPath = func(file string) (string, error) { return "", errors.New("missing") }
+	_, err := SignDigestCosign("sha256:abcd", "/tmp/cosign.key")
+	require.Error(t, err)
+	require.True(t, IsDependencyMissing(err))
+	require.False(t, IsDependencyMissing(errors.New("other error")))
+}
+
 func TestVerifyRecordCosignNilAndPrefixBranches(t *testing.T) {
 	err := VerifyRecordCosign(nil, CosignVerifyOpts{KeyPath: "/tmp/pub"})
 	require.ErrorContains(t, err, "record is nil")

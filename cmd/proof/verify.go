@@ -90,7 +90,7 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 							CertificateIssuer:   cosignCertIssuer,
 						}
 						if err := proof.VerifyCosignWithOptions(r, opts); err != nil {
-							return newCLIError(exitcode.VerificationErr, err.Error())
+							return newCLIError(verificationErrorCode(err), err.Error())
 						}
 					} else {
 						if publicKeyHex == "" {
@@ -140,7 +140,7 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 								CertificateIssuer:   cosignCertIssuer,
 							}
 							if err := proof.VerifyCosignWithOptions(&c.Records[i], opts); err != nil {
-								return newCLIError(exitcode.VerificationErr, fmt.Sprintf("signature verification failed for record %s: %v", c.Records[i].RecordID, err))
+								return newCLIError(verificationErrorCode(err), fmt.Sprintf("signature verification failed for record %s: %v", c.Records[i].RecordID, err))
 							}
 							continue
 						}
@@ -170,7 +170,7 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 						CertificateIdentity: cosignCertIdentity,
 						CertificateIssuer:   cosignCertIssuer,
 					}); err != nil {
-						return newCLIError(exitcode.VerificationErr, err.Error())
+						return newCLIError(verificationErrorCode(err), err.Error())
 					}
 				}
 				if verifyChain {
@@ -194,7 +194,7 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 					CertificateIssuer:   cosignCertIssuer,
 				})
 				if err != nil {
-					return newCLIError(exitcode.VerificationErr, err.Error())
+					return newCLIError(verificationErrorCode(err), err.Error())
 				}
 				printResult(opts, map[string]any{
 					"ok":                     true,
@@ -215,7 +215,7 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 					CertificateIssuer:   cosignCertIssuer,
 				})
 				if err != nil {
-					return newCLIError(exitcode.VerificationErr, err.Error())
+					return newCLIError(verificationErrorCode(err), err.Error())
 				}
 				printResult(opts, map[string]any{"ok": true, "kind": kind, "run_id": res.RunID, "manifest_digest": res.ManifestDigest, "files_verified": res.FilesVerified, "signatures_verified": res.SignaturesVerified}, fmt.Sprintf("Gait runpack verified. Files: %d.", res.FilesVerified))
 				return nil
@@ -223,7 +223,7 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 				explainf(opts, "gait signed JSON verify")
 				if verifySignatures {
 					if err := verifyGaitSignedJSON(path, publicKeyHex); err != nil {
-						return newCLIError(exitcode.VerificationErr, err.Error())
+						return newCLIError(verificationErrorCode(err), err.Error())
 					}
 				}
 				printResult(opts, map[string]any{"ok": true, "kind": kind}, "Gait signed artifact verified.")

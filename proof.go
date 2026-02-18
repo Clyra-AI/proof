@@ -236,6 +236,10 @@ func VerifyCosignWithOptions(r *Record, opts CosignVerifyOpts) error {
 	return signing.VerifyRecordCosign(r, opts)
 }
 
+func IsDependencyMissing(err error) bool {
+	return signing.IsDependencyMissing(err)
+}
+
 func VerifyBundle(path string, opts BundleVerifyOpts) (*BundleManifest, error) {
 	manifestPath := filepath.Join(path, "manifest.json")
 	// #nosec G304 -- caller provides explicit local artifact path.
