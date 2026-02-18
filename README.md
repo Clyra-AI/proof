@@ -37,7 +37,8 @@ An open-source Go module and verification CLI. Four operations:
 ## Quick Start
 
 ```bash
-go install github.com/Clyra-AI/proof/cmd/proof@v0.2.0
+PROOF_VERSION="$(gh release view --repo Clyra-AI/proof --json tagName -q .tagName 2>/dev/null || curl -fsSL https://api.github.com/repos/Clyra-AI/proof/releases/latest | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"tag_name\"])')"
+go install github.com/Clyra-AI/proof/cmd/proof@"${PROOF_VERSION}"
 
 proof types list          # 15 built-in record types
 proof frameworks list     # 8 compliance framework definitions
@@ -180,7 +181,16 @@ All digests carry `algo_id` (sha256 or hmac-sha256) and optional `salt_id` metad
 
 ## Compliance Framework Definitions
 
-YAML files that declare what regulatory controls require — which record types, what fields, what frequency. Zero evaluation logic. Configuration data consumed by downstream compliance tools.
+YAML files that declare what regulatory controls require — which record types, required fields, and evidence frequency. Zero evaluation logic. Configuration data consumed by downstream compliance tools.
+
+```yaml
+controls:
+  - id: article-12
+    title: Record-Keeping
+    required_record_types: [tool_invocation, decision, guardrail_activation, permission_check]
+    required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+    minimum_frequency: continuous
+```
 
 8 frameworks ship with v1:
 
@@ -314,18 +324,21 @@ CI pipelines: main, PR, determinism (cross-platform), CodeQL, nightly (hardening
 ## Install
 
 ```bash
-# From source
-go install github.com/Clyra-AI/proof/cmd/proof@v0.2.0
+PROOF_VERSION="$(gh release view --repo Clyra-AI/proof --json tagName -q .tagName 2>/dev/null || curl -fsSL https://api.github.com/repos/Clyra-AI/proof/releases/latest | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"tag_name\"])')"
 
-# From release (after a tagged release is published)
-gh release download vX.Y.Z -R Clyra-AI/proof -D /tmp/proof-release
+# From module source at latest published release tag
+go install github.com/Clyra-AI/proof/cmd/proof@"${PROOF_VERSION}"
+
+# From release assets
+gh release download "${PROOF_VERSION}" -R Clyra-AI/proof -D /tmp/proof-release
 cd /tmp/proof-release && sha256sum -c checksums.txt
 ```
 
 Go module:
 
 ```bash
-go get github.com/Clyra-AI/proof@v0.2.0
+PROOF_VERSION="$(gh release view --repo Clyra-AI/proof --json tagName -q .tagName 2>/dev/null || curl -fsSL https://api.github.com/repos/Clyra-AI/proof/releases/latest | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"tag_name\"])')"
+go get github.com/Clyra-AI/proof@"${PROOF_VERSION}"
 ```
 
 ## License

@@ -6,4 +6,5 @@ controls:
   - id: co-risk
     title: Risk Management
     required_record_types: [risk_assessment]
+    required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
     minimum_frequency: quarterly

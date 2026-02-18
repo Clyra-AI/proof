@@ -6,4 +6,5 @@ controls:
   - id: req-10
     title: Logging and Monitoring
     required_record_types: [tool_invocation, permission_check, incident]
+    required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
     minimum_frequency: continuous

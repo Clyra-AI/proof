@@ -6,4 +6,5 @@ controls:
   - id: nist-boundary
     title: Boundary Enforcement
     required_record_types: [policy_enforcement, permission_check]
+    required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
     minimum_frequency: continuous

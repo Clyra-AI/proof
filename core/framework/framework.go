@@ -81,7 +81,48 @@ func Load(idOrFile string) (*Framework, error) {
 	if f.Framework.ID == "" {
 		return nil, fmt.Errorf("framework %s missing id", idOrFile)
 	}
+	if len(f.Controls) == 0 {
+		return nil, fmt.Errorf("framework %s has no controls", idOrFile)
+	}
+	if err := validateControls(f.Controls, "controls"); err != nil {
+		return nil, fmt.Errorf("framework %s invalid: %w", idOrFile, err)
+	}
 	return &f, nil
+}
+
+func validateControls(controls []Control, path string) error {
+	for i, c := range controls {
+		controlPath := fmt.Sprintf("%s[%d]", path, i)
+		if strings.TrimSpace(c.ID) == "" {
+			return fmt.Errorf("%s missing id", controlPath)
+		}
+		if strings.TrimSpace(c.Title) == "" {
+			return fmt.Errorf("%s (%s) missing title", controlPath, c.ID)
+		}
+		if len(c.RequiredRecordTypes) == 0 {
+			return fmt.Errorf("%s (%s) missing required_record_types", controlPath, c.ID)
+		}
+		if strings.TrimSpace(c.MinimumFrequency) == "" {
+			return fmt.Errorf("%s (%s) missing minimum_frequency", controlPath, c.ID)
+		}
+		if len(c.RequiredFields) == 0 {
+			return fmt.Errorf("%s (%s) missing required_fields", controlPath, c.ID)
+		}
+		for _, t := range c.RequiredRecordTypes {
+			if strings.TrimSpace(t) == "" {
+				return fmt.Errorf("%s (%s) has blank required_record_types entry", controlPath, c.ID)
+			}
+		}
+		for _, field := range c.RequiredFields {
+			if strings.TrimSpace(field) == "" {
+				return fmt.Errorf("%s (%s) has blank required_fields entry", controlPath, c.ID)
+			}
+		}
+		if err := validateControls(c.Children, controlPath+".children"); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func countControls(in []Control) int {

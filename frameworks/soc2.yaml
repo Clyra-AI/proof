@@ -6,8 +6,10 @@ controls:
   - id: cc6
     title: Logical Access
     required_record_types: [permission_check, approval]
+    required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
     minimum_frequency: continuous
   - id: cc7
     title: System Operations
     required_record_types: [incident, guardrail_activation]
+    required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
     minimum_frequency: continuous
