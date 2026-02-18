@@ -444,6 +444,10 @@ func TestCosignSignFailureBranches(t *testing.T) {
 }
 
 func TestVerifyDigestCosignValidationBranches(t *testing.T) {
+	origLookPath := cosignLookPath
+	t.Cleanup(func() { cosignLookPath = origLookPath })
+	cosignLookPath = func(file string) (string, error) { return "/usr/bin/cosign", nil }
+
 	err := VerifyDigestCosign(Signature{Alg: "cosign", Sig: "abc", SignedDigest: "deadbeef"}, "deadbeef", CosignVerifyOpts{})
 	require.ErrorContains(t, err, "requires --cosign-key or --cosign-cert")
 
