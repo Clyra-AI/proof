@@ -1,0 +1,9 @@
+framework:
+  id: texas-traiga
+  version: "2026"
+  title: Texas TRAIGA
+controls:
+  - id: traiga-disclosure
+    title: AI Decision Disclosure
+    required_record_types: [decision, human_oversight]
+    minimum_frequency: per-event

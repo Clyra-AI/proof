@@ -1,0 +1,17 @@
+framework:
+  id: eu-ai-act
+  version: "2024-final"
+  title: EU Artificial Intelligence Act
+controls:
+  - id: article-9
+    title: Risk Management
+    required_record_types: [risk_assessment]
+    minimum_frequency: quarterly
+  - id: article-12
+    title: Record-Keeping
+    required_record_types: [tool_invocation, decision, guardrail_activation, permission_check]
+    minimum_frequency: continuous
+  - id: article-14
+    title: Human Oversight
+    required_record_types: [human_oversight, approval]
+    minimum_frequency: per-event

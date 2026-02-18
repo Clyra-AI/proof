@@ -1,0 +1,10 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Clyra-AI/proof/schemas/v1/types/scan-finding.schema.json",
+  "type": "object",
+  "required": ["record_type", "event"],
+  "properties": {
+    "record_type": { "const": "scan_finding" },
+    "event": { "type": "object" }
+  }
+}

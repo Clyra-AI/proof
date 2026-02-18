@@ -1,0 +1,9 @@
+framework:
+  id: sox
+  version: "2026"
+  title: Sarbanes-Oxley
+controls:
+  - id: sox-cm
+    title: Change Management
+    required_record_types: [deployment, approval]
+    minimum_frequency: per-change

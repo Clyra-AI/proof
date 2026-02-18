@@ -1,0 +1,13 @@
+framework:
+  id: soc2
+  version: "2026"
+  title: SOC 2 AI Controls
+controls:
+  - id: cc6
+    title: Logical Access
+    required_record_types: [permission_check, approval]
+    minimum_frequency: continuous
+  - id: cc7
+    title: System Operations
+    required_record_types: [incident, guardrail_activation]
+    minimum_frequency: continuous

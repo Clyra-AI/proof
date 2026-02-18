@@ -1,0 +1,9 @@
+framework:
+  id: nist-ai-600-1
+  version: "2026"
+  title: NIST AI 600-1
+controls:
+  - id: nist-boundary
+    title: Boundary Enforcement
+    required_record_types: [policy_enforcement, permission_check]
+    minimum_frequency: continuous

@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Clyra-AI/proof/schemas/v1/chain-v1.schema.json",
+  "type": "object",
+  "required": ["chain_id", "created_at", "record_count", "records"],
+  "properties": {
+    "chain_id": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "record_count": { "type": "integer", "minimum": 0 },
+    "head_hash": { "type": "string" },
+    "records": { "type": "array" }
+  }
+}

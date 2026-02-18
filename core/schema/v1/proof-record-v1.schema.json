@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Clyra-AI/proof/schemas/v1/proof-record-v1.schema.json",
+  "type": "object",
+  "required": [
+    "record_id",
+    "record_version",
+    "timestamp",
+    "source",
+    "source_product",
+    "record_type",
+    "event",
+    "controls",
+    "integrity"
+  ],
+  "properties": {
+    "record_id": { "type": "string", "minLength": 1 },
+    "record_version": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "source": { "type": "string", "minLength": 1 },
+    "source_product": { "type": "string", "minLength": 1 },
+    "agent_id": { "type": "string" },
+    "record_type": { "type": "string", "minLength": 1 },
+    "event": { "type": "object" },
+    "controls": { "type": "object" },
+    "metadata": { "type": "object" },
+    "integrity": {
+      "type": "object",
+      "required": ["record_hash"],
+      "properties": {
+        "record_hash": { "type": "string", "minLength": 1 },
+        "previous_record_hash": { "type": "string" },
+        "signing_key_id": { "type": "string" },
+        "signature": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+framework:
+  id: iso-42001
+  version: "2023"
+  title: ISO 42001
+controls:
+  - id: aisms-risk
+    title: AI Risk Assessment
+    required_record_types: [risk_assessment, incident]
+    minimum_frequency: quarterly

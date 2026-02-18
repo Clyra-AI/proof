@@ -1,0 +1,9 @@
+framework:
+  id: pci-dss
+  version: "4.0"
+  title: PCI-DSS
+controls:
+  - id: req-10
+    title: Logging and Monitoring
+    required_record_types: [tool_invocation, permission_check, incident]
+    minimum_frequency: continuous
