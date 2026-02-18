@@ -98,6 +98,19 @@ func TestDetectAndVerifyGaitPack(t *testing.T) {
 	}
 	traceRaw, _ := json.Marshal(trace)
 
+	proofRec, err := proof.NewRecord(proof.RecordOpts{
+		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
+		Source:        "gait",
+		SourceProduct: "gait",
+		Type:          "tool_invocation",
+		Event:         map[string]any{"tool": "demo"},
+	})
+	require.NoError(t, err)
+	_, err = proof.Sign(proofRec, proof.SigningKey{Private: priv, Public: pub})
+	require.NoError(t, err)
+	proofRaw, _ := json.Marshal(proofRec)
+	proofJSONL := append(proofRaw, '\n')
+
 	manifest := map[string]any{
 		"schema_id":      "gait.pack.manifest",
 		"schema_version": "1",
@@ -106,6 +119,7 @@ func TestDetectAndVerifyGaitPack(t *testing.T) {
 		"pack_type":      "run",
 		"contents": []map[string]any{
 			{"path": "trace.json", "sha256": sha256Hex(traceRaw), "type": "gait.gate.trace"},
+			{"path": "proof_records.jsonl", "sha256": sha256Hex(proofJSONL), "type": "proof.records.v1"},
 		},
 	}
 	manifestDigest := mustDigestJSON(t, manifest)
@@ -121,8 +135,9 @@ func TestDetectAndVerifyGaitPack(t *testing.T) {
 
 	zipPath := filepath.Join(t.TempDir(), "pack.zip")
 	writeZip(t, zipPath, map[string][]byte{
-		"pack_manifest.json": manifestRaw,
-		"trace.json":         traceRaw,
+		"pack_manifest.json":  manifestRaw,
+		"trace.json":          traceRaw,
+		"proof_records.jsonl": proofJSONL,
 	})
 
 	kind, err := detectArtifact(zipPath)
@@ -131,7 +146,8 @@ func TestDetectAndVerifyGaitPack(t *testing.T) {
 
 	res, err := verifyGaitPack(zipPath, true, hex.EncodeToString(pub))
 	require.NoError(t, err)
-	require.Equal(t, 1, res.FilesVerified)
+	require.Equal(t, 2, res.FilesVerified)
+	require.Equal(t, 1, res.ProofRecordsVerified)
 }
 
 func TestVerifyGaitSignedJSON(t *testing.T) {

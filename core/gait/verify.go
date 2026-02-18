@@ -2,6 +2,8 @@ package gait
 
 import (
 	"archive/zip"
+	"bufio"
+	"bytes"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/base64"
@@ -14,6 +16,8 @@ import (
 	"strings"
 
 	"github.com/Clyra-AI/proof/core/canon"
+	"github.com/Clyra-AI/proof/core/record"
+	"github.com/Clyra-AI/proof/core/schema"
 	"github.com/Clyra-AI/proof/core/signing"
 )
 
@@ -41,10 +45,11 @@ type PackEntry struct {
 }
 
 type Result struct {
-	PackID             string `json:"pack_id"`
-	PackType           string `json:"pack_type"`
-	FilesVerified      int    `json:"files_verified"`
-	SignaturesVerified int    `json:"signatures_verified"`
+	PackID               string `json:"pack_id"`
+	PackType             string `json:"pack_type"`
+	FilesVerified        int    `json:"files_verified"`
+	SignaturesVerified   int    `json:"signatures_verified"`
+	ProofRecordsVerified int    `json:"proof_records_verified,omitempty"`
 }
 
 type RunpackManifest struct {
@@ -84,6 +89,7 @@ func VerifyPack(path string, verifySignatures bool, pub ed25519.PublicKey) (*Res
 		return nil, fmt.Errorf("unmarshal pack_manifest.json: %w", err)
 	}
 
+	var proofRecordsVerified int
 	for _, entry := range manifest.Contents {
 		content, err := readZipFile(zr.File, entry.Path)
 		if err != nil {
@@ -95,6 +101,13 @@ func VerifyPack(path string, verifySignatures bool, pub ed25519.PublicKey) (*Res
 		}
 
 		if !verifySignatures {
+			if filepath.Clean(entry.Path) == filepath.Clean("proof_records.jsonl") {
+				verified, err := verifyProofRecordsJSONL(content, false, nil)
+				if err != nil {
+					return nil, fmt.Errorf("verify proof records for %s: %w", entry.Path, err)
+				}
+				proofRecordsVerified = verified
+			}
 			continue
 		}
 		if isLikelySignedJSON(entry.Type, entry.Path) {
@@ -102,9 +115,21 @@ func VerifyPack(path string, verifySignatures bool, pub ed25519.PublicKey) (*Res
 				return nil, fmt.Errorf("verify embedded signature for %s: %w", entry.Path, err)
 			}
 		}
+		if filepath.Clean(entry.Path) == filepath.Clean("proof_records.jsonl") {
+			verified, err := verifyProofRecordsJSONL(content, true, pub)
+			if err != nil {
+				return nil, fmt.Errorf("verify proof records for %s: %w", entry.Path, err)
+			}
+			proofRecordsVerified = verified
+		}
 	}
 
-	result := &Result{PackID: manifest.PackID, PackType: manifest.PackType, FilesVerified: len(manifest.Contents)}
+	result := &Result{
+		PackID:               manifest.PackID,
+		PackType:             manifest.PackType,
+		FilesVerified:        len(manifest.Contents),
+		ProofRecordsVerified: proofRecordsVerified,
+	}
 	if verifySignatures {
 		if len(pub) == 0 {
 			return nil, fmt.Errorf("public key is required for signature verification")
@@ -322,4 +347,55 @@ func isLikelySignedJSON(t, p string) bool {
 		return true
 	}
 	return strings.HasSuffix(strings.ToLower(p), ".json")
+}
+
+func verifyProofRecordsJSONL(raw []byte, verifySignatures bool, pub ed25519.PublicKey) (int, error) {
+	if verifySignatures && len(pub) == 0 {
+		return 0, fmt.Errorf("public key is required for proof record signature verification")
+	}
+
+	count := 0
+	lineNo := 0
+	scanner := bufio.NewScanner(bytes.NewReader(raw))
+	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
+	for scanner.Scan() {
+		lineNo++
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var rec record.Record
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			return count, fmt.Errorf("line %d: parse record: %w", lineNo, err)
+		}
+		if err := record.Validate(&rec); err != nil {
+			return count, fmt.Errorf("line %d: validate record: %w", lineNo, err)
+		}
+		if err := schema.ValidateRecord([]byte(line), rec.RecordType); err != nil {
+			return count, fmt.Errorf("line %d: validate schema: %w", lineNo, err)
+		}
+		expectedHash, err := record.ComputeHash(&rec)
+		if err != nil {
+			return count, fmt.Errorf("line %d: compute record hash: %w", lineNo, err)
+		}
+		if expectedHash != rec.Integrity.RecordHash {
+			return count, fmt.Errorf("line %d: record hash mismatch: expected %s got %s", lineNo, expectedHash, rec.Integrity.RecordHash)
+		}
+		if verifySignatures {
+			if strings.TrimSpace(rec.Integrity.Signature) == "" {
+				return count, fmt.Errorf("line %d: missing signature", lineNo)
+			}
+			if strings.HasPrefix(rec.Integrity.Signature, "cosign:") {
+				return count, fmt.Errorf("line %d: cosign signatures are not supported for embedded proof_records.jsonl verification", lineNo)
+			}
+			if err := signing.Verify(&rec, signing.PublicKey{Public: pub}); err != nil {
+				return count, fmt.Errorf("line %d: signature verification failed: %w", lineNo, err)
+			}
+		}
+		count++
+	}
+	if err := scanner.Err(); err != nil {
+		return count, fmt.Errorf("read jsonl: %w", err)
+	}
+	return count, nil
 }

@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Clyra-AI/proof/core/record"
 	"github.com/Clyra-AI/proof/core/signing"
 	"github.com/stretchr/testify/require"
 )
@@ -298,6 +299,98 @@ func TestVerifyRunpackErrorBranches(t *testing.T) {
 	require.ErrorContains(t, verifyRunpackSignature(digestHex(t, "other"), manifest.Signatures[0], pub), "manifest signed_digest mismatch")
 }
 
+func TestVerifyPackWithProofRecordsJSONL(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+	keyID := signing.KeyID(pub)
+
+	trace := []byte(`{"verdict":"allow"}`)
+	proofRecords := mustProofRecordsJSONL(t, pub, priv)
+
+	manifest := PackManifest{
+		SchemaID:      "gait.pack.manifest",
+		SchemaVersion: "1",
+		CreatedAt:     "2026-02-17T12:00:00Z",
+		PackID:        "pack-proof-records",
+		PackType:      "run",
+		Contents: []PackEntry{
+			{Path: "trace.json", SHA256: sha256Hex(trace), Type: "gait.gate.trace"},
+			{Path: "proof_records.jsonl", SHA256: sha256Hex(proofRecords), Type: "proof.records.v1"},
+		},
+	}
+	manifestDigest, err := canonicalDigestHex(PackManifest{
+		SchemaID:      manifest.SchemaID,
+		SchemaVersion: manifest.SchemaVersion,
+		CreatedAt:     manifest.CreatedAt,
+		PackID:        manifest.PackID,
+		PackType:      manifest.PackType,
+		Contents:      manifest.Contents,
+	})
+	require.NoError(t, err)
+	manifest.Signatures = []Signature{{
+		Alg:          "ed25519",
+		KeyID:        keyID,
+		Sig:          signDigestHex(t, priv, manifestDigest),
+		SignedDigest: manifestDigest,
+	}}
+	manifestRaw, _ := json.Marshal(manifest)
+
+	zipPath := filepath.Join(t.TempDir(), "pack-with-proof-records.zip")
+	writeZip(t, zipPath, map[string][]byte{
+		"pack_manifest.json":  manifestRaw,
+		"trace.json":          trace,
+		"proof_records.jsonl": proofRecords,
+	})
+
+	res, err := VerifyPack(zipPath, true, pub)
+	require.NoError(t, err)
+	require.Equal(t, 2, res.FilesVerified)
+	require.Equal(t, 1, res.ProofRecordsVerified)
+	require.Equal(t, 1, res.SignaturesVerified)
+}
+
+func TestVerifyPackProofRecordsErrors(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+	keyID := signing.KeyID(pub)
+
+	manifest := PackManifest{
+		SchemaID:      "gait.pack.manifest",
+		SchemaVersion: "1",
+		CreatedAt:     "2026-02-17T12:00:00Z",
+		PackID:        "pack-bad-proof-records",
+		PackType:      "run",
+		Contents: []PackEntry{
+			{Path: "proof_records.jsonl", SHA256: sha256Hex([]byte(`{"bad":"line"}` + "\n")), Type: "proof.records.v1"},
+		},
+	}
+	manifestDigest, err := canonicalDigestHex(PackManifest{
+		SchemaID:      manifest.SchemaID,
+		SchemaVersion: manifest.SchemaVersion,
+		CreatedAt:     manifest.CreatedAt,
+		PackID:        manifest.PackID,
+		PackType:      manifest.PackType,
+		Contents:      manifest.Contents,
+	})
+	require.NoError(t, err)
+	manifest.Signatures = []Signature{{
+		Alg:          "ed25519",
+		KeyID:        keyID,
+		Sig:          signDigestHex(t, priv, manifestDigest),
+		SignedDigest: manifestDigest,
+	}}
+	manifestRaw, _ := json.Marshal(manifest)
+
+	zipPath := filepath.Join(t.TempDir(), "pack-bad-proof-records.zip")
+	writeZip(t, zipPath, map[string][]byte{
+		"pack_manifest.json":  manifestRaw,
+		"proof_records.jsonl": []byte(`{"bad":"line"}` + "\n"),
+	})
+
+	_, err = VerifyPack(zipPath, false, nil)
+	require.ErrorContains(t, err, "verify proof records")
+}
+
 func writeZip(t *testing.T, path string, files map[string][]byte) {
 	t.Helper()
 	f, err := os.Create(path)
@@ -388,4 +481,21 @@ func cloneFileMap(in map[string][]byte) map[string][]byte {
 		out[k] = append([]byte(nil), v...)
 	}
 	return out
+}
+
+func mustProofRecordsJSONL(t *testing.T, pub ed25519.PublicKey, priv ed25519.PrivateKey) []byte {
+	t.Helper()
+	rec, err := record.New(record.RecordOpts{
+		Timestamp:     time.Date(2026, 2, 17, 13, 0, 0, 0, time.UTC),
+		Source:        "gait",
+		SourceProduct: "gait",
+		Type:          "tool_invocation",
+		Event:         map[string]any{"tool": "demo"},
+	})
+	require.NoError(t, err)
+	_, err = signing.Sign(rec, signing.SigningKey{Private: priv, Public: pub})
+	require.NoError(t, err)
+	raw, err := json.Marshal(rec)
+	require.NoError(t, err)
+	return append(raw, '\n')
 }

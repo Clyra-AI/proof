@@ -176,7 +176,15 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 				if err != nil {
 					return newCLIError(exitcode.VerificationErr, err.Error())
 				}
-				printResult(opts, map[string]any{"ok": true, "kind": kind, "pack_id": res.PackID, "pack_type": res.PackType, "files_verified": res.FilesVerified, "signatures_verified": res.SignaturesVerified}, fmt.Sprintf("Gait pack verified. Files: %d.", res.FilesVerified))
+				printResult(opts, map[string]any{
+					"ok":                     true,
+					"kind":                   kind,
+					"pack_id":                res.PackID,
+					"pack_type":              res.PackType,
+					"files_verified":         res.FilesVerified,
+					"proof_records_verified": res.ProofRecordsVerified,
+					"signatures_verified":    res.SignaturesVerified,
+				}, fmt.Sprintf("Gait pack verified. Files: %d.", res.FilesVerified))
 				return nil
 			case artifactGaitRunpack:
 				res, err := verifyGaitRunpack(path, verifySignatures, publicKeyHex)
