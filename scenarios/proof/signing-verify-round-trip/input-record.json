@@ -1,0 +1,18 @@
+{
+  "record_id": "prf-2026-02-18T12:00:00Z-a85a3b15",
+  "record_version": "1.0",
+  "timestamp": "2026-02-18T12:00:00Z",
+  "source": "proof",
+  "source_product": "proof",
+  "record_type": "tool_invocation",
+  "event": {
+    "action": "read",
+    "tool": "filesystem_read"
+  },
+  "controls": {
+    "permissions_enforced": true
+  },
+  "integrity": {
+    "record_hash": "sha256:1755a5813924d92563761e37127941dbee4175329b8dbaa6eeb35d2d9eee7a29"
+  }
+}
