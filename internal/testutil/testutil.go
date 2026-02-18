@@ -27,7 +27,14 @@ func BuildBinary(t *testing.T, root string) string {
 	if err != nil {
 		t.Fatalf("build binary: %v: %s", err, string(out))
 	}
-	return bin
+	if _, err := os.Stat(bin); err == nil {
+		return bin
+	}
+	if _, err := os.Stat(bin + ".exe"); err == nil {
+		return bin + ".exe"
+	}
+	t.Fatalf("build binary output not found at %s (or %s.exe)", bin, bin)
+	return ""
 }
 
 func CommandExitCode(t *testing.T, err error) int {
