@@ -7,7 +7,20 @@
     "chain_id": { "type": "string" },
     "created_at": { "type": "string", "format": "date-time" },
     "record_count": { "type": "integer", "minimum": 0 },
-    "head_hash": { "type": "string" },
-    "records": { "type": "array" }
+    "head_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "records": { "type": "array" },
+    "signatures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["alg", "key_id", "sig", "signed_digest"],
+        "properties": {
+          "alg": { "type": "string" },
+          "key_id": { "type": "string" },
+          "sig": { "type": "string" },
+          "signed_digest": { "type": "string" }
+        }
+      }
+    }
   }
 }

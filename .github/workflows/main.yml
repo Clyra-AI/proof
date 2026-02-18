@@ -24,6 +24,9 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go test ./... -coverprofile=coverage.out
+      - run: ./scripts/check_go_coverage.py coverage.out 45
+      - run: ./scripts/check_go_package_coverage.py coverage.out 45 core/exitcode
+      - run: ./scripts/test_contract_exitcodes.sh
 
   build:
     runs-on: ubuntu-latest

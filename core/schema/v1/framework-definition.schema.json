@@ -13,6 +13,20 @@
         "title": { "type": "string" }
       }
     },
-    "controls": { "type": "array" }
+    "controls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title"],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "required_record_types": { "type": "array", "items": { "type": "string" } },
+          "minimum_frequency": { "type": "string" },
+          "required_fields": { "type": "array", "items": { "type": "string" } },
+          "children": { "type": "array", "items": { "type": "object" } }
+        }
+      }
+    }
   }
 }

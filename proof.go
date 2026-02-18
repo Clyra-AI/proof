@@ -21,6 +21,9 @@ type Chain = chain.Chain
 type ChainVerification = chain.Verification
 type SigningKey = signing.SigningKey
 type PublicKey = signing.PublicKey
+type Signature = signing.Signature
+type RevocationList = signing.RevocationList
+type RevocationEntry = signing.RevocationEntry
 type Framework = framework.Framework
 type RecordType = schema.RecordType
 type CanonDomain = canon.Domain
@@ -128,4 +131,66 @@ func ValidateCustomTypeSchema(schemaPath string) error {
 		return fmt.Errorf("invalid schema: %w", err)
 	}
 	return nil
+}
+
+func SignChain(c *Chain, key SigningKey) (Signature, error) {
+	if c == nil {
+		return Signature{}, fmt.Errorf("chain is nil")
+	}
+	digest, err := chainDigest(c)
+	if err != nil {
+		return Signature{}, err
+	}
+	sig, err := signing.SignDigest(digest, key)
+	if err != nil {
+		return Signature{}, err
+	}
+	c.Signatures = append(c.Signatures, sig)
+	return sig, nil
+}
+
+func VerifyChainSignature(c *Chain, sig Signature, pub PublicKey) error {
+	if c == nil {
+		return fmt.Errorf("chain is nil")
+	}
+	digest, err := chainDigest(c)
+	if err != nil {
+		return err
+	}
+	return signing.VerifyDigest(sig, digest, pub)
+}
+
+func SignRevocationList(list RevocationList, key SigningKey) (RevocationList, error) {
+	return signing.SignRevocationList(list, key)
+}
+
+func VerifyRevocationList(list RevocationList, pub PublicKey) error {
+	return signing.VerifyRevocationList(list, pub)
+}
+
+func IsKeyRevoked(list RevocationList, keyID string, at time.Time) bool {
+	return signing.IsRevoked(list, keyID, at)
+}
+
+func SignCosign(r *Record, keyPath string) (*Record, error) {
+	return signing.SignRecordCosign(r, keyPath)
+}
+
+func VerifyCosign(r *Record, keyPath string) error {
+	return signing.VerifyRecordCosign(r, keyPath)
+}
+
+func chainDigest(c *Chain) (string, error) {
+	payload := map[string]any{
+		"chain_id":     c.ChainID,
+		"created_at":   c.CreatedAt.UTC().Format(time.RFC3339),
+		"record_count": c.RecordCount,
+		"head_hash":    c.HeadHash,
+		"records":      c.Records,
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+	return canon.DigestHex(raw, canon.DomainJSON)
 }

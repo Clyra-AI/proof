@@ -6,14 +6,16 @@ import (
 	"time"
 
 	"github.com/Clyra-AI/proof/core/record"
+	"github.com/Clyra-AI/proof/core/signing"
 )
 
 type Chain struct {
-	ChainID     string          `json:"chain_id"`
-	CreatedAt   time.Time       `json:"created_at"`
-	RecordCount int             `json:"record_count"`
-	HeadHash    string          `json:"head_hash,omitempty"`
-	Records     []record.Record `json:"records"`
+	ChainID     string              `json:"chain_id"`
+	CreatedAt   time.Time           `json:"created_at"`
+	RecordCount int                 `json:"record_count"`
+	HeadHash    string              `json:"head_hash,omitempty"`
+	Records     []record.Record     `json:"records"`
+	Signatures  []signing.Signature `json:"signatures,omitempty"`
 }
 
 type Verification struct {
@@ -41,14 +43,19 @@ func Append(c *Chain, r *record.Record) error {
 	if err := record.Validate(r); err != nil {
 		return err
 	}
-	if r.Integrity.Signature != "" {
-		return errors.New("record is already signed; append before signing")
-	}
 	copy := record.Clone(r)
-	copy.Integrity.PreviousRecordHash = c.HeadHash
+	if copy.Integrity.PreviousRecordHash == "" {
+		copy.Integrity.PreviousRecordHash = c.HeadHash
+	}
+	if copy.Integrity.PreviousRecordHash != c.HeadHash {
+		return fmt.Errorf("previous_record_hash mismatch: expected %s got %s", c.HeadHash, copy.Integrity.PreviousRecordHash)
+	}
 	h, err := record.ComputeHash(copy)
 	if err != nil {
 		return err
+	}
+	if copy.Integrity.Signature != "" && copy.Integrity.RecordHash != h {
+		return errors.New("signed record hash does not match computed chain hash; append before signing or pre-link correctly")
 	}
 	copy.Integrity.RecordHash = h
 	c.Records = append(c.Records, *copy)
@@ -96,7 +103,17 @@ func VerifyRange(c *Chain, from, to time.Time) (*Verification, error) {
 	if from.IsZero() && to.IsZero() {
 		return Verify(c)
 	}
-	sub := &Chain{ChainID: c.ChainID, CreatedAt: c.CreatedAt}
+	if c == nil {
+		return nil, errors.New("chain is nil")
+	}
+	v, err := Verify(c)
+	if err != nil {
+		return nil, err
+	}
+	if !v.Intact {
+		return v, nil
+	}
+	count := 0
 	for _, r := range c.Records {
 		ts := r.Timestamp.UTC()
 		if !from.IsZero() && ts.Before(from.UTC()) {
@@ -105,17 +122,10 @@ func VerifyRange(c *Chain, from, to time.Time) (*Verification, error) {
 		if !to.IsZero() && ts.After(to.UTC()) {
 			continue
 		}
-		sub.Records = append(sub.Records, r)
+		count++
 	}
-	if len(sub.Records) == 0 {
+	if count == 0 {
 		return &Verification{Intact: true, Count: 0}, nil
 	}
-	for i := range sub.Records {
-		if i == 0 {
-			continue
-		}
-		sub.Records[i].Integrity.PreviousRecordHash = sub.Records[i-1].Integrity.RecordHash
-	}
-	sub.HeadHash = sub.Records[len(sub.Records)-1].Integrity.RecordHash
-	return Verify(sub)
+	return &Verification{Intact: true, Count: count, HeadHash: c.HeadHash}, nil
 }

@@ -1,0 +1,25 @@
+name: codeql
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  codeql-scan:
+    name: codeql-scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    strategy:
+      matrix:
+        language: [go]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3

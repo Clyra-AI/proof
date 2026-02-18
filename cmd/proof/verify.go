@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -15,6 +17,9 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 	var verifySignatures bool
 	var verifyBundleFlag bool
 	var publicKeyHex string
+	var cosignKeyPath string
+	var revocationListPath string
+	var revocationKeyHex string
 
 	cmd := &cobra.Command{
 		Use:   "verify <path>",
@@ -25,6 +30,28 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 			kind, err := detectArtifact(path)
 			if err != nil {
 				return newCLIError(exitcode.InvalidInput, err.Error())
+			}
+
+			var revocationList *proof.RevocationList
+			if revocationListPath != "" {
+				raw, err := os.ReadFile(revocationListPath)
+				if err != nil {
+					return newCLIError(exitcode.InvalidInput, err.Error())
+				}
+				var rl proof.RevocationList
+				if err := json.Unmarshal(raw, &rl); err != nil {
+					return newCLIError(exitcode.InvalidInput, fmt.Sprintf("invalid revocation list: %v", err))
+				}
+				if revocationKeyHex != "" {
+					revPub, err := decodePublicKey(revocationKeyHex)
+					if err != nil {
+						return newCLIError(exitcode.InvalidInput, err.Error())
+					}
+					if err := proof.VerifyRevocationList(rl, revPub); err != nil {
+						return newCLIError(exitcode.VerificationErr, fmt.Sprintf("revocation list verification failed: %v", err))
+					}
+				}
+				revocationList = &rl
 			}
 
 			switch kind {
@@ -44,16 +71,28 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 					return newCLIError(exitcode.VerificationErr, fmt.Sprintf("record hash mismatch: expected %s got %s", hash, r.Integrity.RecordHash))
 				}
 				if verifySignatures {
-					if publicKeyHex == "" {
-						return newCLIError(exitcode.InvalidInput, "--public-key is required with --signatures")
+					if strings.HasPrefix(r.Integrity.Signature, "cosign:") {
+						if cosignKeyPath == "" {
+							return newCLIError(exitcode.InvalidInput, "--cosign-key is required for cosign signatures")
+						}
+						if err := proof.VerifyCosign(r, cosignKeyPath); err != nil {
+							return newCLIError(exitcode.VerificationErr, err.Error())
+						}
+					} else {
+						if publicKeyHex == "" {
+							return newCLIError(exitcode.InvalidInput, "--public-key is required with --signatures")
+						}
+						pub, err := decodePublicKey(publicKeyHex)
+						if err != nil {
+							return newCLIError(exitcode.InvalidInput, err.Error())
+						}
+						if err := proof.Verify(r, pub); err != nil {
+							return newCLIError(exitcode.VerificationErr, err.Error())
+						}
 					}
-					pub, err := decodePublicKey(publicKeyHex)
-					if err != nil {
-						return newCLIError(exitcode.InvalidInput, err.Error())
-					}
-					if err := proof.Verify(r, pub); err != nil {
-						return newCLIError(exitcode.VerificationErr, err.Error())
-					}
+				}
+				if revocationList != nil && proof.IsKeyRevoked(*revocationList, r.Integrity.SigningKeyID, r.Timestamp) {
+					return newCLIError(exitcode.VerificationErr, fmt.Sprintf("record signing key is revoked: %s", r.Integrity.SigningKeyID))
 				}
 				printResult(opts, map[string]any{"ok": true, "kind": kind, "record_id": r.RecordID}, "Record verified.")
 				return nil
@@ -74,12 +113,31 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 						return newCLIError(exitcode.InvalidInput, "--public-key is required with --signatures")
 					}
 					pub, err := decodePublicKey(publicKeyHex)
-					if err != nil {
+					if err != nil && publicKeyHex != "" {
 						return newCLIError(exitcode.InvalidInput, err.Error())
 					}
 					for i := range c.Records {
+						if strings.HasPrefix(c.Records[i].Integrity.Signature, "cosign:") {
+							if cosignKeyPath == "" {
+								return newCLIError(exitcode.InvalidInput, "--cosign-key is required for cosign signatures")
+							}
+							if err := proof.VerifyCosign(&c.Records[i], cosignKeyPath); err != nil {
+								return newCLIError(exitcode.VerificationErr, fmt.Sprintf("signature verification failed for record %s: %v", c.Records[i].RecordID, err))
+							}
+							continue
+						}
+						if publicKeyHex == "" {
+							return newCLIError(exitcode.InvalidInput, "--public-key is required with --signatures")
+						}
 						if err := proof.Verify(&c.Records[i], pub); err != nil {
 							return newCLIError(exitcode.VerificationErr, fmt.Sprintf("signature verification failed for record %s: %v", c.Records[i].RecordID, err))
+						}
+					}
+				}
+				if revocationList != nil {
+					for i := range c.Records {
+						if proof.IsKeyRevoked(*revocationList, c.Records[i].Integrity.SigningKeyID, c.Records[i].Timestamp) {
+							return newCLIError(exitcode.VerificationErr, fmt.Sprintf("record signing key is revoked: %s", c.Records[i].Integrity.SigningKeyID))
 						}
 					}
 				}
@@ -113,6 +171,9 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 	cmd.Flags().BoolVar(&verifySignatures, "signatures", false, "Verify signatures")
 	cmd.Flags().BoolVar(&verifyBundleFlag, "bundle", false, "Verify bundle integrity")
 	cmd.Flags().StringVar(&publicKeyHex, "public-key", "", "Ed25519 public key as hex")
+	cmd.Flags().StringVar(&cosignKeyPath, "cosign-key", "", "Path to cosign public key")
+	cmd.Flags().StringVar(&revocationListPath, "revocation-list", "", "Path to signed revocation list JSON")
+	cmd.Flags().StringVar(&revocationKeyHex, "revocation-key", "", "Revocation list signer Ed25519 public key as hex")
 	return cmd
 }
 

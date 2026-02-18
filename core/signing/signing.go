@@ -6,11 +6,14 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
+	"github.com/Clyra-AI/proof/core/canon"
 	"github.com/Clyra-AI/proof/core/record"
 )
 
@@ -23,6 +26,26 @@ type SigningKey struct {
 type PublicKey struct {
 	Public ed25519.PublicKey
 	KeyID  string
+}
+
+type Signature struct {
+	Alg          string `json:"alg"`
+	KeyID        string `json:"key_id"`
+	Sig          string `json:"sig"`
+	SignedDigest string `json:"signed_digest"`
+}
+
+type RevocationEntry struct {
+	KeyID     string `json:"key_id"`
+	RevokedAt string `json:"revoked_at"`
+	Reason    string `json:"reason,omitempty"`
+}
+
+type RevocationList struct {
+	Version   string            `json:"version"`
+	CreatedAt string            `json:"created_at"`
+	Revoked   []RevocationEntry `json:"revoked"`
+	Signature Signature         `json:"signature"`
 }
 
 var digestKeyIDRE = regexp.MustCompile(`^[a-f0-9]{64}$`)
@@ -79,6 +102,48 @@ func Sign(r *record.Record, key SigningKey) (*record.Record, error) {
 	return r, nil
 }
 
+func SignDigest(digest string, key SigningKey) (Signature, error) {
+	digest = strings.TrimSpace(digest)
+	if digest == "" {
+		return Signature{}, errors.New("digest is required")
+	}
+	if len(key.Private) == 0 {
+		return Signature{}, errors.New("private key is required")
+	}
+	if len(key.Public) == 0 {
+		key.Public = key.Private.Public().(ed25519.PublicKey)
+	}
+	sig := ed25519.Sign(key.Private, []byte(digest))
+	return Signature{
+		Alg:          "ed25519",
+		KeyID:        NormalizeKeyID(key.KeyID, key.Public),
+		Sig:          base64.StdEncoding.EncodeToString(sig),
+		SignedDigest: digest,
+	}, nil
+}
+
+func VerifyDigest(sig Signature, digest string, pub PublicKey) error {
+	if sig.Alg != "ed25519" {
+		return fmt.Errorf("unsupported signature algorithm: %s", sig.Alg)
+	}
+	digest = strings.TrimSpace(digest)
+	if sig.SignedDigest != digest {
+		return fmt.Errorf("signed digest mismatch: expected %s got %s", digest, sig.SignedDigest)
+	}
+	kid := NormalizeKeyID(pub.KeyID, pub.Public)
+	if sig.KeyID != kid {
+		return fmt.Errorf("signing key mismatch: expected %s got %s", kid, sig.KeyID)
+	}
+	decoded, err := base64.StdEncoding.DecodeString(sig.Sig)
+	if err != nil {
+		return fmt.Errorf("decode signature: %w", err)
+	}
+	if !ed25519.Verify(pub.Public, []byte(digest), decoded) {
+		return errors.New("signature verification failed")
+	}
+	return nil
+}
+
 func Verify(r *record.Record, pub PublicKey) error {
 	if r == nil {
 		return errors.New("record is nil")
@@ -106,4 +171,65 @@ func Verify(r *record.Record, pub PublicKey) error {
 		return errors.New("signature verification failed")
 	}
 	return nil
+}
+
+func SignRevocationList(in RevocationList, key SigningKey) (RevocationList, error) {
+	if in.Version == "" {
+		in.Version = "1.0"
+	}
+	if in.CreatedAt == "" {
+		in.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+	}
+	digest, err := revocationDigest(in)
+	if err != nil {
+		return RevocationList{}, err
+	}
+	sig, err := SignDigest(digest, key)
+	if err != nil {
+		return RevocationList{}, err
+	}
+	in.Signature = sig
+	return in, nil
+}
+
+func VerifyRevocationList(in RevocationList, pub PublicKey) error {
+	digest, err := revocationDigest(in)
+	if err != nil {
+		return err
+	}
+	return VerifyDigest(in.Signature, digest, pub)
+}
+
+func IsRevoked(in RevocationList, keyID string, at time.Time) bool {
+	for _, revoked := range in.Revoked {
+		if strings.TrimSpace(revoked.KeyID) != strings.TrimSpace(keyID) {
+			continue
+		}
+		ts, err := time.Parse(time.RFC3339, revoked.RevokedAt)
+		if err != nil {
+			return true
+		}
+		if at.IsZero() || !at.Before(ts) {
+			return true
+		}
+	}
+	return false
+}
+
+func revocationDigest(in RevocationList) (string, error) {
+	payload := map[string]any{
+		"version":    in.Version,
+		"created_at": in.CreatedAt,
+		"revoked":    in.Revoked,
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
+	canonical, err := canon.Canonicalize(raw, canon.DomainJSON)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(canonical)
+	return hex.EncodeToString(sum[:]), nil
 }
