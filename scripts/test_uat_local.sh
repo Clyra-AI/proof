@@ -76,6 +76,19 @@ run_step() {
   fi
 }
 
+resolve_binary_path() {
+  local candidate="$1"
+  if [[ -x "${candidate}" ]]; then
+    printf '%s' "${candidate}"
+    return 0
+  fi
+  if [[ -x "${candidate}.exe" ]]; then
+    printf '%s' "${candidate}.exe"
+    return 0
+  fi
+  return 1
+}
+
 run_binary_contract_suite() {
   local label="$1"
   local bin_path="$2"
@@ -197,6 +210,24 @@ GO
   rm -f "${generator}"
 }
 
+create_local_release_archive() {
+  local source_bin="$1"
+  local release_dir="$2"
+  local stage_dir="${release_dir}/stage"
+  mkdir -p "${stage_dir}"
+
+  local staged_name="proof"
+  if [[ "${source_bin}" == *.exe ]]; then
+    staged_name="proof.exe"
+  fi
+
+  cp "${source_bin}" "${stage_dir}/${staged_name}"
+
+  local archive="${release_dir}/proof-local.tar.gz"
+  tar -czf "${archive}" -C "${stage_dir}" "${staged_name}"
+  printf '%s' "${archive}"
+}
+
 extract_release_binary() {
   local release_dir="$1"
   local extraction_dir="$2"
@@ -239,12 +270,41 @@ generate_sample_artifacts "${ARTIFACTS_DIR}"
 SOURCE_BIN="${OUTPUT_DIR}/source/proof"
 mkdir -p "$(dirname "${SOURCE_BIN}")"
 run_step "build_source_binary" bash -lc "cd \"${REPO_ROOT}\" && go build -o \"${SOURCE_BIN}\" ./cmd/proof"
-run_binary_contract_suite "source" "${SOURCE_BIN}" "${ARTIFACTS_DIR}"
+SOURCE_BIN_RESOLVED="$(resolve_binary_path "${SOURCE_BIN}" || true)"
+if [[ -z "${SOURCE_BIN_RESOLVED}" ]]; then
+  log "FAIL source_binary_resolve (${SOURCE_BIN} or ${SOURCE_BIN}.exe not found)"
+  exit 1
+fi
+run_binary_contract_suite "source" "${SOURCE_BIN_RESOLVED}" "${ARTIFACTS_DIR}"
 
 GO_INSTALL_DIR="${OUTPUT_DIR}/go_install/bin"
 mkdir -p "${GO_INSTALL_DIR}"
 run_step "install_go_binary" bash -lc "cd \"${REPO_ROOT}\" && GOBIN=\"${GO_INSTALL_DIR}\" go install ./cmd/proof"
-run_binary_contract_suite "go_install" "${GO_INSTALL_DIR}/proof" "${ARTIFACTS_DIR}"
+GO_INSTALL_BIN_RESOLVED="$(resolve_binary_path "${GO_INSTALL_DIR}/proof" || true)"
+if [[ -z "${GO_INSTALL_BIN_RESOLVED}" ]]; then
+  log "FAIL go_install_binary_resolve (${GO_INSTALL_DIR}/proof or ${GO_INSTALL_DIR}/proof.exe not found)"
+  exit 1
+fi
+run_binary_contract_suite "go_install" "${GO_INSTALL_BIN_RESOLVED}" "${ARTIFACTS_DIR}"
+
+log "==> local_release_archive"
+LOCAL_RELEASE_DIR="${OUTPUT_DIR}/local_release"
+mkdir -p "${LOCAL_RELEASE_DIR}"
+LOCAL_RELEASE_ARCHIVE="$(create_local_release_archive "${SOURCE_BIN_RESOLVED}" "${LOCAL_RELEASE_DIR}" 2>"${OUTPUT_DIR}/logs/local_release_archive.log" || true)"
+if [[ -z "${LOCAL_RELEASE_ARCHIVE}" ]]; then
+  log "FAIL local_release_archive (see ${OUTPUT_DIR}/logs/local_release_archive.log)"
+  tail -n 80 "${OUTPUT_DIR}/logs/local_release_archive.log" || true
+  exit 1
+fi
+log "PASS local_release_archive"
+
+LOCAL_RELEASE_EXTRACT_DIR="${OUTPUT_DIR}/local_release_extract"
+LOCAL_RELEASE_BIN="$(extract_release_binary "${LOCAL_RELEASE_DIR}" "${LOCAL_RELEASE_EXTRACT_DIR}" || true)"
+if [[ -z "${LOCAL_RELEASE_BIN}" ]]; then
+  log "FAIL local_release_extract (no proof binary found in local archive)"
+  exit 1
+fi
+run_binary_contract_suite "local_release" "${LOCAL_RELEASE_BIN}" "${ARTIFACTS_DIR}"
 
 if [[ -n "${RELEASE_VERSION}" ]]; then
   require_cmd gh

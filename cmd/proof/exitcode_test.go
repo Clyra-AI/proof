@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -77,4 +78,28 @@ func TestExitCodeRevokedKeyFailure(t *testing.T) {
 	cmd := exec.Command(bin, "verify", "--revocation-list", rlPath, recordPath)
 	_, err = cmd.CombinedOutput()
 	require.Equal(t, 2, testutil.CommandExitCode(t, err))
+}
+
+func TestExitCodeDependencyMissing(t *testing.T) {
+	root := testutil.RepoRoot(t)
+	bin := testutil.BuildBinary(t, root)
+
+	dir := t.TempDir()
+	r, err := proof.NewRecord(proof.RecordOpts{
+		Timestamp:     time.Date(2026, 2, 17, 14, 0, 0, 0, time.UTC),
+		Source:        "axym",
+		SourceProduct: "axym",
+		Type:          "decision",
+		Event:         map[string]any{"action": "allow"},
+	})
+	require.NoError(t, err)
+	r.Integrity.Signature = "cosign:ZmFrZXNpZw=="
+	r.Integrity.SigningKeyID = "cosign:test-key"
+	recordPath := filepath.Join(dir, "record.json")
+	require.NoError(t, proof.WriteRecord(recordPath, r))
+
+	cmd := exec.Command(bin, "verify", "--signatures", "--cosign-key", filepath.Join(dir, "cosign.pub"), recordPath)
+	cmd.Env = append(os.Environ(), "PATH="+t.TempDir())
+	_, err = cmd.CombinedOutput()
+	require.Equal(t, 7, testutil.CommandExitCode(t, err))
 }

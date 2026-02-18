@@ -306,7 +306,7 @@ make fmt             # Format
 make lint            # Vet + golangci-lint
 make test            # Unit tests
 make prepush-full    # Full gate: lint + test + coverage + contract + integration + e2e + acceptance
-make test-uat-local  # Local UAT across install paths
+make test-uat-local  # UAT for source, go-install, and local release-archive install paths
 ```
 
 CI pipelines: main, PR, determinism (cross-platform), CodeQL, nightly (hardening + chaos + performance + soak), release (GoReleaser + checksums + SBOM + cosign + SLSA provenance).
@@ -317,7 +317,7 @@ CI pipelines: main, PR, determinism (cross-platform), CodeQL, nightly (hardening
 # From source
 go install github.com/Clyra-AI/proof/cmd/proof@latest
 
-# From release
+# From release (after a tagged release is published)
 gh release download vX.Y.Z -R Clyra-AI/proof -D /tmp/proof-release
 cd /tmp/proof-release && sha256sum -c checksums.txt
 ```
