@@ -1,6 +1,6 @@
 module github.com/Clyra-AI/proof
 
-go 1.24.12
+go 1.25.7
 
 require (
 	github.com/gowebpki/jcs v1.0.1
