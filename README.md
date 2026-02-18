@@ -37,7 +37,7 @@ An open-source Go module and verification CLI. Four operations:
 ## Quick Start
 
 ```bash
-go install github.com/Clyra-AI/proof/cmd/proof@latest
+go install github.com/Clyra-AI/proof/cmd/proof@v0.2.0
 
 proof types list          # 15 built-in record types
 proof frameworks list     # 8 compliance framework definitions
@@ -315,7 +315,7 @@ CI pipelines: main, PR, determinism (cross-platform), CodeQL, nightly (hardening
 
 ```bash
 # From source
-go install github.com/Clyra-AI/proof/cmd/proof@latest
+go install github.com/Clyra-AI/proof/cmd/proof@v0.2.0
 
 # From release (after a tagged release is published)
 gh release download vX.Y.Z -R Clyra-AI/proof -D /tmp/proof-release
@@ -325,7 +325,7 @@ cd /tmp/proof-release && sha256sum -c checksums.txt
 Go module:
 
 ```bash
-go get github.com/Clyra-AI/proof
+go get github.com/Clyra-AI/proof@v0.2.0
 ```
 
 ## License
