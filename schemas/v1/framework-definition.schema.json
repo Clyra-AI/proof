@@ -3,6 +3,31 @@
   "$id": "https://github.com/Clyra-AI/proof/schemas/v1/framework-definition.schema.json",
   "type": "object",
   "required": ["framework", "controls"],
+  "definitions": {
+    "control": {
+      "type": "object",
+      "required": ["id", "title", "required_record_types", "required_fields", "minimum_frequency"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "required_record_types": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "minimum_frequency": { "type": "string", "minLength": 1 },
+        "required_fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/control" }
+        }
+      }
+    }
+  },
   "properties": {
     "framework": {
       "type": "object",
@@ -15,18 +40,8 @@
     },
     "controls": {
       "type": "array",
-      "items": {
-        "type": "object",
-        "required": ["id", "title"],
-        "properties": {
-          "id": { "type": "string" },
-          "title": { "type": "string" },
-          "required_record_types": { "type": "array", "items": { "type": "string" } },
-          "minimum_frequency": { "type": "string" },
-          "required_fields": { "type": "array", "items": { "type": "string" } },
-          "children": { "type": "array", "items": { "type": "object" } }
-        }
-      }
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/control" }
     }
   }
 }
