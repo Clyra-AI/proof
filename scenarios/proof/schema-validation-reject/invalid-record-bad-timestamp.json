@@ -1,0 +1,13 @@
+{
+  "record_id": "prf-invalid-timestamp",
+  "record_version": "1.0",
+  "timestamp": "not-a-timestamp",
+  "source": "schema-test",
+  "source_product": "proof",
+  "record_type": "decision",
+  "event": {"action": "allow"},
+  "controls": {},
+  "integrity": {
+    "record_hash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
+}

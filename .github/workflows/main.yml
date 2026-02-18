@@ -48,3 +48,23 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go build ./cmd/proof
+
+  gait-compat:
+    name: Gait compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Clone gait
+        run: git clone https://github.com/Clyra-AI/gait.git /tmp/gait
+      - name: Point gait at proof HEAD
+        run: |
+          cd /tmp/gait
+          go mod edit -replace github.com/Clyra-AI/proof=$GITHUB_WORKSPACE
+          go mod tidy
+      - name: Build gait
+        run: cd /tmp/gait && go build ./cmd/gait
+      - name: Test gait
+        run: cd /tmp/gait && go test ./...

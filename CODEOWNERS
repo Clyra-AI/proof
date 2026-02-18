@@ -1,0 +1,5 @@
+# Default owner — all files
+* @davidahmann
+
+# Scenario fixtures — human approval required for expected outcome changes
+scenarios/ @davidahmann

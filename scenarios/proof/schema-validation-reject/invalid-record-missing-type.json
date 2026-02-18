@@ -1,0 +1,11 @@
+{
+  "record_version": "1.0",
+  "timestamp": "2026-02-18T10:00:00Z",
+  "source": "schema-test",
+  "source_product": "proof",
+  "event": {"action": "allow"},
+  "controls": {},
+  "integrity": {
+    "record_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}

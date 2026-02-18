@@ -1,0 +1,3 @@
+sign: success
+verify: pass
+algorithm: ed25519

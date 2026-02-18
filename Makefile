@@ -1,6 +1,9 @@
 BINARY := proof
+GOLANGCI_LINT_VERSION := v2.0.1
+GOSEC_VERSION := v2.23.0
+GOVULNCHECK_VERSION := v1.1.4
 
-.PHONY: fmt lint test build tidy contract coverage hooks prepush prepush-full test-integration test-e2e test-acceptance test-hardening test-chaos test-performance test-soak test-uat-local
+.PHONY: fmt lint lint-full test build tidy contract coverage hooks prepush prepush-full test-integration test-e2e test-acceptance test-hardening test-chaos test-performance test-soak test-scenarios test-uat-local
 
 fmt:
 	gofmt -w .
@@ -8,6 +11,12 @@ fmt:
 lint:
 	go vet ./...
 	@if command -v golangci-lint >/dev/null 2>&1; then golangci-lint run ./...; fi
+
+lint-full:
+	go vet ./...
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) && golangci-lint run ./...
+	go install github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION) && gosec ./...
+	go install golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) && govulncheck ./...
 
 gotest:
 	go test ./...
@@ -50,6 +59,7 @@ prepush-full:
 	$(MAKE) test-chaos
 	$(MAKE) test-performance
 	$(MAKE) test-soak
+	$(MAKE) test-scenarios
 
 test-integration:
 	./scripts/test_integration.sh
@@ -71,6 +81,9 @@ test-performance:
 
 test-soak:
 	./scripts/test_soak.sh
+
+test-scenarios:
+	go test ./internal/scenarios -count=1 -tags=scenario -v
 
 test-uat-local:
 	./scripts/test_uat_local.sh

@@ -1,0 +1,5 @@
+invalid_inputs:
+  - file: invalid-record-missing-type.json
+    exit_code: 6
+  - file: invalid-record-bad-timestamp.json
+    exit_code: 6
