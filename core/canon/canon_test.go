@@ -28,3 +28,40 @@ func TestDigestHex(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, d, 64)
 }
+
+func TestDigestInfoAndHMAC(t *testing.T) {
+	d, err := DigestInfo([]byte("hello"), DomainText, "rotation-q1")
+	require.NoError(t, err)
+	require.Equal(t, "sha256", d.AlgoID)
+	require.Equal(t, "rotation-q1", d.SaltID)
+	require.Len(t, d.Value, 64)
+
+	h, err := DigestHMACInfo([]byte("hello"), DomainText, []byte("secret"), "salt-a")
+	require.NoError(t, err)
+	require.Equal(t, "hmac-sha256", h.AlgoID)
+	require.Equal(t, "salt-a", h.SaltID)
+	require.Len(t, h.Value, 64)
+}
+
+func TestCanonicalizeErrorAndFallbackBranches(t *testing.T) {
+	_, err := Canonicalize([]byte("http://[::1"), DomainURL)
+	require.Error(t, err)
+
+	out, err := Canonicalize([]byte("raw"), Domain("unknown"))
+	require.NoError(t, err)
+	require.Equal(t, "raw", string(out))
+}
+
+func TestDigestErrorBranches(t *testing.T) {
+	_, err := DigestHex([]byte("http://[::1"), DomainURL)
+	require.Error(t, err)
+
+	_, err = DigestInfo([]byte("http://[::1"), DomainURL, "salt")
+	require.Error(t, err)
+
+	_, err = DigestHMACHex([]byte("http://[::1"), DomainURL, []byte("secret"))
+	require.Error(t, err)
+
+	_, err = DigestHMACInfo([]byte("http://[::1"), DomainURL, []byte("secret"), "salt")
+	require.Error(t, err)
+}

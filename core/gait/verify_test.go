@@ -391,6 +391,65 @@ func TestVerifyPackProofRecordsErrors(t *testing.T) {
 	require.ErrorContains(t, err, "verify proof records")
 }
 
+func TestVerifyPackProofRecordsCosignRequiresVerifierOptions(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+	keyID := signing.KeyID(pub)
+
+	rec, err := record.New(record.RecordOpts{
+		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
+		Source:        "gait",
+		SourceProduct: "gait",
+		Type:          "tool_invocation",
+		Event:         map[string]any{"tool": "demo"},
+	})
+	require.NoError(t, err)
+	rec.Integrity.Signature = "cosign:fake-sig"
+	rec.Integrity.SigningKeyID = "cosign:test"
+	recRaw, err := json.Marshal(rec)
+	require.NoError(t, err)
+	proofRecords := append(recRaw, '\n')
+
+	manifest := PackManifest{
+		SchemaID:      "gait.pack.manifest",
+		SchemaVersion: "1",
+		CreatedAt:     "2026-02-17T12:00:00Z",
+		PackID:        "pack-cosign-proof-records",
+		PackType:      "run",
+		Contents: []PackEntry{
+			{Path: "proof_records.jsonl", SHA256: sha256Hex(proofRecords), Type: "proof.records.v1"},
+		},
+	}
+	manifestDigest, err := canonicalDigestHex(PackManifest{
+		SchemaID:      manifest.SchemaID,
+		SchemaVersion: manifest.SchemaVersion,
+		CreatedAt:     manifest.CreatedAt,
+		PackID:        manifest.PackID,
+		PackType:      manifest.PackType,
+		Contents:      manifest.Contents,
+	})
+	require.NoError(t, err)
+	manifest.Signatures = []Signature{{
+		Alg:          "ed25519",
+		KeyID:        keyID,
+		Sig:          signDigestHex(t, priv, manifestDigest),
+		SignedDigest: manifestDigest,
+	}}
+	manifestRaw, _ := json.Marshal(manifest)
+
+	zipPath := filepath.Join(t.TempDir(), "pack-cosign-proof-records.zip")
+	writeZip(t, zipPath, map[string][]byte{
+		"pack_manifest.json":  manifestRaw,
+		"proof_records.jsonl": proofRecords,
+	})
+
+	_, err = VerifyPackWithOptions(zipPath, VerifyOpts{
+		VerifySignatures: true,
+		PublicKey:        pub,
+	})
+	require.ErrorContains(t, err, "requires --cosign-key or --cosign-cert")
+}
+
 func writeZip(t *testing.T, path string, files map[string][]byte) {
 	t.Helper()
 	f, err := os.Create(path)

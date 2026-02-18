@@ -1,0 +1,22 @@
+{
+  "created_at": "2026-02-05T00:00:00Z",
+  "delegate_identity": "agent.specialist",
+  "delegator_identity": "agent.lead",
+  "expires_at": "2026-02-05T01:00:00Z",
+  "intent_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+  "policy_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+  "producer_version": "0.0.0-compat",
+  "schema_id": "gait.gate.delegation_token",
+  "schema_version": "1.0.0",
+  "scope": [
+    "tool:tool.write"
+  ],
+  "scope_class": "write",
+  "signature": {
+    "alg": "ed25519",
+    "key_id": "65b60673d6ed884bf01c2c222d82ada0740f29ac3355d6a925c81f17f47a27b8",
+    "sig": "yVYZvXCXs/5x8/a0aXhm7q22c6MQpsKV++P+AhcyZFBKlNRF+8qbA6FVqQAYJ9dFwlhkn6nXDYaaWovAS13nBw==",
+    "signed_digest": "30b45769ddc69d4a799a355e3e1f78307ffc9013fa1f1dfca29f59dba8e0500c"
+  },
+  "token_id": "delegation_compat_001"
+}

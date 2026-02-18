@@ -17,10 +17,12 @@ func newInspectCmd(opts *globalOpts) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := args[0]
+			explainf(opts, "inspect path=%s", path)
 			kind, err := detectArtifact(path)
 			if err != nil {
 				return newCLIError(exitcode.InvalidInput, err.Error())
 			}
+			explainf(opts, "inspect artifact kind=%s", kind)
 			switch kind {
 			case artifactRecord:
 				r, err := loadRecord(path)

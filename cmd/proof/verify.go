@@ -16,6 +16,7 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 	var verifyChain bool
 	var verifySignatures bool
 	var verifyBundleFlag bool
+	var customTypeSchemas []string
 	var publicKeyHex string
 	var cosignKeyPath string
 	var cosignCertPath string
@@ -30,10 +31,15 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path := args[0]
+			explainf(opts, "verifying artifact path=%s", path)
+			if err := registerCustomTypeSchemas(customTypeSchemas); err != nil {
+				return newCLIError(exitcode.InvalidInput, err.Error())
+			}
 			kind, err := detectArtifact(path)
 			if err != nil {
 				return newCLIError(exitcode.InvalidInput, err.Error())
 			}
+			explainf(opts, "artifact kind=%s", kind)
 
 			var revocationList *proof.RevocationList
 			if revocationListPath != "" {
@@ -60,6 +66,7 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 
 			switch kind {
 			case artifactRecord:
+				explainf(opts, "record verify: schema/hash/signature checks")
 				r, err := loadRecord(path)
 				if err != nil {
 					return newCLIError(exitcode.InvalidInput, err.Error())
@@ -104,6 +111,7 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 				printResult(opts, map[string]any{"ok": true, "kind": kind, "record_id": r.RecordID}, "Record verified.")
 				return nil
 			case artifactChain:
+				explainf(opts, "chain verify: integrity check")
 				c, err := loadChain(path)
 				if err != nil {
 					return newCLIError(exitcode.InvalidInput, err.Error())
@@ -154,8 +162,14 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 				printResult(opts, map[string]any{"ok": true, "kind": kind, "records": v.Count, "head_hash": v.HeadHash}, fmt.Sprintf("Chain intact. %d records. No gaps.", v.Count))
 				return nil
 			case artifactBundle:
+				explainf(opts, "bundle verify: manifest hash checks")
 				if verifyBundleFlag || !verifyChain {
-					if err := verifyBundle(path); err != nil {
+					if err := verifyBundle(path, verifySignatures, publicKeyHex, proof.CosignVerifyOpts{
+						KeyPath:             cosignKeyPath,
+						CertificatePath:     cosignCertPath,
+						CertificateIdentity: cosignCertIdentity,
+						CertificateIssuer:   cosignCertIssuer,
+					}); err != nil {
 						return newCLIError(exitcode.VerificationErr, err.Error())
 					}
 				}
@@ -172,7 +186,13 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 				printResult(opts, map[string]any{"ok": true, "kind": kind}, "Bundle verified.")
 				return nil
 			case artifactGaitPack:
-				res, err := verifyGaitPack(path, verifySignatures, publicKeyHex)
+				explainf(opts, "gait pack verify: manifest + embedded artifacts")
+				res, err := verifyGaitPack(path, verifySignatures, publicKeyHex, proof.CosignVerifyOpts{
+					KeyPath:             cosignKeyPath,
+					CertificatePath:     cosignCertPath,
+					CertificateIdentity: cosignCertIdentity,
+					CertificateIssuer:   cosignCertIssuer,
+				})
 				if err != nil {
 					return newCLIError(exitcode.VerificationErr, err.Error())
 				}
@@ -187,13 +207,20 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 				}, fmt.Sprintf("Gait pack verified. Files: %d.", res.FilesVerified))
 				return nil
 			case artifactGaitRunpack:
-				res, err := verifyGaitRunpack(path, verifySignatures, publicKeyHex)
+				explainf(opts, "gait runpack verify: manifest + file integrity")
+				res, err := verifyGaitRunpack(path, verifySignatures, publicKeyHex, proof.CosignVerifyOpts{
+					KeyPath:             cosignKeyPath,
+					CertificatePath:     cosignCertPath,
+					CertificateIdentity: cosignCertIdentity,
+					CertificateIssuer:   cosignCertIssuer,
+				})
 				if err != nil {
 					return newCLIError(exitcode.VerificationErr, err.Error())
 				}
 				printResult(opts, map[string]any{"ok": true, "kind": kind, "run_id": res.RunID, "manifest_digest": res.ManifestDigest, "files_verified": res.FilesVerified, "signatures_verified": res.SignaturesVerified}, fmt.Sprintf("Gait runpack verified. Files: %d.", res.FilesVerified))
 				return nil
 			case artifactGaitSignedJSON:
+				explainf(opts, "gait signed JSON verify")
 				if verifySignatures {
 					if err := verifyGaitSignedJSON(path, publicKeyHex); err != nil {
 						return newCLIError(exitcode.VerificationErr, err.Error())
@@ -210,6 +237,7 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 	cmd.Flags().BoolVar(&verifyChain, "chain", false, "Verify chain integrity")
 	cmd.Flags().BoolVar(&verifySignatures, "signatures", false, "Verify signatures")
 	cmd.Flags().BoolVar(&verifyBundleFlag, "bundle", false, "Verify bundle integrity")
+	cmd.Flags().StringArrayVar(&customTypeSchemas, "custom-type-schema", nil, "Custom type schema mapping record_type=/path/to/schema.json (repeatable)")
 	cmd.Flags().StringVar(&publicKeyHex, "public-key", "", "Ed25519 public key as hex or base64")
 	cmd.Flags().StringVar(&cosignKeyPath, "cosign-key", "", "Path to cosign public key")
 	cmd.Flags().StringVar(&cosignCertPath, "cosign-cert", "", "Path to cosign certificate")
@@ -227,4 +255,26 @@ func decodePublicKey(h string) (proof.PublicKey, error) {
 		return proof.PublicKey{}, fmt.Errorf("invalid public key: %w", err)
 	}
 	return proof.PublicKey{Public: pub}, nil
+}
+
+func registerCustomTypeSchemas(mappings []string) error {
+	for _, mapping := range mappings {
+		mapping = strings.TrimSpace(mapping)
+		if mapping == "" {
+			continue
+		}
+		parts := strings.SplitN(mapping, "=", 2)
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid --custom-type-schema value %q: expected record_type=/path/to/schema.json", mapping)
+		}
+		recordType := strings.TrimSpace(parts[0])
+		schemaPath := strings.TrimSpace(parts[1])
+		if recordType == "" || schemaPath == "" {
+			return fmt.Errorf("invalid --custom-type-schema value %q: record type and schema path are required", mapping)
+		}
+		if err := proof.RegisterCustomTypeSchema(recordType, schemaPath); err != nil {
+			return fmt.Errorf("register custom type %s: %w", recordType, err)
+		}
+	}
+	return nil
 }

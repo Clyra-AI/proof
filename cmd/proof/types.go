@@ -15,6 +15,7 @@ func newTypesCmd(opts *globalOpts) *cobra.Command {
 		Use:   "list",
 		Short: "List registered record types",
 		Run: func(cmd *cobra.Command, args []string) {
+			explainf(opts, "types list")
 			types := proof.ListRecordTypes()
 			if opts.json {
 				printResult(opts, types, "")
@@ -30,6 +31,7 @@ func newTypesCmd(opts *globalOpts) *cobra.Command {
 		Short: "Validate a custom record type schema",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			explainf(opts, "types validate schema=%s", args[0])
 			raw, err := os.ReadFile(args[0])
 			if err != nil {
 				return newCLIError(exitcode.InvalidInput, err.Error())

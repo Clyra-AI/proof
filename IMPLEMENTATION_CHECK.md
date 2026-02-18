@@ -16,11 +16,11 @@ Status key:
 | ID | Status | Notes |
 |---|---|---|
 | FR1 Record creation | PASS | Deterministic record creation + validation in `core/record` + `proof.NewRecord()`. |
-| FR2 Type registry | PASS | Built-in registry + schema validation + `proof types list/validate`. |
+| FR2 Type registry | PASS | Built-in registry + runtime custom type registration + `proof types list/validate`. |
 | FR3 Hash chain | PASS | Append + verify + range verify + break-point reporting in `core/chain` and CLI. |
-| FR4 Signing | PASS | Ed25519 + cosign signing/verification paths implemented, including cert/identity/issuer verify options and revocation-list verification. |
-| FR5 Canonicalization | PASS | JSON/SQL/URL/text/prompt canonicalization in `core/canon`. |
-| FR6 Verification CLI | PASS | `verify`, `inspect`, `chain verify`, `types`, `frameworks`; exit code contract and JSON output implemented. |
+| FR4 Signing | PASS | Ed25519 + cosign signing/verification paths implemented for records/chains and bundle manifests, including cert/identity/issuer verify options and revocation-list verification. |
+| FR5 Canonicalization | PASS | JSON/SQL/URL/text/prompt canonicalization plus digest metadata (`algo_id`, `salt_id`) and HMAC-SHA-256 helpers in `core/canon`. |
+| FR6 Verification CLI | PASS | `verify`, `inspect`, `chain verify`, `types`, `frameworks`; bundle signature verification, custom type schema mapping, `--explain`, and exit code contract implemented. |
 | FR7 Framework definitions | PASS | 8 frameworks in `frameworks/` and `core/framework/`; list/show implemented. |
 | FR8 Go module API | PASS | Primary API surface exported from `proof.go`. |
 | FR9 JSON schemas | PASS | Base + type schemas + chain/bundle/framework schemas in `schemas/v1/`. |
@@ -35,11 +35,11 @@ Status key:
 | AC4 Cross-product chain | PASS | Mixed record types chain and verify correctly. |
 | AC5 Offline guarantee | PASS | Core verification is offline-first; cosign path is explicitly local-binary based, no mandatory network dependency in CLI flow. |
 | AC6 Schema validation | PASS | Invalid/missing fields rejected by schema and validation layers. |
-| AC7 Custom type | PASS | Custom schema validation is supported through CLI/API (`types validate`, `ValidateCustomTypeSchema`). |
+| AC7 Custom type | PASS | Runtime custom type registration is supported through CLI/API (`--custom-type-schema`, `RegisterCustomTypeSchema`), and verification validates base + custom schema. |
 | AC8 Framework PR only | PASS | Frameworks are YAML-only; no code change required to add files. |
-| AC9 Sigstore parity | PASS | cosign key/cert verification paths, release signing, and release signature verification are wired and tested. |
-| AC10 Determinism proof | PASS | Determinism/contract checks are gated (hash-chain integrity, exit-code contract, golden-style deterministic checks in tests/scripts). |
-| AC11 Gait backward compatibility | PASS | Native Gait pack and embedded signed-JSON verification with key-id compatibility and signature checks implemented and covered. |
+| AC9 Sigstore parity | PASS | cosign key/cert verification paths cover records/chains and Gait `proof_records.jsonl` verification with Sigstore options. |
+| AC10 Determinism proof | PASS | Deterministic vector assertions are enforced in tests with a dedicated cross-platform determinism workflow. |
+| AC11 Gait backward compatibility | PASS | Native Gait pack + signed-JSON verification with key-id compatibility is covered, including committed compatibility fixtures in `testdata/gait_compat/`. |
 | AC12 Exit code contract | PASS | Implemented and validated in unit + contract script. |
 
 ## Clyra_DEV Standards Check
@@ -51,7 +51,7 @@ Status key:
 | Pre-commit hooks | PASS | `.pre-commit-config.yaml` added. |
 | Testing tiers | PASS | Tiered scripts and workflows are present for unit/integration/e2e/acceptance/hardening/chaos/performance/soak/contract. |
 | Coverage gates | PASS | Coverage gates enforce package-level `>=85` for core/cmd stack (with narrow allowlist exceptions) and `>=75` package baseline. |
-| Main CI pipeline | PASS | PR and main workflows with lint/test/build/contract checks. |
+| Main CI pipeline | PASS | PR and main workflows with lint/test/build/contract checks, plus deterministic vector checks in cross-platform CI. |
 | Nightly pipelines | PASS | Nightly workflow includes hardening/chaos/soak/acceptance with cross-platform hardening matrix + performance job. |
 | Release integrity | PASS | GoReleaser, checksums, SBOM, grype, cosign sign/verify, and provenance attestation are wired in release workflow. |
 | Security scanning | PASS | CodeQL + `gosec` + `govulncheck` + release vulnerability scan are present in CI/release gates. |

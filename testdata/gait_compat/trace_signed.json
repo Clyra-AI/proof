@@ -1,0 +1,18 @@
+{
+  "args_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+  "created_at": "2026-02-05T00:00:00Z",
+  "intent_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+  "policy_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+  "producer_version": "0.0.0-compat",
+  "schema_id": "gait.gate.trace",
+  "schema_version": "1.0.0",
+  "signature": {
+    "alg": "ed25519",
+    "key_id": "65b60673d6ed884bf01c2c222d82ada0740f29ac3355d6a925c81f17f47a27b8",
+    "sig": "fcVWSlBpurTYrRa+OMwA6TUwPIJgtFHDCO+4/GplletIp65E806OzTBU7LYqlMe9qJ8/ErzT0RQzTeo54L2EBQ==",
+    "signed_digest": "f5d6b8ad0ca53ea917a8c09479f6d065b87c7126ddc91bd1073d99d86bffd392"
+  },
+  "tool_name": "tool.demo",
+  "trace_id": "trace_compat_001",
+  "verdict": "allow"
+}

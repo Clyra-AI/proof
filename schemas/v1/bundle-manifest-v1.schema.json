@@ -4,6 +4,8 @@
   "type": "object",
   "required": ["files"],
   "properties": {
+    "algo_id": { "type": "string" },
+    "salt_id": { "type": "string" },
     "files": {
       "type": "array",
       "items": {
@@ -12,6 +14,19 @@
         "properties": {
           "path": { "type": "string" },
           "sha256": { "type": "string" }
+        }
+      }
+    },
+    "signatures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["alg", "key_id", "sig", "signed_digest"],
+        "properties": {
+          "alg": { "type": "string", "minLength": 1 },
+          "key_id": { "type": "string", "minLength": 1 },
+          "sig": { "type": "string", "minLength": 1 },
+          "signed_digest": { "type": "string", "minLength": 1 }
         }
       }
     }

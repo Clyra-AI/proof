@@ -66,7 +66,7 @@ func TestVerifyBundle(t *testing.T) {
 	manifestJSON := `{"files":[{"path":"records.jsonl","sha256":"sha256:ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"}]}`
 	testutil.WriteFile(t, filepath.Join(dir, "manifest.json"), []byte(manifestJSON))
 
-	require.NoError(t, verifyBundle(dir))
+	require.NoError(t, verifyBundle(dir, false, "", proof.CosignVerifyOpts{}))
 }
 
 func TestDecodePublicKeyErrors(t *testing.T) {
@@ -144,7 +144,7 @@ func TestDetectAndVerifyGaitPack(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, artifactGaitPack, kind)
 
-	res, err := verifyGaitPack(zipPath, true, hex.EncodeToString(pub))
+	res, err := verifyGaitPack(zipPath, true, hex.EncodeToString(pub), proof.CosignVerifyOpts{})
 	require.NoError(t, err)
 	require.Equal(t, 2, res.FilesVerified)
 	require.Equal(t, 1, res.ProofRecordsVerified)
@@ -224,7 +224,7 @@ func TestDetectAndVerifyGaitRunpack(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, artifactGaitRunpack, kind)
 
-	res, err := verifyGaitRunpack(zipPath, true, base64.StdEncoding.EncodeToString(pub))
+	res, err := verifyGaitRunpack(zipPath, true, base64.StdEncoding.EncodeToString(pub), proof.CosignVerifyOpts{})
 	require.NoError(t, err)
 	require.Equal(t, "run-1", res.RunID)
 	require.Equal(t, 4, res.FilesVerified)

@@ -1,6 +1,7 @@
 package canon
 
 import (
+	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"net/url"
@@ -24,6 +25,12 @@ const (
 var whitespaceRE = regexp.MustCompile(`\s+`)
 var trailingSemicolonRE = regexp.MustCompile(`;+[\s]*$`)
 var sqlKeywordRE = regexp.MustCompile(`\b(SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|JOIN|LEFT|RIGHT|INNER|OUTER|GROUP|BY|ORDER|HAVING|LIMIT|OFFSET|AND|OR|NOT|IN|AS|ON|VALUES|SET)\b`)
+
+type Digest struct {
+	AlgoID string `json:"algo_id"`
+	Value  string `json:"value"`
+	SaltID string `json:"salt_id,omitempty"`
+}
 
 func Canonicalize(input []byte, domain Domain) ([]byte, error) {
 	switch domain {
@@ -68,6 +75,42 @@ func DigestHex(input []byte, domain Domain) (string, error) {
 	}
 	sum := sha256.Sum256(canonical)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+func DigestInfo(input []byte, domain Domain, saltID string) (Digest, error) {
+	value, err := DigestHex(input, domain)
+	if err != nil {
+		return Digest{}, err
+	}
+	return Digest{
+		AlgoID: "sha256",
+		Value:  value,
+		SaltID: strings.TrimSpace(saltID),
+	}, nil
+}
+
+func DigestHMACHex(input []byte, domain Domain, secret []byte) (string, error) {
+	canonical, err := Canonicalize(input, domain)
+	if err != nil {
+		return "", err
+	}
+	mac := hmac.New(sha256.New, secret)
+	if _, err := mac.Write(canonical); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(mac.Sum(nil)), nil
+}
+
+func DigestHMACInfo(input []byte, domain Domain, secret []byte, saltID string) (Digest, error) {
+	value, err := DigestHMACHex(input, domain, secret)
+	if err != nil {
+		return Digest{}, err
+	}
+	return Digest{
+		AlgoID: "hmac-sha256",
+		Value:  value,
+		SaltID: strings.TrimSpace(saltID),
+	}, nil
 }
 
 func normalizeWhitespace(s string) string {

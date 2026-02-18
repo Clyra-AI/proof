@@ -73,7 +73,20 @@ type RunpackResult struct {
 	SignaturesVerified int    `json:"signatures_verified"`
 }
 
+type VerifyOpts struct {
+	VerifySignatures bool
+	PublicKey        ed25519.PublicKey
+	Cosign           signing.CosignVerifyOpts
+}
+
 func VerifyPack(path string, verifySignatures bool, pub ed25519.PublicKey) (*Result, error) {
+	return VerifyPackWithOptions(path, VerifyOpts{
+		VerifySignatures: verifySignatures,
+		PublicKey:        pub,
+	})
+}
+
+func VerifyPackWithOptions(path string, opts VerifyOpts) (*Result, error) {
 	zr, err := zip.OpenReader(path)
 	if err != nil {
 		return nil, err
@@ -100,9 +113,9 @@ func VerifyPack(path string, verifySignatures bool, pub ed25519.PublicKey) (*Res
 			return nil, fmt.Errorf("content hash mismatch for %s", entry.Path)
 		}
 
-		if !verifySignatures {
+		if !opts.VerifySignatures {
 			if filepath.Clean(entry.Path) == filepath.Clean("proof_records.jsonl") {
-				verified, err := verifyProofRecordsJSONL(content, false, nil)
+				verified, err := verifyProofRecordsJSONL(content, false, nil, signing.CosignVerifyOpts{})
 				if err != nil {
 					return nil, fmt.Errorf("verify proof records for %s: %w", entry.Path, err)
 				}
@@ -111,12 +124,12 @@ func VerifyPack(path string, verifySignatures bool, pub ed25519.PublicKey) (*Res
 			continue
 		}
 		if isLikelySignedJSON(entry.Type, entry.Path) {
-			if err := VerifyEmbeddedSignedJSON(content, pub); err != nil {
+			if err := VerifyEmbeddedSignedJSON(content, opts.PublicKey); err != nil {
 				return nil, fmt.Errorf("verify embedded signature for %s: %w", entry.Path, err)
 			}
 		}
 		if filepath.Clean(entry.Path) == filepath.Clean("proof_records.jsonl") {
-			verified, err := verifyProofRecordsJSONL(content, true, pub)
+			verified, err := verifyProofRecordsJSONL(content, true, opts.PublicKey, opts.Cosign)
 			if err != nil {
 				return nil, fmt.Errorf("verify proof records for %s: %w", entry.Path, err)
 			}
@@ -130,15 +143,15 @@ func VerifyPack(path string, verifySignatures bool, pub ed25519.PublicKey) (*Res
 		FilesVerified:        len(manifest.Contents),
 		ProofRecordsVerified: proofRecordsVerified,
 	}
-	if verifySignatures {
-		if len(pub) == 0 {
+	if opts.VerifySignatures {
+		if len(opts.PublicKey) == 0 {
 			return nil, fmt.Errorf("public key is required for signature verification")
 		}
 		if len(manifest.Signatures) == 0 {
 			return nil, fmt.Errorf("manifest has no signatures")
 		}
 		for _, sig := range manifest.Signatures {
-			if err := verifyManifestSignature(manifest, sig, pub); err != nil {
+			if err := verifyManifestSignature(manifest, sig, opts.PublicKey); err != nil {
 				return nil, err
 			}
 			result.SignaturesVerified++
@@ -182,6 +195,13 @@ func VerifyEmbeddedSignedJSON(raw []byte, pub ed25519.PublicKey) error {
 }
 
 func VerifyRunpack(path string, verifySignatures bool, pub ed25519.PublicKey) (*RunpackResult, error) {
+	return VerifyRunpackWithOptions(path, VerifyOpts{
+		VerifySignatures: verifySignatures,
+		PublicKey:        pub,
+	})
+}
+
+func VerifyRunpackWithOptions(path string, opts VerifyOpts) (*RunpackResult, error) {
 	zr, err := zip.OpenReader(path)
 	if err != nil {
 		return nil, err
@@ -226,15 +246,15 @@ func VerifyRunpack(path string, verifySignatures bool, pub ed25519.PublicKey) (*
 		ManifestDigest: manifest.ManifestDigest,
 		FilesVerified:  len(manifest.Files),
 	}
-	if verifySignatures {
-		if len(pub) == 0 {
+	if opts.VerifySignatures {
+		if len(opts.PublicKey) == 0 {
 			return nil, fmt.Errorf("public key is required for signature verification")
 		}
 		if len(manifest.Signatures) == 0 {
 			return nil, fmt.Errorf("manifest has no signatures")
 		}
 		for _, sig := range manifest.Signatures {
-			if err := verifyRunpackSignature(manifestDigest, sig, pub); err != nil {
+			if err := verifyRunpackSignature(manifestDigest, sig, opts.PublicKey); err != nil {
 				return nil, err
 			}
 			result.SignaturesVerified++
@@ -349,9 +369,11 @@ func isLikelySignedJSON(t, p string) bool {
 	return strings.HasSuffix(strings.ToLower(p), ".json")
 }
 
-func verifyProofRecordsJSONL(raw []byte, verifySignatures bool, pub ed25519.PublicKey) (int, error) {
+func verifyProofRecordsJSONL(raw []byte, verifySignatures bool, pub ed25519.PublicKey, cosignOpts signing.CosignVerifyOpts) (int, error) {
 	if verifySignatures && len(pub) == 0 {
-		return 0, fmt.Errorf("public key is required for proof record signature verification")
+		if strings.TrimSpace(cosignOpts.KeyPath) == "" && strings.TrimSpace(cosignOpts.CertificatePath) == "" {
+			return 0, fmt.Errorf("public key is required for proof record signature verification")
+		}
 	}
 
 	count := 0
@@ -386,7 +408,11 @@ func verifyProofRecordsJSONL(raw []byte, verifySignatures bool, pub ed25519.Publ
 				return count, fmt.Errorf("line %d: missing signature", lineNo)
 			}
 			if strings.HasPrefix(rec.Integrity.Signature, "cosign:") {
-				return count, fmt.Errorf("line %d: cosign signatures are not supported for embedded proof_records.jsonl verification", lineNo)
+				if err := signing.VerifyRecordCosign(&rec, cosignOpts); err != nil {
+					return count, fmt.Errorf("line %d: signature verification failed: %w", lineNo, err)
+				}
+				count++
+				continue
 			}
 			if err := signing.Verify(&rec, signing.PublicKey{Public: pub}); err != nil {
 				return count, fmt.Errorf("line %d: signature verification failed: %w", lineNo, err)

@@ -14,6 +14,7 @@ func newFrameworksCmd(opts *globalOpts) *cobra.Command {
 		Use:   "list",
 		Short: "List available frameworks",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			explainf(opts, "frameworks list")
 			list, err := framework.List()
 			if err != nil {
 				return newCLIError(exitcode.InternalError, err.Error())
@@ -33,6 +34,7 @@ func newFrameworksCmd(opts *globalOpts) *cobra.Command {
 		Short: "Show a framework definition",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			explainf(opts, "frameworks show id=%s", args[0])
 			f, err := framework.Load(args[0])
 			if err != nil {
 				return newCLIError(exitcode.InvalidInput, err.Error())

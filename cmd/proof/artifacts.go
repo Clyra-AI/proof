@@ -3,8 +3,6 @@ package main
 import (
 	"archive/zip"
 	"bufio"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,15 +27,6 @@ const (
 	artifactGaitRunpack    artifactKind = "gait_runpack"
 	artifactGaitSignedJSON artifactKind = "gait_signed_json"
 )
-
-type manifest struct {
-	Files []manifestEntry `json:"files"`
-}
-
-type manifestEntry struct {
-	Path   string `json:"path"`
-	SHA256 string `json:"sha256"`
-}
 
 func detectArtifact(path string) (artifactKind, error) {
 	info, err := os.Stat(path)
@@ -150,30 +139,21 @@ func loadChain(path string) (*proof.Chain, error) {
 	return c, nil
 }
 
-func verifyBundle(path string) error {
-	// #nosec G304 -- CLI accepts explicit local artifact paths.
-	raw, err := os.ReadFile(filepath.Join(path, "manifest.json"))
-	if err != nil {
-		return err
-	}
-	var m manifest
-	if err := json.Unmarshal(raw, &m); err != nil {
-		return err
-	}
-	for _, file := range m.Files {
-		// #nosec G304 -- Bundle manifest drives local file verification.
-		b, err := os.ReadFile(filepath.Join(path, file.Path))
+func verifyBundle(path string, verifySignatures bool, publicKey string, cosignOpts proof.CosignVerifyOpts) error {
+	var pub proof.PublicKey
+	if strings.TrimSpace(publicKey) != "" {
+		decoded, err := decodePublicKey(publicKey)
 		if err != nil {
 			return err
 		}
-		sum := sha256.Sum256(b)
-		got := hex.EncodeToString(sum[:])
-		want := strings.TrimPrefix(file.SHA256, "sha256:")
-		if got != want {
-			return fmt.Errorf("bundle hash mismatch for %s", file.Path)
-		}
+		pub = decoded
 	}
-	return nil
+	_, err := proof.VerifyBundle(path, proof.BundleVerifyOpts{
+		VerifySignatures: verifySignatures,
+		PublicKey:        pub,
+		Cosign:           cosignOpts,
+	})
+	return err
 }
 
 func appendJSONLRecords(c *proof.Chain, path string) error {
@@ -201,22 +181,28 @@ func appendJSONLRecords(c *proof.Chain, path string) error {
 	return scanner.Err()
 }
 
-func verifyGaitPack(path string, verifySignatures bool, publicKey string) (*gait.Result, error) {
+func verifyGaitPack(path string, verifySignatures bool, publicKey string, cosignOpts proof.CosignVerifyOpts) (*gait.Result, error) {
 	var pubKey []byte
 	if verifySignatures {
-		if strings.TrimSpace(publicKey) == "" {
+		if strings.TrimSpace(publicKey) != "" {
+			pub, err := decodePublicKeyValue(publicKey)
+			if err != nil {
+				return nil, err
+			}
+			pubKey = pub
+		}
+		if len(pubKey) == 0 && strings.TrimSpace(cosignOpts.KeyPath) == "" && strings.TrimSpace(cosignOpts.CertificatePath) == "" {
 			return nil, fmt.Errorf("--public-key is required for gait pack signature verification")
 		}
-		pub, err := decodePublicKeyValue(publicKey)
-		if err != nil {
-			return nil, err
-		}
-		pubKey = pub
 	}
-	return gait.VerifyPack(path, verifySignatures, pubKey)
+	return gait.VerifyPackWithOptions(path, gait.VerifyOpts{
+		VerifySignatures: verifySignatures,
+		PublicKey:        pubKey,
+		Cosign:           cosignOpts,
+	})
 }
 
-func verifyGaitRunpack(path string, verifySignatures bool, publicKey string) (*gait.RunpackResult, error) {
+func verifyGaitRunpack(path string, verifySignatures bool, publicKey string, _ proof.CosignVerifyOpts) (*gait.RunpackResult, error) {
 	var pubKey []byte
 	if verifySignatures {
 		if strings.TrimSpace(publicKey) == "" {
@@ -228,7 +214,10 @@ func verifyGaitRunpack(path string, verifySignatures bool, publicKey string) (*g
 		}
 		pubKey = pub
 	}
-	return gait.VerifyRunpack(path, verifySignatures, pubKey)
+	return gait.VerifyRunpackWithOptions(path, gait.VerifyOpts{
+		VerifySignatures: verifySignatures,
+		PublicKey:        pubKey,
+	})
 }
 
 func verifyGaitSignedJSON(path, publicKey string) error {

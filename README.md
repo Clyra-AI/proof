@@ -12,6 +12,8 @@ Core capabilities:
 - Hash-chain append and integrity verification
 - Ed25519 signing and verification
 - Cosign/Sigstore-backed signature verification support
+- Bundle manifest signing and verification (Ed25519 + cosign)
+- Runtime custom record type registration (schema-per-type)
 - Offline CLI verification and inspection
 - Versioned schemas for proof record types
 - Gait pack/runpack compatibility verification
@@ -89,9 +91,10 @@ cosign verify-blob \
 ## What You Get
 
 - **Deterministic canonicalization**: JSON/SQL/URL/text domains with stable digests.
+- **Digest metadata**: `algo_id` + optional `salt_id`, including HMAC-SHA-256 helpers.
 - **Tamper evidence**: record hashes + chain head continuity checks.
 - **Signature options**: Ed25519 and cosign verification support.
-- **Schema contracts**: built-in proof record schemas and custom schema validation.
+- **Schema contracts**: built-in proof record schemas plus runtime custom type validation.
 - **Cross-product compatibility**: Gait pack/runpack verification and migration-friendly compatibility packages.
 
 ## CLI Surface
@@ -100,6 +103,7 @@ cosign verify-blob \
 proof verify <path>                               Verify record, chain, bundle, gait pack/runpack/signed JSON
 proof verify --signatures --public-key <key> <path>
 proof verify --signatures --cosign-key <pubkey-path> <path>
+proof verify --custom-type-schema <type>=<schema.json> <path>
 proof verify --revocation-list <path> --revocation-key <pubkey> <path>
 proof chain verify <path> [--from RFC3339] [--to RFC3339]
 proof inspect <path> [--record <record_id>]
@@ -114,7 +118,7 @@ Global flags:
 
 - `--json`
 - `--quiet`
-- `--explain`
+- `--explain` (step diagnostics to stderr)
 
 ## Gait Compatibility
 
@@ -132,6 +136,12 @@ For Gait extraction/migration support, Proof exposes compatibility packages:
 - `github.com/Clyra-AI/proof/canon`
 - `github.com/Clyra-AI/proof/schema`
 - `github.com/Clyra-AI/proof/exitcode`
+
+Compatibility fixtures used by tests:
+
+- `testdata/gait_compat/trace_signed.json`
+- `testdata/gait_compat/approval_token_signed.json`
+- `testdata/gait_compat/delegation_token_signed.json`
 
 ## Library Usage
 
@@ -159,6 +169,19 @@ _, _ = proof.Sign(&chain.Records[0], key)
 _, _ = proof.VerifyChain(chain)
 ```
 
+Custom type registration + bundle signing:
+
+```go
+_ = proof.RegisterCustomTypeSchema("vendor.custom_event", "./custom.schema.json")
+
+manifest, _ := proof.SignBundle("./bundle", key)
+_, _ = proof.VerifyBundle("./bundle", proof.BundleVerifyOpts{
+  VerifySignatures: true,
+  PublicKey:        proof.PublicKey{Public: key.Public},
+})
+_ = manifest
+```
+
 ## Contract Commitments
 
 - Deterministic canonicalization and hashing for supported domains
@@ -182,6 +205,7 @@ Exit codes:
 
 ![Main](https://github.com/Clyra-AI/proof/actions/workflows/main.yml/badge.svg)
 ![CodeQL](https://github.com/Clyra-AI/proof/actions/workflows/codeql.yml/badge.svg)
+![Determinism](https://github.com/Clyra-AI/proof/actions/workflows/determinism.yml/badge.svg)
 
 ```bash
 make fmt
@@ -195,6 +219,7 @@ Key automation:
 
 - Main CI: `.github/workflows/main.yml`
 - PR CI: `.github/workflows/pr.yml`
+- Determinism CI: `.github/workflows/determinism.yml`
 - Nightly hardening/perf: `.github/workflows/nightly.yml`
 - Release: `.github/workflows/release.yml`
 

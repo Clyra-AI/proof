@@ -56,9 +56,9 @@ func TestBundleAndGaitHelperErrors(t *testing.T) {
 	dir := t.TempDir()
 	testutil.WriteFile(t, filepath.Join(dir, "manifest.json"), []byte(`{"files":[{"path":"a.txt","sha256":"sha256:abcd"}]}`))
 	testutil.WriteFile(t, filepath.Join(dir, "a.txt"), []byte("hello"))
-	require.Error(t, verifyBundle(dir))
+	require.Error(t, verifyBundle(dir, false, "", proof.CosignVerifyOpts{}))
 
-	_, err := verifyGaitPack(filepath.Join(dir, "missing.zip"), true, "")
+	_, err := verifyGaitPack(filepath.Join(dir, "missing.zip"), true, "", proof.CosignVerifyOpts{})
 	require.Error(t, err)
 	require.ErrorContains(t, verifyGaitSignedJSON(filepath.Join(dir, "x.json"), ""), "--public-key is required")
 }

@@ -1,0 +1,21 @@
+{
+  "approver_identity": "alice",
+  "created_at": "2026-02-05T00:00:00Z",
+  "expires_at": "2026-02-05T01:00:00Z",
+  "intent_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+  "policy_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+  "producer_version": "0.0.0-compat",
+  "reason_code": "incident_hotfix",
+  "schema_id": "gait.gate.approval_token",
+  "schema_version": "1.0.0",
+  "scope": [
+    "tool:tool.write"
+  ],
+  "signature": {
+    "alg": "ed25519",
+    "key_id": "65b60673d6ed884bf01c2c222d82ada0740f29ac3355d6a925c81f17f47a27b8",
+    "sig": "B6QhffrELQ7Z3qPLD6eDqByPMQ34krZXhxi5AzUHxzx/jqq+eJ3yzE9BwXjwymzpMi/R+/Qpz3qJyf4PE7WEAA==",
+    "signed_digest": "c73507a8fb46c08617210218c07cef7658842a37e506bbc60065e1e7845f39b7"
+  },
+  "token_id": "approval_compat_001"
+}

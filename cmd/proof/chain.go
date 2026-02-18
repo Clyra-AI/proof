@@ -17,6 +17,7 @@ func newChainCmd(opts *globalOpts) *cobra.Command {
 		Short: "Verify chain integrity",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			explainf(opts, "chain verify path=%s from=%s to=%s", args[0], fromStr, toStr)
 			c, err := loadChain(args[0])
 			if err != nil {
 				return newCLIError(exitcode.InvalidInput, err.Error())

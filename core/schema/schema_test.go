@@ -37,6 +37,61 @@ func TestValidateCustomSchema(t *testing.T) {
 	require.NoError(t, ValidateCustomSchema(p, raw))
 }
 
+func TestRegisterCustomTypeAndValidateRecord(t *testing.T) {
+	ResetCustomTypes()
+	t.Cleanup(ResetCustomTypes)
+
+	customSchema := []byte(`{
+	  "$schema":"http://json-schema.org/draft-07/schema#",
+	  "type":"object",
+	  "required":["record_type","event"],
+	  "properties":{
+	    "record_type":{"const":"vendor.custom_event"},
+	    "event":{
+	      "type":"object",
+	      "required":["custom_value"],
+	      "properties":{"custom_value":{"type":"string"}}
+	    }
+	  }
+	}`)
+	require.NoError(t, RegisterCustomType("vendor.custom_event", "custom.schema.json", customSchema))
+
+	raw := []byte(`{
+	  "record_id":"prf-test",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-17T12:00:00Z",
+	  "source":"axym",
+	  "source_product":"axym",
+	  "record_type":"vendor.custom_event",
+	  "event":{"custom_value":"ok"},
+	  "controls":{},
+	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	}`)
+	require.NoError(t, ValidateRecord(raw, "vendor.custom_event"))
+
+	invalid := []byte(`{
+	  "record_id":"prf-test",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-17T12:00:00Z",
+	  "source":"axym",
+	  "source_product":"axym",
+	  "record_type":"vendor.custom_event",
+	  "event":{"wrong":"field"},
+	  "controls":{},
+	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	}`)
+	require.Error(t, ValidateRecord(invalid, "vendor.custom_event"))
+}
+
+func TestRegisterCustomTypeRejectsBuiltinAndEmptyName(t *testing.T) {
+	ResetCustomTypes()
+	t.Cleanup(ResetCustomTypes)
+
+	raw := []byte(`{"$schema":"http://json-schema.org/draft-07/schema#","type":"object"}`)
+	require.Error(t, RegisterCustomType("", "custom.schema.json", raw))
+	require.Error(t, RegisterCustomType("decision", "custom.schema.json", raw))
+}
+
 func TestValidateAgainstSchemaAndErrors(t *testing.T) {
 	raw := []byte(`{"chain_id":"c1","created_at":"2026-02-17T12:00:00Z","record_count":0,"records":[]}`)
 	require.NoError(t, ValidateAgainstSchema(raw, "v1/chain-v1.schema.json"))

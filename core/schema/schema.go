@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
 )
@@ -38,9 +39,18 @@ var builtins = []RecordType{
 	{Name: "approval", Description: "An approval or delegation was issued", SchemaPath: "v1/types/approval.schema.json"},
 }
 
+var customMu sync.RWMutex
+var customTypes = map[string]RecordType{}
+var customSchemas = map[string]*jsonschema.Schema{}
+
 func ListRecordTypes() []RecordType {
 	out := make([]RecordType, len(builtins))
 	copy(out, builtins)
+	customMu.RLock()
+	for _, rt := range customTypes {
+		out = append(out, rt)
+	}
+	customMu.RUnlock()
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }
@@ -51,21 +61,53 @@ func ValidateRecord(data []byte, recordType string) error {
 	}
 	path, ok := schemaPathForType(recordType)
 	if !ok {
-		return fmt.Errorf("unknown record type: %s", recordType)
+		customMu.RLock()
+		customSchema, customOK := customSchemas[recordType]
+		customMu.RUnlock()
+		if !customOK {
+			return fmt.Errorf("unknown record type: %s", recordType)
+		}
+		return validateWithCompiledSchema(data, customSchema)
 	}
 	return validateWithSchema(data, path)
 }
 
 func ValidateCustomSchema(schemaPath string, data []byte) error {
-	compiler := jsonschema.NewCompiler()
-	if err := compiler.AddResource("custom.json", strings.NewReader(string(data))); err != nil {
-		return err
-	}
-	_, err := compiler.Compile("custom.json")
+	_, err := compileSchema("custom.json", data)
 	if err != nil {
 		return fmt.Errorf("compile custom schema %s: %w", filepath.Base(schemaPath), err)
 	}
 	return nil
+}
+
+func RegisterCustomType(recordType string, schemaPath string, data []byte) error {
+	recordType = strings.TrimSpace(recordType)
+	if recordType == "" {
+		return fmt.Errorf("record type is required")
+	}
+	if _, ok := schemaPathForType(recordType); ok {
+		return fmt.Errorf("record type %s conflicts with built-in type", recordType)
+	}
+	s, err := compileSchema("custom.json", data)
+	if err != nil {
+		return fmt.Errorf("compile custom schema %s: %w", filepath.Base(schemaPath), err)
+	}
+	customMu.Lock()
+	customTypes[recordType] = RecordType{
+		Name:        recordType,
+		Description: "Custom record type",
+		SchemaPath:  schemaPath,
+	}
+	customSchemas[recordType] = s
+	customMu.Unlock()
+	return nil
+}
+
+func ResetCustomTypes() {
+	customMu.Lock()
+	customTypes = map[string]RecordType{}
+	customSchemas = map[string]*jsonschema.Schema{}
+	customMu.Unlock()
 }
 
 func ValidateAgainstSchema(data []byte, schemaPath string) error {
@@ -77,19 +119,27 @@ func validateWithSchema(data []byte, schemaPath string) error {
 	if err != nil {
 		return err
 	}
-	compiler := jsonschema.NewCompiler()
-	if err := compiler.AddResource("schema.json", strings.NewReader(string(raw))); err != nil {
-		return err
-	}
-	s, err := compiler.Compile("schema.json")
+	s, err := compileSchema("schema.json", raw)
 	if err != nil {
 		return err
 	}
+	return validateWithCompiledSchema(data, s)
+}
+
+func validateWithCompiledSchema(data []byte, s *jsonschema.Schema) error {
 	var v any
 	if err := json.Unmarshal(data, &v); err != nil {
 		return err
 	}
 	return s.Validate(v)
+}
+
+func compileSchema(name string, raw []byte) (*jsonschema.Schema, error) {
+	compiler := jsonschema.NewCompiler()
+	if err := compiler.AddResource(name, strings.NewReader(string(raw))); err != nil {
+		return nil, err
+	}
+	return compiler.Compile(name)
 }
 
 func schemaPathForType(recordType string) (string, bool) {
