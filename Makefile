@@ -1,6 +1,6 @@
 BINARY := proof
 
-.PHONY: fmt lint test build tidy contract coverage hooks prepush prepush-full test-integration test-e2e test-acceptance test-hardening test-chaos test-performance test-soak
+.PHONY: fmt lint test build tidy contract coverage hooks prepush prepush-full test-integration test-e2e test-acceptance test-hardening test-chaos test-performance test-soak test-uat-local
 
 fmt:
 	gofmt -w .
@@ -71,3 +71,6 @@ test-performance:
 
 test-soak:
 	./scripts/test_soak.sh
+
+test-uat-local:
+	./scripts/test_uat_local.sh

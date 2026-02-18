@@ -1,24 +1,55 @@
-# Proof
+# Proof — Tamper-Evident Governance Primitive for AI Systems
 
-`github.com/Clyra-AI/proof` is the shared primitive for tamper-evident governance records.
+## Overview
 
-## Scope
+Use Proof when you need deterministic, offline-verifiable records for AI system actions.
 
-- Deterministic record creation
-- Hash-chain append/verification
-- Ed25519 signing/verification
-- Offline verification CLI
-- JSON Schemas and framework definition assets
+Proof is not an agent runtime, not a policy engine, and not a dashboard. It is a Go library + CLI for canonicalization, signing, chain verification, schema validation, and artifact integrity checks.
 
-## Build
+Core capabilities:
+
+- Deterministic record creation and hashing
+- Hash-chain append and integrity verification
+- Ed25519 signing and verification
+- Cosign/Sigstore-backed signature verification support
+- Offline CLI verification and inspection
+- Versioned schemas for proof record types
+- Gait pack/runpack compatibility verification
+
+## When To Use Proof
+
+- You need portable proof artifacts that can be verified offline.
+- You need stable exit-code behavior for CI gates.
+- You want a shared primitive that multiple products (including Gait) can reuse.
+- You need deterministic canonicalization and repeatable digests.
+
+## When Not To Use Proof
+
+- You need policy authoring/enforcement logic (use your policy layer above Proof).
+- You need orchestration of agent workflows or tools.
+- You only need live telemetry/observability and no artifact verification contract.
+
+## Try It (Offline, <60s)
 
 ```bash
-go build ./cmd/proof
+# Install CLI
+GO111MODULE=on go install github.com/Clyra-AI/proof/cmd/proof@latest
+
+# Explore built-in surfaces
+proof --version
+proof types list
+proof frameworks list
+```
+
+If you already have an artifact:
+
+```bash
+proof verify ./artifact.json
 ```
 
 ## Install
 
-Current stable install path (works now):
+Current stable install path:
 
 ```bash
 go install github.com/Clyra-AI/proof/cmd/proof@latest
@@ -26,16 +57,16 @@ go install github.com/Clyra-AI/proof/cmd/proof@latest
 
 Binary location:
 
-- If `GOBIN` is set: `$(go env GOBIN)/proof`
-- Otherwise: `$(go env GOPATH)/bin/proof` (typically `~/go/bin/proof`)
+- `$(go env GOBIN)/proof` when `GOBIN` is set
+- otherwise `$(go env GOPATH)/bin/proof` (typically `~/go/bin/proof`)
 
-Tagged release install path (enabled by `.github/workflows/release.yml` on `v*.*.*` tags; assets appear after the first release tag):
+Release artifact path (enabled on `v*.*.*` tags via `.github/workflows/release.yml`):
 
 ```bash
-# Option A: GitHub CLI (recommended for release assets)
+# GitHub CLI
 gh release download vX.Y.Z -R Clyra-AI/proof -D /tmp/proof-release
 
-# Option B: curl (direct asset URLs)
+# Direct download example
 curl -fL -o /tmp/proof-release/proof.tar.gz \
   https://github.com/Clyra-AI/proof/releases/download/vX.Y.Z/proof_X.Y.Z_<os>_<arch>.tar.gz
 curl -fL -o /tmp/proof-release/checksums.txt \
@@ -48,33 +79,46 @@ Verify release artifacts:
 cd /tmp/proof-release
 sha256sum -c checksums.txt
 
-# Optional (if provided in the release and cosign is installed):
+# Optional (if release includes signature + cert and cosign is installed)
 cosign verify-blob \
   --certificate checksums.txt.pem \
   --signature checksums.txt.sig \
   checksums.txt
 ```
 
-Then place `proof` on your PATH (for example `/usr/local/bin` or `~/.local/bin`).
+## What You Get
 
-## CLI
+- **Deterministic canonicalization**: JSON/SQL/URL/text domains with stable digests.
+- **Tamper evidence**: record hashes + chain head continuity checks.
+- **Signature options**: Ed25519 and cosign verification support.
+- **Schema contracts**: built-in proof record schemas and custom schema validation.
+- **Cross-product compatibility**: Gait pack/runpack verification and migration-friendly compatibility packages.
 
-```bash
-proof verify <path>
-proof verify --chain <path>
-proof verify --signatures --public-key <hex-or-base64-ed25519-pub> <path>
-proof verify --signatures --cosign-key <cosign-pub-key-path> <path>
-proof verify --signatures --cosign-cert ./checksums.pem --cosign-cert-identity <identity> --cosign-cert-issuer <issuer> <path>
-proof verify --revocation-list ./revocations.json --revocation-key <hex-ed25519-pub> <path>
-proof chain verify --from 2026-01-01T00:00:00Z --to 2026-12-31T23:59:59Z <path>
-proof inspect <path>
+## CLI Surface
+
+```text
+proof verify <path>                               Verify record, chain, bundle, gait pack/runpack/signed JSON
+proof verify --signatures --public-key <key> <path>
+proof verify --signatures --cosign-key <pubkey-path> <path>
+proof verify --revocation-list <path> --revocation-key <pubkey> <path>
+proof chain verify <path> [--from RFC3339] [--to RFC3339]
+proof inspect <path> [--record <record_id>]
 proof types list
-proof types validate ./custom.schema.json
+proof types validate <schema-path>
 proof frameworks list
-proof frameworks show eu-ai-act
+proof frameworks show <id>
+proof completion <shell>
 ```
 
-Gait compatibility:
+Global flags:
+
+- `--json`
+- `--quiet`
+- `--explain`
+
+## Gait Compatibility
+
+Proof can verify Gait artifacts directly:
 
 ```bash
 proof verify ./gait-pack.zip
@@ -82,7 +126,47 @@ proof verify ./gait-runpack.zip
 proof verify --signatures --public-key <hex-or-base64-ed25519-pub> ./gait-pack.zip
 ```
 
-## Exit Codes
+For Gait extraction/migration support, Proof exposes compatibility packages:
+
+- `github.com/Clyra-AI/proof/signing`
+- `github.com/Clyra-AI/proof/canon`
+- `github.com/Clyra-AI/proof/schema`
+- `github.com/Clyra-AI/proof/exitcode`
+
+## Library Usage
+
+Primary API:
+
+```go
+import "github.com/Clyra-AI/proof"
+```
+
+Quick example:
+
+```go
+record, _ := proof.NewRecord(proof.RecordOpts{
+  Source:        "example",
+  SourceProduct: "example",
+  Type:          "tool_invocation",
+  Event:         map[string]any{"tool": "postgres_query"},
+})
+
+chain := proof.NewChain("default")
+_ = proof.AppendToChain(chain, record)
+
+key, _ := proof.GenerateSigningKey()
+_, _ = proof.Sign(&chain.Records[0], key)
+_, _ = proof.VerifyChain(chain)
+```
+
+## Contract Commitments
+
+- Deterministic canonicalization and hashing for supported domains
+- Offline-first verification workflows
+- Stable exit-code contract
+- Versioned schema assets under `schemas/v1`
+
+Exit codes:
 
 - `0` success
 - `1` internal/runtime failure
@@ -94,21 +178,38 @@ proof verify --signatures --public-key <hex-or-base64-ed25519-pub> ./gait-pack.z
 - `7` dependency missing
 - `8` unsafe operation blocked
 
-## API Quickstart
+## Developer Workflow
 
-```go
-record, _ := proof.NewRecord(proof.RecordOpts{
-  Source: "example",
-  SourceProduct: "third-party",
-  Type: "tool_invocation",
-  Event: map[string]any{"tool":"postgres_query"},
-})
+![Main](https://github.com/Clyra-AI/proof/actions/workflows/main.yml/badge.svg)
+![CodeQL](https://github.com/Clyra-AI/proof/actions/workflows/codeql.yml/badge.svg)
 
-chain := proof.NewChain("default")
-_ = proof.AppendToChain(chain, record)
-key, _ := proof.GenerateSigningKey()
-_, _ = proof.Sign(&chain.Records[0], key)
-_, _ = proof.VerifyChain(chain)
-sig, _ := proof.SignChain(chain, key)
-_ = proof.VerifyChainSignature(chain, sig, proof.PublicKey{Public: key.Public})
+```bash
+make fmt
+make lint
+make test
+make prepush-full
+make test-uat-local
 ```
+
+Key automation:
+
+- Main CI: `.github/workflows/main.yml`
+- PR CI: `.github/workflows/pr.yml`
+- Nightly hardening/perf: `.github/workflows/nightly.yml`
+- Release: `.github/workflows/release.yml`
+
+## Repository Map
+
+- CLI: `cmd/proof`
+- Core packages: `core/*`
+- Compatibility packages: `signing`, `canon`, `schema`, `exitcode`
+- Schemas: `schemas/v1`
+- Framework definitions: `frameworks/`
+- Scripts: `scripts/`
+- Performance budgets: `perf/`
+
+## Notes
+
+- Current Go baseline: `1.25.7`
+- Implementation checklist: `IMPLEMENTATION_CHECK.md`
+- Product PRD/source of scope: `product/proof.md`
