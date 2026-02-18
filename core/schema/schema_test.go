@@ -36,3 +36,10 @@ func TestValidateCustomSchema(t *testing.T) {
 	require.NoError(t, os.WriteFile(p, raw, 0o644))
 	require.NoError(t, ValidateCustomSchema(p, raw))
 }
+
+func TestValidateAgainstSchemaAndErrors(t *testing.T) {
+	raw := []byte(`{"chain_id":"c1","created_at":"2026-02-17T12:00:00Z","record_count":0,"records":[]}`)
+	require.NoError(t, ValidateAgainstSchema(raw, "v1/chain-v1.schema.json"))
+	require.Error(t, ValidateAgainstSchema([]byte("{"), "v1/chain-v1.schema.json"))
+	require.Error(t, ValidateAgainstSchema(raw, "v1/missing.schema.json"))
+}

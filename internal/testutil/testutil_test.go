@@ -33,4 +33,5 @@ func TestBuildBinaryAndExitCode(t *testing.T) {
 	cmd := exec.Command("sh", "-c", "exit 7")
 	err = cmd.Run()
 	require.Equal(t, 7, CommandExitCode(t, err))
+	require.Equal(t, 0, CommandExitCode(t, nil))
 }

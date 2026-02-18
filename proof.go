@@ -24,6 +24,7 @@ type PublicKey = signing.PublicKey
 type Signature = signing.Signature
 type RevocationList = signing.RevocationList
 type RevocationEntry = signing.RevocationEntry
+type CosignVerifyOpts = signing.CosignVerifyOpts
 type Framework = framework.Framework
 type RecordType = schema.RecordType
 type CanonDomain = canon.Domain
@@ -177,7 +178,11 @@ func SignCosign(r *Record, keyPath string) (*Record, error) {
 }
 
 func VerifyCosign(r *Record, keyPath string) error {
-	return signing.VerifyRecordCosign(r, keyPath)
+	return signing.VerifyRecordCosign(r, signing.CosignVerifyOpts{KeyPath: keyPath})
+}
+
+func VerifyCosignWithOptions(r *Record, opts CosignVerifyOpts) error {
+	return signing.VerifyRecordCosign(r, opts)
 }
 
 func chainDigest(c *Chain) (string, error) {

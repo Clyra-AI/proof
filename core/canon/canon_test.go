@@ -22,3 +22,9 @@ func TestCanonicalizeURLSortsQuery(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "https://example.com/path?a=1&b=2", string(out))
 }
+
+func TestDigestHex(t *testing.T) {
+	d, err := DigestHex([]byte("hello"), DomainText)
+	require.NoError(t, err)
+	require.Len(t, d, 64)
+}

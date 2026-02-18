@@ -45,3 +45,23 @@ func TestFrameworkShowCommand(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, out, "eu-ai-act")
 }
+
+func TestChainVerifyCommandValid(t *testing.T) {
+	c := proof.NewChain("chain-valid")
+	r, err := proof.NewRecord(proof.RecordOpts{
+		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
+		Source:        "axym",
+		SourceProduct: "axym",
+		Type:          "decision",
+		Event:         map[string]any{"action": "allow"},
+	})
+	require.NoError(t, err)
+	require.NoError(t, proof.AppendToChain(c, r))
+	raw, _ := json.Marshal(c)
+	p := filepath.Join(t.TempDir(), "chain.json")
+	testutil.WriteFile(t, p, raw)
+
+	out, err := runCLIForTest(t, []string{"chain", "verify", p})
+	require.NoError(t, err)
+	require.Contains(t, out, "Chain intact")
+}

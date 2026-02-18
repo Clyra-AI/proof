@@ -10,6 +10,19 @@ import (
 	"github.com/Clyra-AI/proof/core/record"
 )
 
+type CosignVerifyOpts struct {
+	KeyPath             string
+	CertificatePath     string
+	CertificateIdentity string
+	CertificateIssuer   string
+}
+
+var cosignLookPath = exec.LookPath
+var cosignRun = func(name string, args ...string) ([]byte, error) {
+	cmd := exec.Command(name, args...)
+	return cmd.CombinedOutput()
+}
+
 func SignRecordCosign(r *record.Record, keyPath string) (*record.Record, error) {
 	if r == nil {
 		return nil, fmt.Errorf("record is nil")
@@ -17,7 +30,7 @@ func SignRecordCosign(r *record.Record, keyPath string) (*record.Record, error) 
 	if strings.TrimSpace(keyPath) == "" {
 		return nil, fmt.Errorf("cosign key path is required")
 	}
-	if _, err := exec.LookPath("cosign"); err != nil {
+	if _, err := cosignLookPath("cosign"); err != nil {
 		return nil, fmt.Errorf("cosign binary not found: %w", err)
 	}
 	if r.Integrity.RecordHash == "" {
@@ -32,7 +45,7 @@ func SignRecordCosign(r *record.Record, keyPath string) (*record.Record, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	blobPath := filepath.Join(tmpDir, "digest.txt")
 	sigPath := filepath.Join(tmpDir, "signature.sig")
@@ -40,8 +53,8 @@ func SignRecordCosign(r *record.Record, keyPath string) (*record.Record, error) 
 		return nil, err
 	}
 
-	cmd := exec.Command("cosign", "sign-blob", "--key", keyPath, "--output-signature", sigPath, blobPath)
-	if out, err := cmd.CombinedOutput(); err != nil {
+	args := []string{"sign-blob", "--key", keyPath, "--output-signature", sigPath, blobPath}
+	if out, err := cosignRun("cosign", args...); err != nil {
 		return nil, fmt.Errorf("cosign sign-blob failed: %v (%s)", err, strings.TrimSpace(string(out)))
 	}
 	rawSig, err := os.ReadFile(sigPath)
@@ -53,14 +66,11 @@ func SignRecordCosign(r *record.Record, keyPath string) (*record.Record, error) 
 	return r, nil
 }
 
-func VerifyRecordCosign(r *record.Record, keyPath string) error {
+func VerifyRecordCosign(r *record.Record, opts CosignVerifyOpts) error {
 	if r == nil {
 		return fmt.Errorf("record is nil")
 	}
-	if strings.TrimSpace(keyPath) == "" {
-		return fmt.Errorf("cosign key path is required")
-	}
-	if _, err := exec.LookPath("cosign"); err != nil {
+	if _, err := cosignLookPath("cosign"); err != nil {
 		return fmt.Errorf("cosign binary not found: %w", err)
 	}
 	if !strings.HasPrefix(r.Integrity.Signature, "cosign:") {
@@ -78,7 +88,7 @@ func VerifyRecordCosign(r *record.Record, keyPath string) error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	blobPath := filepath.Join(tmpDir, "digest.txt")
 	sigPath := filepath.Join(tmpDir, "signature.sig")
@@ -90,8 +100,25 @@ func VerifyRecordCosign(r *record.Record, keyPath string) error {
 		return err
 	}
 
-	cmd := exec.Command("cosign", "verify-blob", "--key", keyPath, "--signature", sigPath, blobPath)
-	if out, err := cmd.CombinedOutput(); err != nil {
+	args := []string{"verify-blob", "--signature", sigPath}
+	if strings.TrimSpace(opts.KeyPath) != "" {
+		args = append(args, "--key", opts.KeyPath)
+	}
+	if strings.TrimSpace(opts.CertificatePath) != "" {
+		args = append(args, "--certificate", opts.CertificatePath)
+	}
+	if strings.TrimSpace(opts.CertificateIdentity) != "" {
+		args = append(args, "--certificate-identity", opts.CertificateIdentity)
+	}
+	if strings.TrimSpace(opts.CertificateIssuer) != "" {
+		args = append(args, "--certificate-oidc-issuer", opts.CertificateIssuer)
+	}
+	if strings.TrimSpace(opts.KeyPath) == "" && strings.TrimSpace(opts.CertificatePath) == "" {
+		return fmt.Errorf("cosign verification requires --cosign-key or --cosign-cert")
+	}
+	args = append(args, blobPath)
+
+	if out, err := cosignRun("cosign", args...); err != nil {
 		return fmt.Errorf("cosign verify-blob failed: %v (%s)", err, strings.TrimSpace(string(out)))
 	}
 	return nil

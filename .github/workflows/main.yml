@@ -15,6 +15,14 @@ jobs:
       - run: go mod tidy
       - run: gofmt -w . && git diff --exit-code
       - run: go vet ./...
+      - name: gosec
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          gosec ./...
+      - name: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
 
   test:
     runs-on: ubuntu-latest
@@ -24,9 +32,13 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go test ./... -coverprofile=coverage.out
-      - run: ./scripts/check_go_coverage.py coverage.out 45
-      - run: ./scripts/check_go_package_coverage.py coverage.out 45 core/exitcode
+      - run: ./scripts/check_go_coverage.py coverage.out 75
+      - run: ./scripts/check_go_package_coverage.py coverage.out 85 github.com/Clyra-AI/proof/core/exitcode,github.com/Clyra-AI/proof/internal/testutil
+      - run: ./scripts/check_go_package_coverage.py coverage.out 75 github.com/Clyra-AI/proof/core/exitcode
       - run: ./scripts/test_contract_exitcodes.sh
+      - run: ./scripts/test_integration.sh
+      - run: ./scripts/test_e2e.sh
+      - run: ./scripts/test_acceptance.sh
 
   build:
     runs-on: ubuntu-latest

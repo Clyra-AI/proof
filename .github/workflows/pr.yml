@@ -26,6 +26,8 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go test ./...
+      - run: ./scripts/test_contract_exitcodes.sh
+      - run: ./scripts/test_integration.sh
 
   pr-windows:
     runs-on: windows-latest

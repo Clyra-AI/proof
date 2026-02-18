@@ -18,6 +18,9 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 	var verifyBundleFlag bool
 	var publicKeyHex string
 	var cosignKeyPath string
+	var cosignCertPath string
+	var cosignCertIdentity string
+	var cosignCertIssuer string
 	var revocationListPath string
 	var revocationKeyHex string
 
@@ -72,10 +75,13 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 				}
 				if verifySignatures {
 					if strings.HasPrefix(r.Integrity.Signature, "cosign:") {
-						if cosignKeyPath == "" {
-							return newCLIError(exitcode.InvalidInput, "--cosign-key is required for cosign signatures")
+						opts := proof.CosignVerifyOpts{
+							KeyPath:             cosignKeyPath,
+							CertificatePath:     cosignCertPath,
+							CertificateIdentity: cosignCertIdentity,
+							CertificateIssuer:   cosignCertIssuer,
 						}
-						if err := proof.VerifyCosign(r, cosignKeyPath); err != nil {
+						if err := proof.VerifyCosignWithOptions(r, opts); err != nil {
 							return newCLIError(exitcode.VerificationErr, err.Error())
 						}
 					} else {
@@ -109,25 +115,28 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 					return newCLIError(exitcode.VerificationErr, fmt.Sprintf("chain verification failed at index %d record %s", v.BreakIndex, v.BreakPoint))
 				}
 				if verifySignatures {
-					if publicKeyHex == "" {
-						return newCLIError(exitcode.InvalidInput, "--public-key is required with --signatures")
+					var pub proof.PublicKey
+					if publicKeyHex != "" {
+						pub, err = decodePublicKey(publicKeyHex)
 					}
-					pub, err := decodePublicKey(publicKeyHex)
-					if err != nil && publicKeyHex != "" {
+					if err != nil {
 						return newCLIError(exitcode.InvalidInput, err.Error())
 					}
 					for i := range c.Records {
 						if strings.HasPrefix(c.Records[i].Integrity.Signature, "cosign:") {
-							if cosignKeyPath == "" {
-								return newCLIError(exitcode.InvalidInput, "--cosign-key is required for cosign signatures")
+							opts := proof.CosignVerifyOpts{
+								KeyPath:             cosignKeyPath,
+								CertificatePath:     cosignCertPath,
+								CertificateIdentity: cosignCertIdentity,
+								CertificateIssuer:   cosignCertIssuer,
 							}
-							if err := proof.VerifyCosign(&c.Records[i], cosignKeyPath); err != nil {
+							if err := proof.VerifyCosignWithOptions(&c.Records[i], opts); err != nil {
 								return newCLIError(exitcode.VerificationErr, fmt.Sprintf("signature verification failed for record %s: %v", c.Records[i].RecordID, err))
 							}
 							continue
 						}
 						if publicKeyHex == "" {
-							return newCLIError(exitcode.InvalidInput, "--public-key is required with --signatures")
+							return newCLIError(exitcode.InvalidInput, "--public-key is required with --signatures for non-cosign signatures")
 						}
 						if err := proof.Verify(&c.Records[i], pub); err != nil {
 							return newCLIError(exitcode.VerificationErr, fmt.Sprintf("signature verification failed for record %s: %v", c.Records[i].RecordID, err))
@@ -161,6 +170,21 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 				}
 				printResult(opts, map[string]any{"ok": true, "kind": kind}, "Bundle verified.")
 				return nil
+			case artifactGaitPack:
+				res, err := verifyGaitPack(path, verifySignatures, publicKeyHex)
+				if err != nil {
+					return newCLIError(exitcode.VerificationErr, err.Error())
+				}
+				printResult(opts, map[string]any{"ok": true, "kind": kind, "pack_id": res.PackID, "pack_type": res.PackType, "files_verified": res.FilesVerified, "signatures_verified": res.SignaturesVerified}, fmt.Sprintf("Gait pack verified. Files: %d.", res.FilesVerified))
+				return nil
+			case artifactGaitSignedJSON:
+				if verifySignatures {
+					if err := verifyGaitSignedJSON(path, publicKeyHex); err != nil {
+						return newCLIError(exitcode.VerificationErr, err.Error())
+					}
+				}
+				printResult(opts, map[string]any{"ok": true, "kind": kind}, "Gait signed artifact verified.")
+				return nil
 			default:
 				return newCLIError(exitcode.InvalidInput, "unsupported artifact type")
 			}
@@ -172,6 +196,9 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 	cmd.Flags().BoolVar(&verifyBundleFlag, "bundle", false, "Verify bundle integrity")
 	cmd.Flags().StringVar(&publicKeyHex, "public-key", "", "Ed25519 public key as hex")
 	cmd.Flags().StringVar(&cosignKeyPath, "cosign-key", "", "Path to cosign public key")
+	cmd.Flags().StringVar(&cosignCertPath, "cosign-cert", "", "Path to cosign certificate")
+	cmd.Flags().StringVar(&cosignCertIdentity, "cosign-cert-identity", "", "Expected cosign certificate identity")
+	cmd.Flags().StringVar(&cosignCertIssuer, "cosign-cert-issuer", "", "Expected cosign certificate OIDC issuer")
 	cmd.Flags().StringVar(&revocationListPath, "revocation-list", "", "Path to signed revocation list JSON")
 	cmd.Flags().StringVar(&revocationKeyHex, "revocation-key", "", "Revocation list signer Ed25519 public key as hex")
 	return cmd

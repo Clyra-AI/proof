@@ -1,0 +1,4 @@
+{
+  "proof verify": {"p50_ms": 200, "p95_ms": 500, "p99_ms": 1000, "error_rate": 0.0},
+  "proof chain verify": {"p50_ms": 250, "p95_ms": 750, "p99_ms": 1500, "error_rate": 0.0}
+}

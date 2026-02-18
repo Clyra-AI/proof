@@ -23,6 +23,7 @@ proof verify <path>
 proof verify --chain <path>
 proof verify --signatures --public-key <hex-ed25519-pub> <path>
 proof verify --signatures --cosign-key <cosign-pub-key-path> <path>
+proof verify --signatures --cosign-cert ./checksums.pem --cosign-cert-identity <identity> --cosign-cert-issuer <issuer> <path>
 proof verify --revocation-list ./revocations.json --revocation-key <hex-ed25519-pub> <path>
 proof chain verify --from 2026-01-01T00:00:00Z --to 2026-12-31T23:59:59Z <path>
 proof inspect <path>
@@ -30,6 +31,13 @@ proof types list
 proof types validate ./custom.schema.json
 proof frameworks list
 proof frameworks show eu-ai-act
+```
+
+Gait compatibility:
+
+```bash
+proof verify ./gait-pack.zip
+proof verify --signatures --public-key <hex-ed25519-pub> ./gait-pack.zip
 ```
 
 ## Exit Codes

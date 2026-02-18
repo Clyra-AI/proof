@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+MODE="${PREPUSH_MODE:-fast}"
+if [[ "$MODE" == "full" ]]; then
+  make prepush-full
+else
+  make prepush
+fi

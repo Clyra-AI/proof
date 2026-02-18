@@ -8,14 +8,20 @@ import (
 )
 
 var version = "dev"
+var exitFn = os.Exit
 
 func main() {
+	exitFn(run(os.Stderr))
+}
+
+func run(stderr *os.File) int {
 	root := newRootCmd(version)
 	if err := root.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		_, _ = fmt.Fprintln(stderr, err)
 		if ec, ok := err.(interface{ ExitCode() int }); ok {
-			os.Exit(ec.ExitCode())
+			return ec.ExitCode()
 		}
-		os.Exit(exitcode.InternalError)
+		return exitcode.InternalError
 	}
+	return exitcode.Success
 }

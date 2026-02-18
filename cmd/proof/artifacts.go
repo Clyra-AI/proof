@@ -1,6 +1,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
@@ -15,14 +16,17 @@ import (
 
 	"github.com/Clyra-AI/proof"
 	"github.com/Clyra-AI/proof/core/chain"
+	"github.com/Clyra-AI/proof/core/gait"
 )
 
 type artifactKind string
 
 const (
-	artifactRecord artifactKind = "record"
-	artifactChain  artifactKind = "chain"
-	artifactBundle artifactKind = "bundle"
+	artifactRecord         artifactKind = "record"
+	artifactChain          artifactKind = "chain"
+	artifactBundle         artifactKind = "bundle"
+	artifactGaitPack       artifactKind = "gait_pack"
+	artifactGaitSignedJSON artifactKind = "gait_signed_json"
 )
 
 type manifest struct {
@@ -45,6 +49,9 @@ func detectArtifact(path string) (artifactKind, error) {
 		}
 		return artifactChain, nil
 	}
+	if strings.EqualFold(filepath.Ext(path), ".zip") && zipHasPackManifest(path) {
+		return artifactGaitPack, nil
+	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
@@ -58,6 +65,14 @@ func detectArtifact(path string) (artifactKind, error) {
 	}
 	if _, ok := obj["record_id"]; ok {
 		return artifactRecord, nil
+	}
+	if _, ok := obj["pack_id"]; ok {
+		return artifactGaitSignedJSON, nil
+	}
+	if sigAny, ok := obj["signature"]; ok {
+		if _, ok := sigAny.(map[string]any); ok {
+			return artifactGaitSignedJSON, nil
+		}
 	}
 	return "", errors.New("unsupported artifact type")
 }
@@ -155,7 +170,7 @@ func appendJSONLRecords(c *proof.Chain, path string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -172,4 +187,48 @@ func appendJSONLRecords(c *proof.Chain, path string) error {
 		c.HeadHash = r.Integrity.RecordHash
 	}
 	return scanner.Err()
+}
+
+func verifyGaitPack(path string, verifySignatures bool, publicKeyHex string) (*gait.Result, error) {
+	var pubKey []byte
+	if verifySignatures {
+		if strings.TrimSpace(publicKeyHex) == "" {
+			return nil, fmt.Errorf("--public-key is required for gait pack signature verification")
+		}
+		pub, err := hexDecode(strings.TrimSpace(publicKeyHex))
+		if err != nil {
+			return nil, err
+		}
+		pubKey = pub
+	}
+	return gait.VerifyPack(path, verifySignatures, pubKey)
+}
+
+func verifyGaitSignedJSON(path, publicKeyHex string) error {
+	if strings.TrimSpace(publicKeyHex) == "" {
+		return fmt.Errorf("--public-key is required for gait signed JSON verification")
+	}
+	pub, err := hexDecode(strings.TrimSpace(publicKeyHex))
+	if err != nil {
+		return err
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	return gait.VerifyEmbeddedSignedJSON(raw, pub)
+}
+
+func zipHasPackManifest(path string) bool {
+	zr, err := zip.OpenReader(path)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = zr.Close() }()
+	for _, f := range zr.File {
+		if filepath.Clean(f.Name) == "pack_manifest.json" {
+			return true
+		}
+	}
+	return false
 }

@@ -134,3 +134,28 @@ func TestRevocationListAPI(t *testing.T) {
 	require.NoError(t, VerifyRevocationList(list, PublicKey{Public: key.Public}))
 	require.True(t, IsKeyRevoked(list, key.KeyID, time.Date(2026, 2, 17, 12, 11, 0, 0, time.UTC)))
 }
+
+func TestAdditionalWrappers(t *testing.T) {
+	r, err := NewRecord(RecordOpts{
+		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
+		Source:        "axym",
+		SourceProduct: "axym",
+		Type:          "decision",
+		Event:         map[string]any{"action": "allow"},
+	})
+	require.NoError(t, err)
+	_, err = ComputeRecordHash(r)
+	require.NoError(t, err)
+
+	c := NewChain("wrapper")
+	require.NoError(t, AppendToChain(c, r))
+	_, err = VerifyChainRange(c, time.Date(2026, 2, 17, 11, 59, 0, 0, time.UTC), time.Date(2026, 2, 17, 12, 1, 0, 0, time.UTC))
+	require.NoError(t, err)
+
+	_, err = SignCosign(nil, "")
+	require.Error(t, err)
+	err = VerifyCosign(nil, "")
+	require.Error(t, err)
+	err = VerifyCosignWithOptions(nil, CosignVerifyOpts{})
+	require.Error(t, err)
+}

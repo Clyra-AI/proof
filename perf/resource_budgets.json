@@ -1,0 +1,3 @@
+{
+  "proof verify": {"max_rss_mb": 256, "max_cpu_pct": 90, "max_alloc_mb": 128}
+}

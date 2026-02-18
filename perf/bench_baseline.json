@@ -1,0 +1,6 @@
+{
+  "BenchmarkAppendAndVerify": {
+    "baseline_ns_op": 1000000,
+    "max_regression_factor": 4.0
+  }
+}

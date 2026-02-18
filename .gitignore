@@ -1,2 +1,6 @@
 product/
 /proof
+coverage.out
+cmdcov.out
+perf/bench_output.txt
+perf/*_report.json
