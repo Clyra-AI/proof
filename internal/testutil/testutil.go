@@ -29,6 +29,18 @@ func BuildBinary(t *testing.T, root string) string {
 	return bin
 }
 
+func CommandExitCode(t *testing.T, err error) int {
+	t.Helper()
+	if err == nil {
+		return 0
+	}
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok {
+		t.Fatalf("unexpected non-exit error: %v", err)
+	}
+	return exitErr.ExitCode()
+}
+
 func WriteFile(t *testing.T, path string, content []byte) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

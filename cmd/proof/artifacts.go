@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -101,6 +102,17 @@ func loadChain(path string) (*proof.Chain, error) {
 		c.RecordCount = len(c.Records)
 		c.HeadHash = r.Integrity.RecordHash
 	}
+	// Support JSONL proof record streams in chain directories.
+	jsonlFiles, err := filepath.Glob(filepath.Join(path, "*.jsonl"))
+	if err != nil {
+		return nil, err
+	}
+	sort.Strings(jsonlFiles)
+	for _, f := range jsonlFiles {
+		if err := appendJSONLRecords(c, f); err != nil {
+			return nil, err
+		}
+	}
 	if len(c.Records) == 0 {
 		chainPath := filepath.Join(path, "chain.json")
 		raw, err := os.ReadFile(chainPath)
@@ -136,4 +148,28 @@ func verifyBundle(path string) error {
 		}
 	}
 	return nil
+}
+
+func appendJSONLRecords(c *proof.Chain, path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		var r proof.Record
+		if err := json.Unmarshal([]byte(line), &r); err != nil {
+			return fmt.Errorf("parse %s: %w", filepath.Base(path), err)
+		}
+		c.Records = append(c.Records, r)
+		c.RecordCount = len(c.Records)
+		c.HeadHash = r.Integrity.RecordHash
+	}
+	return scanner.Err()
 }

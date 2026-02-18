@@ -36,6 +36,13 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 				if err := proof.ValidateRecord(r); err != nil {
 					return newCLIError(exitcode.VerificationErr, fmt.Sprintf("record validation failed: %v", err))
 				}
+				hash, err := proof.ComputeRecordHash(r)
+				if err != nil {
+					return newCLIError(exitcode.InternalError, err.Error())
+				}
+				if hash != r.Integrity.RecordHash {
+					return newCLIError(exitcode.VerificationErr, fmt.Sprintf("record hash mismatch: expected %s got %s", hash, r.Integrity.RecordHash))
+				}
 				if verifySignatures {
 					if publicKeyHex == "" {
 						return newCLIError(exitcode.InvalidInput, "--public-key is required with --signatures")
@@ -61,6 +68,20 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 				}
 				if !v.Intact {
 					return newCLIError(exitcode.VerificationErr, fmt.Sprintf("chain verification failed at index %d record %s", v.BreakIndex, v.BreakPoint))
+				}
+				if verifySignatures {
+					if publicKeyHex == "" {
+						return newCLIError(exitcode.InvalidInput, "--public-key is required with --signatures")
+					}
+					pub, err := decodePublicKey(publicKeyHex)
+					if err != nil {
+						return newCLIError(exitcode.InvalidInput, err.Error())
+					}
+					for i := range c.Records {
+						if err := proof.Verify(&c.Records[i], pub); err != nil {
+							return newCLIError(exitcode.VerificationErr, fmt.Sprintf("signature verification failed for record %s: %v", c.Records[i].RecordID, err))
+						}
+					}
 				}
 				printResult(opts, map[string]any{"ok": true, "kind": kind, "records": v.Count, "head_hash": v.HeadHash}, fmt.Sprintf("Chain intact. %d records. No gaps.", v.Count))
 				return nil

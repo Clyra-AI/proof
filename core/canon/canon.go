@@ -22,12 +22,20 @@ const (
 )
 
 var whitespaceRE = regexp.MustCompile(`\s+`)
+var trailingSemicolonRE = regexp.MustCompile(`;+[\s]*$`)
+var sqlKeywordRE = regexp.MustCompile(`\b(SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|JOIN|LEFT|RIGHT|INNER|OUTER|GROUP|BY|ORDER|HAVING|LIMIT|OFFSET|AND|OR|NOT|IN|AS|ON|VALUES|SET)\b`)
 
 func Canonicalize(input []byte, domain Domain) ([]byte, error) {
 	switch domain {
 	case DomainJSON:
 		return jcs.Transform(input)
-	case DomainSQL, DomainText, DomainPrompt:
+	case DomainSQL:
+		s := normalizeWhitespace(string(input))
+		s = trailingSemicolonRE.ReplaceAllString(s, "")
+		s = sqlKeywordRE.ReplaceAllStringFunc(s, strings.ToLower)
+		s = strings.TrimSpace(s)
+		return []byte(s), nil
+	case DomainText, DomainPrompt:
 		return []byte(normalizeWhitespace(string(input))), nil
 	case DomainURL:
 		u, err := url.Parse(strings.TrimSpace(string(input)))

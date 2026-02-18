@@ -83,6 +83,10 @@ func ValidateRecord(r *Record) error {
 	return schema.ValidateRecord(raw, r.RecordType)
 }
 
+func ComputeRecordHash(r *Record) (string, error) {
+	return record.ComputeHash(r)
+}
+
 func NewChain(id string) *Chain {
 	return chain.New(id, time.Now().UTC())
 }
