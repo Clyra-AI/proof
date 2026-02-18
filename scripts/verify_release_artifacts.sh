@@ -15,7 +15,31 @@ fi
 
 if [[ -f "${DIST_DIR}/checksums.txt.sig" && -f "${DIST_DIR}/checksums.txt.pem" ]]; then
   if command -v cosign >/dev/null 2>&1; then
-    cosign verify-blob --certificate "${DIST_DIR}/checksums.txt.pem" --signature "${DIST_DIR}/checksums.txt.sig" "${DIST_DIR}/checksums.txt"
+    verify_args=(
+      verify-blob
+      --certificate "${DIST_DIR}/checksums.txt.pem"
+      --signature "${DIST_DIR}/checksums.txt.sig"
+    )
+
+    cert_identity="${COSIGN_CERT_IDENTITY:-}"
+    cert_issuer="${COSIGN_CERT_ISSUER:-}"
+
+    if [[ -z "${cert_identity}" && -n "${GITHUB_WORKFLOW_REF:-}" ]]; then
+      cert_identity="https://github.com/${GITHUB_WORKFLOW_REF}"
+    fi
+    if [[ -z "${cert_issuer}" && -n "${GITHUB_ACTIONS:-}" ]]; then
+      cert_issuer="https://token.actions.githubusercontent.com"
+    fi
+
+    if [[ -n "${cert_identity}" ]]; then
+      verify_args+=(--certificate-identity "${cert_identity}")
+    fi
+    if [[ -n "${cert_issuer}" ]]; then
+      verify_args+=(--certificate-oidc-issuer "${cert_issuer}")
+    fi
+
+    verify_args+=("${DIST_DIR}/checksums.txt")
+    cosign "${verify_args[@]}"
   else
     echo "cosign not installed; skipping signature verification"
   fi
