@@ -116,7 +116,7 @@ func TestCosignSignAndVerifyViaMockRunner(t *testing.T) {
 	})
 
 	cosignLookPath = func(file string) (string, error) { return "/usr/bin/cosign", nil }
-	cosignRun = func(name string, args ...string) ([]byte, error) {
+	cosignRun = func(args ...string) ([]byte, error) {
 		if len(args) > 0 && args[0] == "sign-blob" {
 			for i := 0; i < len(args)-1; i++ {
 				if args[i] == "--output-signature" {
@@ -168,7 +168,7 @@ func TestCosignErrors(t *testing.T) {
 	require.Error(t, err)
 
 	cosignLookPath = func(file string) (string, error) { return "/usr/bin/cosign", nil }
-	cosignRun = func(name string, args ...string) ([]byte, error) { return nil, errors.New("boom") }
+	cosignRun = func(args ...string) ([]byte, error) { return nil, errors.New("boom") }
 	r.Integrity.Signature = "cosign:abc"
 	r.Integrity.RecordHash, _ = record.ComputeHash(r)
 	err = VerifyRecordCosign(r, CosignVerifyOpts{KeyPath: "/tmp/cosign.pub"})
@@ -318,7 +318,7 @@ func TestCosignAdditionalBranches(t *testing.T) {
 	require.ErrorContains(t, err, "requires --cosign-key or --cosign-cert")
 
 	var gotArgs []string
-	cosignRun = func(name string, args ...string) ([]byte, error) {
+	cosignRun = func(args ...string) ([]byte, error) {
 		gotArgs = append([]string{}, args...)
 		return []byte("verified"), nil
 	}
@@ -365,7 +365,7 @@ func TestCosignSignFailureBranches(t *testing.T) {
 	})
 
 	cosignLookPath = func(file string) (string, error) { return "/usr/bin/cosign", nil }
-	cosignRun = func(name string, args ...string) ([]byte, error) {
+	cosignRun = func(args ...string) ([]byte, error) {
 		return []byte("boom"), errors.New("sign failed")
 	}
 
@@ -380,7 +380,7 @@ func TestCosignSignFailureBranches(t *testing.T) {
 	_, err = SignRecordCosign(r, "/tmp/cosign.key")
 	require.ErrorContains(t, err, "cosign sign-blob failed")
 
-	cosignRun = func(name string, args ...string) ([]byte, error) { return []byte("ok"), nil }
+	cosignRun = func(args ...string) ([]byte, error) { return []byte("ok"), nil }
 	_, err = SignRecordCosign(r, "/tmp/cosign.key")
 	require.Error(t, err)
 }

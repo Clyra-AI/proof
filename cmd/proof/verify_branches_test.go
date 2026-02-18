@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/ed25519"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"path/filepath"
@@ -93,7 +92,7 @@ func TestVerifyGaitSignedJSONBranch(t *testing.T) {
 	payload["signature"] = map[string]any{
 		"alg":           "ed25519",
 		"key_id":        signing.KeyID(pub),
-		"sig":           base64.StdEncoding.EncodeToString(ed25519.Sign(priv, []byte(digest))),
+		"sig":           signDigestHex(t, priv, digest),
 		"signed_digest": digest,
 	}
 	raw, _ := json.Marshal(payload)

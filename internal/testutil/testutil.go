@@ -20,6 +20,7 @@ func RepoRoot(t *testing.T) string {
 func BuildBinary(t *testing.T, root string) string {
 	t.Helper()
 	bin := filepath.Join(t.TempDir(), "proof")
+	// #nosec G204 -- test helper executes a fixed go build command.
 	cmd := exec.Command("go", "build", "-o", bin, "./cmd/proof")
 	cmd.Dir = root
 	out, err := cmd.CombinedOutput()
@@ -43,10 +44,10 @@ func CommandExitCode(t *testing.T, err error) int {
 
 func WriteFile(t *testing.T, path string, content []byte) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	if err := os.WriteFile(path, content, 0o644); err != nil {
+	if err := os.WriteFile(path, content, 0o600); err != nil {
 		t.Fatalf("write file: %v", err)
 	}
 }

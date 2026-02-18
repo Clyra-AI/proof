@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/Clyra-AI/proof/core/canon"
@@ -42,6 +43,27 @@ type PackEntry struct {
 type Result struct {
 	PackID             string `json:"pack_id"`
 	PackType           string `json:"pack_type"`
+	FilesVerified      int    `json:"files_verified"`
+	SignaturesVerified int    `json:"signatures_verified"`
+}
+
+type RunpackManifest struct {
+	SchemaID       string        `json:"schema_id"`
+	SchemaVersion  string        `json:"schema_version"`
+	RunID          string        `json:"run_id"`
+	Files          []RunpackFile `json:"files"`
+	ManifestDigest string        `json:"manifest_digest"`
+	Signatures     []Signature   `json:"signatures,omitempty"`
+}
+
+type RunpackFile struct {
+	Path   string `json:"path"`
+	SHA256 string `json:"sha256"`
+}
+
+type RunpackResult struct {
+	RunID              string `json:"run_id"`
+	ManifestDigest     string `json:"manifest_digest"`
 	FilesVerified      int    `json:"files_verified"`
 	SignaturesVerified int    `json:"signatures_verified"`
 }
@@ -134,6 +156,68 @@ func VerifyEmbeddedSignedJSON(raw []byte, pub ed25519.PublicKey) error {
 	return nil
 }
 
+func VerifyRunpack(path string, verifySignatures bool, pub ed25519.PublicKey) (*RunpackResult, error) {
+	zr, err := zip.OpenReader(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = zr.Close() }()
+
+	manifestRaw, err := readZipFile(zr.File, "manifest.json")
+	if err != nil {
+		return nil, err
+	}
+	var manifest RunpackManifest
+	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
+		return nil, fmt.Errorf("unmarshal manifest.json: %w", err)
+	}
+	if manifest.SchemaID != "gait.runpack.manifest" {
+		return nil, fmt.Errorf("manifest schema_id must be gait.runpack.manifest")
+	}
+	if manifest.SchemaVersion != "1.0.0" {
+		return nil, fmt.Errorf("manifest schema_version must be 1.0.0")
+	}
+
+	for _, entry := range manifest.Files {
+		content, err := readZipFile(zr.File, entry.Path)
+		if err != nil {
+			return nil, fmt.Errorf("missing content %s: %w", entry.Path, err)
+		}
+		sum := sha256.Sum256(content)
+		if hex.EncodeToString(sum[:]) != strings.ToLower(strings.TrimSpace(entry.SHA256)) {
+			return nil, fmt.Errorf("content hash mismatch for %s", entry.Path)
+		}
+	}
+	manifestDigest, err := runpackManifestDigest(manifest)
+	if err != nil {
+		return nil, err
+	}
+	if !strings.EqualFold(strings.TrimSpace(manifest.ManifestDigest), manifestDigest) {
+		return nil, fmt.Errorf("manifest digest mismatch: expected %s got %s", manifest.ManifestDigest, manifestDigest)
+	}
+
+	result := &RunpackResult{
+		RunID:          manifest.RunID,
+		ManifestDigest: manifest.ManifestDigest,
+		FilesVerified:  len(manifest.Files),
+	}
+	if verifySignatures {
+		if len(pub) == 0 {
+			return nil, fmt.Errorf("public key is required for signature verification")
+		}
+		if len(manifest.Signatures) == 0 {
+			return nil, fmt.Errorf("manifest has no signatures")
+		}
+		for _, sig := range manifest.Signatures {
+			if err := verifyRunpackSignature(manifestDigest, sig, pub); err != nil {
+				return nil, err
+			}
+			result.SignaturesVerified++
+		}
+	}
+	return result, nil
+}
+
 func verifyManifestSignature(manifest PackManifest, sig Signature, pub ed25519.PublicKey) error {
 	m := manifest
 	m.Signatures = nil
@@ -158,10 +242,24 @@ func verifySignature(sig Signature, pub ed25519.PublicKey) error {
 	if err != nil {
 		return fmt.Errorf("decode signature: %w", err)
 	}
-	if !ed25519.Verify(pub, []byte(sig.SignedDigest), decoded) {
+	digestBytes, err := hex.DecodeString(strings.TrimSpace(sig.SignedDigest))
+	if err != nil {
+		return fmt.Errorf("decode signed digest: %w", err)
+	}
+	if len(digestBytes) != sha256.Size {
+		return fmt.Errorf("invalid signed digest length: %d", len(digestBytes))
+	}
+	if !ed25519.Verify(pub, digestBytes, decoded) {
 		return fmt.Errorf("signature verification failed")
 	}
 	return nil
+}
+
+func verifyRunpackSignature(manifestDigest string, sig Signature, pub ed25519.PublicKey) error {
+	if !strings.EqualFold(strings.TrimSpace(sig.SignedDigest), strings.TrimSpace(manifestDigest)) {
+		return fmt.Errorf("manifest signed_digest mismatch")
+	}
+	return verifySignature(sig, pub)
 }
 
 func signatureFromMap(m map[string]any) (Signature, error) {
@@ -190,6 +288,16 @@ func canonicalDigestHex(v any) (string, error) {
 	}
 	sum := sha256.Sum256(canonical)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+func runpackManifestDigest(manifest RunpackManifest) (string, error) {
+	m := manifest
+	m.ManifestDigest = ""
+	m.Signatures = nil
+	sort.Slice(m.Files, func(i, j int) bool {
+		return m.Files[i].Path < m.Files[j].Path
+	})
+	return canonicalDigestHex(m)
 }
 
 func readZipFile(files []*zip.File, path string) ([]byte, error) {

@@ -108,10 +108,12 @@ func WriteRecord(path string, r *Record) error {
 	if err != nil {
 		return err
 	}
+	// #nosec G306 -- proof artifacts are intentionally shareable within local workspace.
 	return os.WriteFile(path, raw, 0o644)
 }
 
 func ReadRecord(path string) (*Record, error) {
+	// #nosec G304 -- library API reads explicit caller-provided artifact paths.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -124,6 +126,7 @@ func ReadRecord(path string) (*Record, error) {
 }
 
 func ValidateCustomTypeSchema(schemaPath string) error {
+	// #nosec G304 -- schema path is explicit user input for validation.
 	raw, err := os.ReadFile(schemaPath)
 	if err != nil {
 		return err

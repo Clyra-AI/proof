@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 
@@ -73,6 +74,15 @@ func TestDecodePublicKeyErrors(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestDecodePublicKeyBase64(t *testing.T) {
+	pub, _, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+
+	decoded, err := decodePublicKey(base64.StdEncoding.EncodeToString(pub))
+	require.NoError(t, err)
+	require.Equal(t, hex.EncodeToString(pub), hex.EncodeToString(decoded.Public))
+}
+
 func TestDetectAndVerifyGaitPack(t *testing.T) {
 	pub, priv, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
@@ -83,7 +93,7 @@ func TestDetectAndVerifyGaitPack(t *testing.T) {
 	trace["signature"] = map[string]any{
 		"alg":           "ed25519",
 		"key_id":        keyID,
-		"sig":           base64.StdEncoding.EncodeToString(ed25519.Sign(priv, []byte(traceDigest))),
+		"sig":           signDigestHex(t, priv, traceDigest),
 		"signed_digest": traceDigest,
 	}
 	traceRaw, _ := json.Marshal(trace)
@@ -103,7 +113,7 @@ func TestDetectAndVerifyGaitPack(t *testing.T) {
 		{
 			"alg":           "ed25519",
 			"key_id":        keyID,
-			"sig":           base64.StdEncoding.EncodeToString(ed25519.Sign(priv, []byte(manifestDigest))),
+			"sig":           signDigestHex(t, priv, manifestDigest),
 			"signed_digest": manifestDigest,
 		},
 	}
@@ -133,13 +143,75 @@ func TestVerifyGaitSignedJSON(t *testing.T) {
 	payload["signature"] = map[string]any{
 		"alg":           "ed25519",
 		"key_id":        keyID,
-		"sig":           base64.StdEncoding.EncodeToString(ed25519.Sign(priv, []byte(d))),
+		"sig":           signDigestHex(t, priv, d),
 		"signed_digest": d,
 	}
 	raw, _ := json.Marshal(payload)
 	p := filepath.Join(t.TempDir(), "trace.json")
 	testutil.WriteFile(t, p, raw)
 	require.NoError(t, verifyGaitSignedJSON(p, hex.EncodeToString(pub)))
+}
+
+func TestDetectAndVerifyGaitRunpack(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+	keyID := signing.KeyID(pub)
+
+	run := []byte(`{"schema_id":"gait.runpack.run","run_id":"run-1"}`)
+	intents := []byte(`{"schema_id":"gait.runpack.intent"}` + "\n")
+	results := []byte(`{"schema_id":"gait.runpack.result"}` + "\n")
+	refs := []byte(`{"schema_id":"gait.runpack.refs","receipts":[]}`)
+
+	files := []map[string]any{
+		{"path": "run.json", "sha256": sha256Hex(run)},
+		{"path": "intents.jsonl", "sha256": sha256Hex(intents)},
+		{"path": "results.jsonl", "sha256": sha256Hex(results)},
+		{"path": "refs.json", "sha256": sha256Hex(refs)},
+	}
+	sort.Slice(files, func(i, j int) bool {
+		return files[i]["path"].(string) < files[j]["path"].(string)
+	})
+
+	signable := map[string]any{
+		"schema_id":       "gait.runpack.manifest",
+		"schema_version":  "1.0.0",
+		"run_id":          "run-1",
+		"files":           files,
+		"manifest_digest": "",
+	}
+	manifestDigest := mustDigestJSON(t, signable)
+	manifest := map[string]any{
+		"schema_id":       "gait.runpack.manifest",
+		"schema_version":  "1.0.0",
+		"run_id":          "run-1",
+		"files":           files,
+		"manifest_digest": manifestDigest,
+		"signatures": []map[string]any{{
+			"alg":           "ed25519",
+			"key_id":        keyID,
+			"sig":           signDigestHex(t, priv, manifestDigest),
+			"signed_digest": manifestDigest,
+		}},
+	}
+	manifestRaw, _ := json.Marshal(manifest)
+
+	zipPath := filepath.Join(t.TempDir(), "runpack.zip")
+	writeZip(t, zipPath, map[string][]byte{
+		"manifest.json": manifestRaw,
+		"run.json":      run,
+		"intents.jsonl": intents,
+		"results.jsonl": results,
+		"refs.json":     refs,
+	})
+
+	kind, err := detectArtifact(zipPath)
+	require.NoError(t, err)
+	require.Equal(t, artifactGaitRunpack, kind)
+
+	res, err := verifyGaitRunpack(zipPath, true, base64.StdEncoding.EncodeToString(pub))
+	require.NoError(t, err)
+	require.Equal(t, "run-1", res.RunID)
+	require.Equal(t, 4, res.FilesVerified)
 }
 
 func writeZip(t *testing.T, path string, files map[string][]byte) {
@@ -170,4 +242,11 @@ func mustDigestJSON(t *testing.T, v any) string {
 	require.NoError(t, err)
 	sum := sha256.Sum256(canonical)
 	return hex.EncodeToString(sum[:])
+}
+
+func signDigestHex(t *testing.T, priv ed25519.PrivateKey, digestHex string) string {
+	t.Helper()
+	digest, err := hex.DecodeString(digestHex)
+	require.NoError(t, err)
+	return base64.StdEncoding.EncodeToString(ed25519.Sign(priv, digest))
 }

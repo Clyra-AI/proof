@@ -26,6 +26,7 @@ const (
 	artifactChain          artifactKind = "chain"
 	artifactBundle         artifactKind = "bundle"
 	artifactGaitPack       artifactKind = "gait_pack"
+	artifactGaitRunpack    artifactKind = "gait_runpack"
 	artifactGaitSignedJSON artifactKind = "gait_signed_json"
 )
 
@@ -49,9 +50,15 @@ func detectArtifact(path string) (artifactKind, error) {
 		}
 		return artifactChain, nil
 	}
-	if strings.EqualFold(filepath.Ext(path), ".zip") && zipHasPackManifest(path) {
-		return artifactGaitPack, nil
+	if strings.EqualFold(filepath.Ext(path), ".zip") {
+		if zipHasFile(path, "pack_manifest.json") {
+			return artifactGaitPack, nil
+		}
+		if zipHasFile(path, "manifest.json") {
+			return artifactGaitRunpack, nil
+		}
 	}
+	// #nosec G304 -- CLI accepts explicit local artifact paths.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
@@ -87,6 +94,7 @@ func loadChain(path string) (*proof.Chain, error) {
 		return nil, err
 	}
 	if !info.IsDir() {
+		// #nosec G304 -- CLI accepts explicit local artifact paths.
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			return nil, err
@@ -130,6 +138,7 @@ func loadChain(path string) (*proof.Chain, error) {
 	}
 	if len(c.Records) == 0 {
 		chainPath := filepath.Join(path, "chain.json")
+		// #nosec G304 -- CLI accepts explicit local artifact paths.
 		raw, err := os.ReadFile(chainPath)
 		if err != nil {
 			return c, nil
@@ -142,6 +151,7 @@ func loadChain(path string) (*proof.Chain, error) {
 }
 
 func verifyBundle(path string) error {
+	// #nosec G304 -- CLI accepts explicit local artifact paths.
 	raw, err := os.ReadFile(filepath.Join(path, "manifest.json"))
 	if err != nil {
 		return err
@@ -151,6 +161,7 @@ func verifyBundle(path string) error {
 		return err
 	}
 	for _, file := range m.Files {
+		// #nosec G304 -- Bundle manifest drives local file verification.
 		b, err := os.ReadFile(filepath.Join(path, file.Path))
 		if err != nil {
 			return err
@@ -166,6 +177,7 @@ func verifyBundle(path string) error {
 }
 
 func appendJSONLRecords(c *proof.Chain, path string) error {
+	// #nosec G304 -- CLI accepts explicit local artifact paths.
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -189,13 +201,13 @@ func appendJSONLRecords(c *proof.Chain, path string) error {
 	return scanner.Err()
 }
 
-func verifyGaitPack(path string, verifySignatures bool, publicKeyHex string) (*gait.Result, error) {
+func verifyGaitPack(path string, verifySignatures bool, publicKey string) (*gait.Result, error) {
 	var pubKey []byte
 	if verifySignatures {
-		if strings.TrimSpace(publicKeyHex) == "" {
+		if strings.TrimSpace(publicKey) == "" {
 			return nil, fmt.Errorf("--public-key is required for gait pack signature verification")
 		}
-		pub, err := hexDecode(strings.TrimSpace(publicKeyHex))
+		pub, err := decodePublicKeyValue(publicKey)
 		if err != nil {
 			return nil, err
 		}
@@ -204,14 +216,30 @@ func verifyGaitPack(path string, verifySignatures bool, publicKeyHex string) (*g
 	return gait.VerifyPack(path, verifySignatures, pubKey)
 }
 
-func verifyGaitSignedJSON(path, publicKeyHex string) error {
-	if strings.TrimSpace(publicKeyHex) == "" {
+func verifyGaitRunpack(path string, verifySignatures bool, publicKey string) (*gait.RunpackResult, error) {
+	var pubKey []byte
+	if verifySignatures {
+		if strings.TrimSpace(publicKey) == "" {
+			return nil, fmt.Errorf("--public-key is required for gait runpack signature verification")
+		}
+		pub, err := decodePublicKeyValue(publicKey)
+		if err != nil {
+			return nil, err
+		}
+		pubKey = pub
+	}
+	return gait.VerifyRunpack(path, verifySignatures, pubKey)
+}
+
+func verifyGaitSignedJSON(path, publicKey string) error {
+	if strings.TrimSpace(publicKey) == "" {
 		return fmt.Errorf("--public-key is required for gait signed JSON verification")
 	}
-	pub, err := hexDecode(strings.TrimSpace(publicKeyHex))
+	pub, err := decodePublicKeyValue(publicKey)
 	if err != nil {
 		return err
 	}
+	// #nosec G304 -- CLI accepts explicit local artifact paths.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -219,14 +247,14 @@ func verifyGaitSignedJSON(path, publicKeyHex string) error {
 	return gait.VerifyEmbeddedSignedJSON(raw, pub)
 }
 
-func zipHasPackManifest(path string) bool {
+func zipHasFile(path, name string) bool {
 	zr, err := zip.OpenReader(path)
 	if err != nil {
 		return false
 	}
 	defer func() { _ = zr.Close() }()
 	for _, f := range zr.File {
-		if filepath.Clean(f.Name) == "pack_manifest.json" {
+		if filepath.Clean(f.Name) == filepath.Clean(name) {
 			return true
 		}
 	}

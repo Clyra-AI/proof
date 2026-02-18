@@ -47,6 +47,7 @@ func newInspectCmd(opts *globalOpts) *cobra.Command {
 				b, _ := json.MarshalIndent(c, "", "  ")
 				printResult(opts, c, string(b))
 			case artifactBundle:
+				// #nosec G304 -- CLI accepts explicit local artifact paths.
 				raw, err := os.ReadFile(path + "/manifest.json")
 				if err != nil {
 					return newCLIError(exitcode.InvalidInput, err.Error())

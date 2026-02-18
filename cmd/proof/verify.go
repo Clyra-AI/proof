@@ -37,6 +37,7 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 
 			var revocationList *proof.RevocationList
 			if revocationListPath != "" {
+				// #nosec G304 -- CLI accepts explicit local file paths for revocation lists.
 				raw, err := os.ReadFile(revocationListPath)
 				if err != nil {
 					return newCLIError(exitcode.InvalidInput, err.Error())
@@ -177,6 +178,13 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 				}
 				printResult(opts, map[string]any{"ok": true, "kind": kind, "pack_id": res.PackID, "pack_type": res.PackType, "files_verified": res.FilesVerified, "signatures_verified": res.SignaturesVerified}, fmt.Sprintf("Gait pack verified. Files: %d.", res.FilesVerified))
 				return nil
+			case artifactGaitRunpack:
+				res, err := verifyGaitRunpack(path, verifySignatures, publicKeyHex)
+				if err != nil {
+					return newCLIError(exitcode.VerificationErr, err.Error())
+				}
+				printResult(opts, map[string]any{"ok": true, "kind": kind, "run_id": res.RunID, "manifest_digest": res.ManifestDigest, "files_verified": res.FilesVerified, "signatures_verified": res.SignaturesVerified}, fmt.Sprintf("Gait runpack verified. Files: %d.", res.FilesVerified))
+				return nil
 			case artifactGaitSignedJSON:
 				if verifySignatures {
 					if err := verifyGaitSignedJSON(path, publicKeyHex); err != nil {
@@ -194,7 +202,7 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 	cmd.Flags().BoolVar(&verifyChain, "chain", false, "Verify chain integrity")
 	cmd.Flags().BoolVar(&verifySignatures, "signatures", false, "Verify signatures")
 	cmd.Flags().BoolVar(&verifyBundleFlag, "bundle", false, "Verify bundle integrity")
-	cmd.Flags().StringVar(&publicKeyHex, "public-key", "", "Ed25519 public key as hex")
+	cmd.Flags().StringVar(&publicKeyHex, "public-key", "", "Ed25519 public key as hex or base64")
 	cmd.Flags().StringVar(&cosignKeyPath, "cosign-key", "", "Path to cosign public key")
 	cmd.Flags().StringVar(&cosignCertPath, "cosign-cert", "", "Path to cosign certificate")
 	cmd.Flags().StringVar(&cosignCertIdentity, "cosign-cert-identity", "", "Expected cosign certificate identity")
@@ -206,9 +214,9 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 
 func decodePublicKey(h string) (proof.PublicKey, error) {
 	h = strings.TrimSpace(h)
-	pub, err := hexDecode(h)
+	pub, err := decodePublicKeyValue(h)
 	if err != nil {
-		return proof.PublicKey{}, fmt.Errorf("invalid public key hex: %w", err)
+		return proof.PublicKey{}, fmt.Errorf("invalid public key: %w", err)
 	}
 	return proof.PublicKey{Public: pub}, nil
 }

@@ -18,8 +18,9 @@ type CosignVerifyOpts struct {
 }
 
 var cosignLookPath = exec.LookPath
-var cosignRun = func(name string, args ...string) ([]byte, error) {
-	cmd := exec.Command(name, args...)
+var cosignRun = func(args ...string) ([]byte, error) {
+	// #nosec G204 -- executable is fixed to cosign; args are assembled from controlled flags/paths.
+	cmd := exec.Command("cosign", args...)
 	return cmd.CombinedOutput()
 }
 
@@ -54,9 +55,10 @@ func SignRecordCosign(r *record.Record, keyPath string) (*record.Record, error) 
 	}
 
 	args := []string{"sign-blob", "--key", keyPath, "--output-signature", sigPath, blobPath}
-	if out, err := cosignRun("cosign", args...); err != nil {
+	if out, err := cosignRun(args...); err != nil {
 		return nil, fmt.Errorf("cosign sign-blob failed: %v (%s)", err, strings.TrimSpace(string(out)))
 	}
+	// #nosec G304 -- signature path is generated in process-owned temp dir.
 	rawSig, err := os.ReadFile(sigPath)
 	if err != nil {
 		return nil, err
@@ -118,7 +120,7 @@ func VerifyRecordCosign(r *record.Record, opts CosignVerifyOpts) error {
 	}
 	args = append(args, blobPath)
 
-	if out, err := cosignRun("cosign", args...); err != nil {
+	if out, err := cosignRun(args...); err != nil {
 		return fmt.Errorf("cosign verify-blob failed: %v (%s)", err, strings.TrimSpace(string(out)))
 	}
 	return nil
