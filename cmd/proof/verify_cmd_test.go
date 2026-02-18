@@ -64,6 +64,11 @@ func TestVerifyCommandErrorPaths(t *testing.T) {
 	require.NoError(t, proof.WriteRecord(p, r))
 	_, err = runCLIForTest(t, []string{"verify", "--signatures", p})
 	require.Error(t, err)
+
+	chainDir := t.TempDir()
+	testutil.WriteFile(t, filepath.Join(chainDir, "bad.json"), []byte("{not-json"))
+	_, err = runCLIForTest(t, []string{"verify", chainDir})
+	require.Error(t, err)
 }
 
 func TestVerifyBundleWithManifestSignature(t *testing.T) {

@@ -108,7 +108,7 @@ func loadChain(path string) (*proof.Chain, error) {
 		}
 		r, err := loadRecord(f)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("parse %s: %w", base, err)
 		}
 		c.Records = append(c.Records, *r)
 		c.RecordCount = len(c.Records)

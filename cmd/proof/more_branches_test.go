@@ -52,6 +52,13 @@ func TestLoadChainFallbackAndJSONLError(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestLoadChainMalformedJSONRecordFails(t *testing.T) {
+	dir := t.TempDir()
+	testutil.WriteFile(t, filepath.Join(dir, "bad.json"), []byte("{not-json"))
+	_, err := loadChain(dir)
+	require.Error(t, err)
+}
+
 func TestBundleAndGaitHelperErrors(t *testing.T) {
 	dir := t.TempDir()
 	testutil.WriteFile(t, filepath.Join(dir, "manifest.json"), []byte(`{"files":[{"path":"a.txt","sha256":"sha256:abcd"}]}`))

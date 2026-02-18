@@ -22,7 +22,7 @@ jobs:
           go-version-file: go.mod
       - uses: goreleaser/goreleaser-action@v6
         with:
-          version: latest
+          version: v2.13.3
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -42,6 +42,15 @@ jobs:
           cosign sign-blob --yes --output-signature dist/checksums.txt.sig --output-certificate dist/checksums.txt.pem dist/checksums.txt
       - name: Verify signed checksums
         run: ./scripts/verify_release_artifacts.sh dist
+      - name: Upload checksum signature assets to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            dist/checksums.txt.sig \
+            dist/checksums.txt.pem \
+            --repo "${{ github.repository }}" \
+            --clobber
       - name: Generate build provenance
         uses: actions/attest-build-provenance@v2
         with:
