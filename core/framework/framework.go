@@ -74,6 +74,10 @@ func Load(idOrFile string) (*Framework, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load framework %s: %w", idOrFile, err)
 	}
+	return parseFramework(idOrFile, raw)
+}
+
+func parseFramework(idOrFile string, raw []byte) (*Framework, error) {
 	var f Framework
 	if err := yaml.Unmarshal(raw, &f); err != nil {
 		return nil, err

@@ -72,3 +72,127 @@ func TestFrameworkCopiesStayInSync(t *testing.T) {
 		require.Equalf(t, string(repoRaw), string(coreRaw), "framework copy mismatch for %s", entry.Name())
 	}
 }
+
+func TestParseFrameworkBranches(t *testing.T) {
+	_, err := parseFramework("bad-yaml", []byte("framework: ["))
+	require.Error(t, err)
+
+	_, err = parseFramework("missing-id", []byte(`
+framework:
+  version: "1"
+  title: Missing ID
+controls:
+  - id: c1
+    title: Control
+    required_record_types: [decision]
+    required_fields: [record_id]
+    minimum_frequency: continuous
+`))
+	require.ErrorContains(t, err, "missing id")
+
+	_, err = parseFramework("missing-controls", []byte(`
+framework:
+  id: test
+  version: "1"
+  title: Missing Controls
+controls: []
+`))
+	require.ErrorContains(t, err, "has no controls")
+}
+
+func TestValidateControlsErrors(t *testing.T) {
+	cases := []struct {
+		name   string
+		in     []Control
+		needle string
+	}{
+		{
+			name: "missing id",
+			in: []Control{{
+				Title:               "Control",
+				RequiredRecordTypes: []string{"decision"},
+				MinimumFrequency:    "continuous",
+				RequiredFields:      []string{"record_id"},
+			}},
+			needle: "missing id",
+		},
+		{
+			name: "missing title",
+			in: []Control{{
+				ID:                  "c1",
+				RequiredRecordTypes: []string{"decision"},
+				MinimumFrequency:    "continuous",
+				RequiredFields:      []string{"record_id"},
+			}},
+			needle: "missing title",
+		},
+		{
+			name: "missing required_record_types",
+			in: []Control{{
+				ID:               "c1",
+				Title:            "Control",
+				MinimumFrequency: "continuous",
+				RequiredFields:   []string{"record_id"},
+			}},
+			needle: "missing required_record_types",
+		},
+		{
+			name: "missing minimum_frequency",
+			in: []Control{{
+				ID:                  "c1",
+				Title:               "Control",
+				RequiredRecordTypes: []string{"decision"},
+				RequiredFields:      []string{"record_id"},
+			}},
+			needle: "missing minimum_frequency",
+		},
+		{
+			name: "blank required_record_types entry",
+			in: []Control{{
+				ID:                  "c1",
+				Title:               "Control",
+				RequiredRecordTypes: []string{"decision", " "},
+				MinimumFrequency:    "continuous",
+				RequiredFields:      []string{"record_id"},
+			}},
+			needle: "blank required_record_types entry",
+		},
+		{
+			name: "blank required_fields entry",
+			in: []Control{{
+				ID:                  "c1",
+				Title:               "Control",
+				RequiredRecordTypes: []string{"decision"},
+				MinimumFrequency:    "continuous",
+				RequiredFields:      []string{"record_id", ""},
+			}},
+			needle: "blank required_fields entry",
+		},
+		{
+			name: "invalid child control",
+			in: []Control{{
+				ID:                  "c1",
+				Title:               "Control",
+				RequiredRecordTypes: []string{"decision"},
+				MinimumFrequency:    "continuous",
+				RequiredFields:      []string{"record_id"},
+				Children: []Control{{
+					ID:               "child",
+					Title:            "Child",
+					MinimumFrequency: "continuous",
+					RequiredFields:   []string{"record_id"},
+				}},
+			}},
+			needle: "missing required_record_types",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateControls(tc.in, "controls")
+			require.Error(t, err)
+			require.ErrorContains(t, err, tc.needle)
+		})
+	}
+}
