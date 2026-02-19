@@ -3,6 +3,7 @@ package framework
 import (
 	"embed"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -66,6 +67,18 @@ func List() ([]Info, error) {
 }
 
 func Load(idOrFile string) (*Framework, error) {
+	if info, err := os.Stat(idOrFile); err == nil {
+		if info.IsDir() {
+			if isLikelyPath(idOrFile) {
+				return nil, fmt.Errorf("load framework file %s: path is a directory", idOrFile)
+			}
+		} else {
+			return LoadFile(idOrFile)
+		}
+	} else if isLikelyPath(idOrFile) {
+		return nil, fmt.Errorf("load framework file %s: %w", idOrFile, err)
+	}
+
 	name := idOrFile
 	if !strings.HasSuffix(name, ".yaml") {
 		name = name + ".yaml"
@@ -75,6 +88,27 @@ func Load(idOrFile string) (*Framework, error) {
 		return nil, fmt.Errorf("load framework %s: %w", idOrFile, err)
 	}
 	return parseFramework(idOrFile, raw)
+}
+
+func LoadFile(path string) (*Framework, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("load framework file %s: %w", path, err)
+	}
+	return parseFramework(path, raw)
+}
+
+func isLikelyPath(value string) bool {
+	if value == "" {
+		return false
+	}
+	if filepath.IsAbs(value) {
+		return true
+	}
+	if strings.HasPrefix(value, ".") {
+		return true
+	}
+	return strings.ContainsAny(value, `/\`)
 }
 
 func parseFramework(idOrFile string, raw []byte) (*Framework, error) {

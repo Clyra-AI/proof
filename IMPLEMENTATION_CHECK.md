@@ -36,7 +36,7 @@ Status key:
 | AC5 Offline guarantee | PASS | Core verification is offline-first; cosign path is explicitly local-binary based, no mandatory network dependency in CLI flow. |
 | AC6 Schema validation | PASS | Invalid/missing fields rejected by schema and validation layers. |
 | AC7 Custom type | PASS | Runtime custom type registration is supported through CLI/API (`--custom-type-schema`, `RegisterCustomTypeSchema`), and verification validates base + custom schema. |
-| AC8 Framework PR only | PASS | Frameworks are YAML-only; no code change required to add files. |
+| AC8 Framework PR only | PASS | Built-ins are YAML starter definitions and `LoadFramework(path)` supports runtime loading of custom YAML without code changes. |
 | AC9 Sigstore parity | PASS | cosign key/cert verification paths cover records/chains and Gait `proof_records.jsonl` verification with Sigstore options. |
 | AC10 Determinism proof | PASS | Deterministic vector assertions are enforced in tests with a dedicated cross-platform determinism workflow. |
 | AC11 Gait backward compatibility | PASS | Native Gait pack + signed-JSON verification with key-id compatibility is covered, including committed compatibility fixtures in `testdata/gait_compat/`. |
