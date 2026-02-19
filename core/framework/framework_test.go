@@ -57,6 +57,49 @@ func TestLoadMissingFilesystemPath(t *testing.T) {
 	require.ErrorContains(t, err, "load framework file")
 }
 
+func TestLoadPrefersEmbeddedOverLocalCollision(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	require.NoError(t, os.WriteFile("eu-ai-act.yaml", []byte("not: valid: yaml: ["), 0o644))
+
+	f, err := Load("eu-ai-act.yaml")
+	require.NoError(t, err)
+	require.Equal(t, "eu-ai-act", f.Framework.ID)
+	require.Equal(t, "2024-final", f.Framework.Version)
+
+	list, err := List()
+	require.NoError(t, err)
+	var found bool
+	for _, info := range list {
+		if info.ID == "eu-ai-act" {
+			found = true
+			require.Equal(t, 3, info.ControlCount)
+		}
+	}
+	require.True(t, found)
+}
+
+func TestLoadFilenameFallbackForCustomFramework(t *testing.T) {
+	dir := t.TempDir()
+	t.Chdir(dir)
+	require.NoError(t, os.WriteFile("custom-framework.yaml", []byte(`
+framework:
+  id: custom-framework
+  version: "1"
+  title: Custom Framework
+controls:
+  - id: custom-control
+    title: Custom Control
+    required_record_types: [decision]
+    required_fields: [record_id]
+    minimum_frequency: continuous
+`), 0o644))
+
+	f, err := Load("custom-framework.yaml")
+	require.NoError(t, err)
+	require.Equal(t, "custom-framework", f.Framework.ID)
+}
+
 func TestValidateControls(t *testing.T) {
 	valid := []Control{
 		{
