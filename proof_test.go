@@ -99,6 +99,23 @@ func TestAPIHelpers(t *testing.T) {
 	f, err := LoadFramework("eu-ai-act")
 	require.NoError(t, err)
 	require.Equal(t, "eu-ai-act", f.Framework.ID)
+
+	path := filepath.Join(t.TempDir(), "custom-framework.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(`
+framework:
+  id: custom-framework
+  version: "1"
+  title: Custom Framework
+controls:
+  - id: custom-control
+    title: Custom Control
+    required_record_types: [decision]
+    required_fields: [record_id]
+    minimum_frequency: continuous
+`), 0o644))
+	custom, err := LoadFramework(path)
+	require.NoError(t, err)
+	require.Equal(t, "custom-framework", custom.Framework.ID)
 }
 
 func TestWriteReadAndCustomSchemaValidation(t *testing.T) {

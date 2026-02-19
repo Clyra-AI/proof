@@ -30,6 +30,33 @@ func TestLoadMissingAndCountControls(t *testing.T) {
 	require.Equal(t, 4, total)
 }
 
+func TestLoadFromFilesystemPath(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "custom-framework.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(`
+framework:
+  id: custom-framework
+  version: "1"
+  title: Custom Framework
+controls:
+  - id: custom-control
+    title: Custom Control
+    required_record_types: [decision]
+    required_fields: [record_id]
+    minimum_frequency: continuous
+`), 0o644))
+
+	f, err := Load(path)
+	require.NoError(t, err)
+	require.Equal(t, "custom-framework", f.Framework.ID)
+	require.Len(t, f.Controls, 1)
+}
+
+func TestLoadMissingFilesystemPath(t *testing.T) {
+	_, err := Load(filepath.Join(t.TempDir(), "missing.yaml"))
+	require.Error(t, err)
+	require.ErrorContains(t, err, "load framework file")
+}
+
 func TestValidateControls(t *testing.T) {
 	valid := []Control{
 		{

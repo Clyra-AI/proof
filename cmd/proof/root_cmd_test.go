@@ -23,6 +23,27 @@ func TestFrameworksListCommand(t *testing.T) {
 	out, err := runCLIForTest(t, []string{"frameworks", "list"})
 	require.NoError(t, err)
 	require.Contains(t, out, "eu-ai-act")
+	require.Contains(t, out, "built-in starter frameworks")
+}
+
+func TestFrameworksShowByPathCommand(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "custom-framework.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(`
+framework:
+  id: custom-framework
+  version: "1"
+  title: Custom Framework
+controls:
+  - id: custom-control
+    title: Custom Control
+    required_record_types: [decision]
+    required_fields: [record_id]
+    minimum_frequency: continuous
+`), 0o644))
+
+	out, err := runCLIForTest(t, []string{"frameworks", "show", path, "--json"})
+	require.NoError(t, err)
+	require.Contains(t, out, `"id": "custom-framework"`)
 }
 
 func TestInspectRecordCommand(t *testing.T) {

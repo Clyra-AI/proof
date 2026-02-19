@@ -41,7 +41,7 @@ PROOF_VERSION="$(gh release view --repo Clyra-AI/proof --json tagName -q .tagNam
 go install github.com/Clyra-AI/proof/cmd/proof@"${PROOF_VERSION}"
 
 proof types list          # 15 built-in record types
-proof frameworks list     # 8 compliance framework definitions
+proof frameworks list     # 8 built-in starter frameworks (11 controls)
 proof verify ./artifact   # Verify any proof artifact offline
 ```
 
@@ -192,20 +192,20 @@ controls:
     minimum_frequency: continuous
 ```
 
-8 frameworks ship with v1:
+8 built-in starter frameworks ship with v1 (11 controls total). Add custom frameworks via YAML.
 
 | Framework | Scope |
 |---|---|
-| EU AI Act | Articles 9, 12, 13, 14, 15, 26 |
-| SOC 2 | CC6, CC7, CC8 (AI-specific sub-controls) |
-| SOX | Change management, SoD, access controls |
+| EU AI Act | Articles 9, 12, 14 (starter mapping) |
+| SOC 2 | CC6, CC7 (starter mapping) |
+| SOX | Change management (starter mapping) |
 | PCI-DSS | Requirement 10 (logging and monitoring) |
 | Texas TRAIGA | State AI regulation |
 | Colorado AI Act | State AI regulation |
 | ISO 42001 | AI Management System |
 | NIST AI 600-1 | Agent security guidance |
 
-Adding a new framework is a YAML file and a PR — no code changes required.
+Built-ins are starter definitions; teams can add custom frameworks via YAML files.
 
 ## CLI Reference
 
@@ -232,8 +232,8 @@ proof chain verify <path>              Verify chain integrity
 proof types list                       List all registered record types
 proof types validate <schema-path>     Validate a custom record type schema
 
-proof frameworks list                  List available compliance frameworks
-proof frameworks show <id>             Display framework controls
+proof frameworks list                  List built-in starter framework definitions
+proof frameworks show <id|path>        Display framework controls
 
 proof completion <shell>               Shell completion generation
 ```
