@@ -67,21 +67,39 @@ func List() ([]Info, error) {
 }
 
 func Load(idOrFile string) (*Framework, error) {
-	if info, err := os.Stat(idOrFile); err == nil {
-		if info.IsDir() {
-			if isLikelyPath(idOrFile) {
-				return nil, fmt.Errorf("load framework file %s: path is a directory", idOrFile)
-			}
-		} else {
-			return LoadFile(idOrFile)
+	if isLikelyPath(idOrFile) {
+		info, err := os.Stat(idOrFile)
+		if err != nil {
+			return nil, fmt.Errorf("load framework file %s: %w", idOrFile, err)
 		}
-	} else if isLikelyPath(idOrFile) {
-		return nil, fmt.Errorf("load framework file %s: %w", idOrFile, err)
+		if info.IsDir() {
+			return nil, fmt.Errorf("load framework file %s: path is a directory", idOrFile)
+		}
+		return LoadFile(idOrFile)
 	}
 
+	embedded, embeddedErr := loadEmbedded(idOrFile)
+	if embeddedErr == nil {
+		return embedded, nil
+	}
+
+	info, err := os.Stat(idOrFile)
+	if err == nil {
+		if info.IsDir() {
+			return nil, fmt.Errorf("load framework file %s: path is a directory", idOrFile)
+		}
+		return LoadFile(idOrFile)
+	}
+	if !os.IsNotExist(err) {
+		return nil, fmt.Errorf("load framework file %s: %w", idOrFile, err)
+	}
+	return nil, embeddedErr
+}
+
+func loadEmbedded(idOrFile string) (*Framework, error) {
 	name := idOrFile
 	if !strings.HasSuffix(name, ".yaml") {
-		name = name + ".yaml"
+		name += ".yaml"
 	}
 	raw, err := frameworkFS.ReadFile(name)
 	if err != nil {
@@ -91,6 +109,7 @@ func Load(idOrFile string) (*Framework, error) {
 }
 
 func LoadFile(path string) (*Framework, error) {
+	// #nosec G304 -- path is intentionally caller-provided for runtime custom framework loading.
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("load framework file %s: %w", path, err)
