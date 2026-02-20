@@ -1,0 +1,44 @@
+{
+  "record_id": "prf-2026-02-20T13:00:00Z-a19ef462",
+  "record_version": "1.0",
+  "timestamp": "2026-02-20T13:00:00Z",
+  "source": "gait",
+  "source_product": "gait",
+  "record_type": "compiled_action",
+  "event": {
+    "composite_risk_class": "high",
+    "execution_trace_refs": [
+      "prf-2026-02-20T13:01:00Z-aaaaaaaa",
+      "prf-2026-02-20T13:01:01Z-bbbbbbbb"
+    ],
+    "gate_verdict": "allow",
+    "has_conditionals": true,
+    "has_loops": false,
+    "script_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "script_source": "ptc",
+    "step_count": 5,
+    "tool_sequence": [
+      "shell.exec",
+      "fs.write",
+      "http.request",
+      "db.query",
+      "notify.send"
+    ]
+  },
+  "controls": {
+    "permissions_enforced": false
+  },
+  "metadata": {
+    "affected_entities": [
+      "customer:42",
+      "txn:99"
+    ],
+    "business_process": "payments-refund",
+    "data_class": "pii",
+    "endpoint_class": "write",
+    "risk_level": "high"
+  },
+  "integrity": {
+    "record_hash": "sha256:70f67498d1883cad8ac61129ef0f2e43c7e6c7700c02283e11a47d21d66c65f9"
+  }
+}

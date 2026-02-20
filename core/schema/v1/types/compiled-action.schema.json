@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Clyra-AI/proof/schemas/v1/types/compiled-action.schema.json",
+  "type": "object",
+  "required": ["record_type", "event"],
+  "properties": {
+    "record_type": { "const": "compiled_action" },
+    "event": {
+      "type": "object",
+      "required": [
+        "script_hash",
+        "tool_sequence",
+        "step_count",
+        "has_conditionals",
+        "has_loops",
+        "composite_risk_class"
+      ],
+      "properties": {
+        "script_hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "tool_sequence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "step_count": { "type": "integer", "minimum": 1 },
+        "has_conditionals": { "type": "boolean" },
+        "has_loops": { "type": "boolean" },
+        "composite_risk_class": {
+          "type": "string",
+          "enum": ["minimal", "limited", "high", "unacceptable"]
+        },
+        "execution_trace_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^prf-[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z-[a-f0-9]{8}$"
+          }
+        },
+        "gate_verdict": {
+          "type": "string",
+          "enum": ["allow", "block", "dry_run", "require_approval"]
+        },
+        "script_source": {
+          "type": "string",
+          "enum": ["ptc", "agent_planner", "workflow_engine", "unknown"]
+        }
+      }
+    }
+  }
+}

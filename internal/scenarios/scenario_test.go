@@ -74,6 +74,14 @@ func runScenario(t *testing.T, binary, dir string) {
 		require.Contains(t, out, "Chain intact")
 		require.Contains(t, out, strconv.Itoa(expected.Count)+" records")
 
+	case "compiled-action-chain-round-trip":
+		require.Equal(t, "pass", expected.Verify)
+		require.Equal(t, "intact", expected.Chain)
+		out, code := runProof(binary, "verify", dir)
+		require.Equal(t, 0, code, out)
+		require.Contains(t, out, "Chain intact")
+		require.Contains(t, out, strconv.Itoa(expected.Count)+" records")
+
 	case "chain-tamper-detection":
 		require.Equal(t, "fail", expected.Verify)
 		tempDir := t.TempDir()

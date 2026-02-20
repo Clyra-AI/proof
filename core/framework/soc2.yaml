@@ -10,6 +10,11 @@ controls:
     minimum_frequency: continuous
   - id: cc7
     title: System Operations
-    required_record_types: [incident, guardrail_activation]
+    required_record_types: [incident, guardrail_activation, compiled_action]
+    required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+    minimum_frequency: continuous
+  - id: cc8
+    title: Change Management
+    required_record_types: [approval, compiled_action]
     required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
     minimum_frequency: continuous
