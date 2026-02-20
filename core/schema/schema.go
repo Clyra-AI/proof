@@ -37,6 +37,7 @@ var builtins = []RecordType{
 	{Name: "data_pipeline_run", Description: "A data pipeline executed", SchemaPath: "v1/types/data-pipeline-run.schema.json"},
 	{Name: "replay_certification", Description: "A replay was run and certified", SchemaPath: "v1/types/replay-certification.schema.json"},
 	{Name: "approval", Description: "An approval or delegation was issued", SchemaPath: "v1/types/approval.schema.json"},
+	{Name: "compiled_action", Description: "A compound agent action was compiled for execution", SchemaPath: "v1/types/compiled-action.schema.json"},
 }
 
 var customMu sync.RWMutex

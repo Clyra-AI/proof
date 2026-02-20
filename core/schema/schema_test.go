@@ -98,3 +98,11 @@ func TestValidateAgainstSchemaAndErrors(t *testing.T) {
 	require.Error(t, ValidateAgainstSchema([]byte("{"), "v1/chain-v1.schema.json"))
 	require.Error(t, ValidateAgainstSchema(raw, "v1/missing.schema.json"))
 }
+
+func TestValidateGovernanceEventSchema(t *testing.T) {
+	valid := []byte(`{"event_id":"evt-1","timestamp":"2026-02-20T12:00:00Z","event_type":"tool_gate"}`)
+	require.NoError(t, ValidateAgainstSchema(valid, "v1/governance-event-v1.schema.json"))
+
+	invalid := []byte(`{"timestamp":"2026-02-20T12:00:00Z","event_type":"tool_gate"}`)
+	require.Error(t, ValidateAgainstSchema(invalid, "v1/governance-event-v1.schema.json"))
+}

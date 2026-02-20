@@ -40,8 +40,8 @@ An open-source Go module and verification CLI. Four operations:
 PROOF_VERSION="$(gh release view --repo Clyra-AI/proof --json tagName -q .tagName 2>/dev/null || curl -fsSL https://api.github.com/repos/Clyra-AI/proof/releases/latest | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"tag_name\"])')"
 go install github.com/Clyra-AI/proof/cmd/proof@"${PROOF_VERSION}"
 
-proof types list          # 15 built-in record types
-proof frameworks list     # 8 built-in starter frameworks (11 controls)
+proof types list          # 16 built-in record types
+proof frameworks list     # 8 built-in starter frameworks (12 controls)
 proof verify ./artifact   # Verify any proof artifact offline
 ```
 
@@ -73,6 +73,19 @@ _ = proof.RegisterCustomTypeSchema("vendor.custom_event", "./custom.schema.json"
 ```
 
 Custom types validate against the base proof record schema plus your type-specific schema. They chain and sign identically to built-in types.
+
+### Governance Events
+
+```go
+record, _ := proof.NewRecordFromEvent(proof.GovernanceEvent{
+    EventID:   "evt-1",
+    Timestamp: "2026-02-20T12:00:00Z",
+    EventType: "tool_gate",
+    Detail:    map[string]any{"verdict": "allow"},
+}, "axym")
+```
+
+Use `schemas/v1/governance-event-v1.schema.json` for event validation. See `docs/governance-events.md` and `docs/record-context-keys.md`.
 
 ### Bundle Signing and Verification
 
@@ -120,7 +133,7 @@ Records are immutable, deterministic, and JSON-native — readable by any langua
 
 ## Built-in Record Types
 
-15 types covering the full AI governance surface, each with its own JSON Schema:
+16 types covering the full AI governance surface, each with its own JSON Schema:
 
 | Type | Description |
 |---|---|
@@ -139,6 +152,7 @@ Records are immutable, deterministic, and JSON-native — readable by any langua
 | `data_pipeline_run` | A data pipeline executed |
 | `replay_certification` | A replay was run and certified |
 | `approval` | An approval or delegation was issued |
+| `compiled_action` | A compound agent action was compiled for execution |
 
 Record types are extensible. Define a custom type by providing a JSON Schema that extends the base record schema.
 
@@ -187,17 +201,17 @@ YAML files that declare what regulatory controls require — which record types,
 controls:
   - id: article-12
     title: Record-Keeping
-    required_record_types: [tool_invocation, decision, guardrail_activation, permission_check]
+    required_record_types: [tool_invocation, decision, guardrail_activation, permission_check, compiled_action]
     required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
     minimum_frequency: continuous
 ```
 
-8 built-in starter frameworks ship with v1 (11 controls total). Add custom frameworks via YAML.
+8 built-in starter frameworks ship with v1 (12 controls total). Add custom frameworks via YAML.
 
 | Framework | Scope |
 |---|---|
 | EU AI Act | Articles 9, 12, 14 (starter mapping) |
-| SOC 2 | CC6, CC7 (starter mapping) |
+| SOC 2 | CC6, CC7, CC8 (starter mapping) |
 | SOX | Change management (starter mapping) |
 | PCI-DSS | Requirement 10 (logging and monitoring) |
 | Texas TRAIGA | State AI regulation |
@@ -302,8 +316,9 @@ canon/               Compatibility package (Gait migration)
 schema/              Compatibility package (Gait migration)
 exitcode/            Compatibility package (Gait migration)
 schemas/v1/          JSON Schema spec files (language-agnostic contract)
-  types/             15 record type schemas
+  types/             16 record type schemas
 frameworks/          8 compliance framework YAML definitions
+docs/                Supplementary format and interoperability documentation
 testdata/            Golden vectors and test fixtures
 scripts/             Test and validation scripts
 perf/                Performance budgets

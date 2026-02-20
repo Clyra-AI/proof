@@ -1,0 +1,24 @@
+{
+  "record_id": "prf-2026-02-20T13:10:00Z-9dac8ec3",
+  "record_version": "1.0",
+  "timestamp": "2026-02-20T13:10:00Z",
+  "source": "gait",
+  "source_product": "gait",
+  "record_type": "compiled_action",
+  "event": {
+    "composite_risk_class": "limited",
+    "has_conditionals": false,
+    "has_loops": false,
+    "script_hash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    "step_count": 1,
+    "tool_sequence": [
+      "shell.exec"
+    ]
+  },
+  "controls": {
+    "permissions_enforced": false
+  },
+  "integrity": {
+    "record_hash": "sha256:717a171c00b635e7023719a758b7188c65d3b3c36dd32adee57a57fa5920ccbf"
+  }
+}

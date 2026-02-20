@@ -10,11 +10,11 @@ controls:
     minimum_frequency: quarterly
   - id: article-12
     title: Record-Keeping
-    required_record_types: [tool_invocation, decision, guardrail_activation, permission_check]
+    required_record_types: [tool_invocation, decision, guardrail_activation, permission_check, compiled_action]
     required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
     minimum_frequency: continuous
   - id: article-14
     title: Human Oversight
-    required_record_types: [human_oversight, approval]
+    required_record_types: [human_oversight, approval, compiled_action]
     required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
     minimum_frequency: per-event

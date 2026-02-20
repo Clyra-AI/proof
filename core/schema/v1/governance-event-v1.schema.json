@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Clyra-AI/proof/schemas/v1/governance-event-v1.schema.json",
+  "type": "object",
+  "required": ["event_id", "timestamp", "event_type"],
+  "properties": {
+    "event_id": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "tool_gate",
+        "permission_check",
+        "approval_request",
+        "policy_evaluation",
+        "guardrail_activation",
+        "script_evaluation"
+      ]
+    },
+    "agent_id": { "type": "string", "minLength": 1 },
+    "tool_name": { "type": "string", "minLength": 1 },
+    "verdict": {
+      "type": "string",
+      "enum": ["allow", "block", "dry_run", "require_approval", "pending"]
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "detail": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

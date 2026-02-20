@@ -1,5 +1,9 @@
 # Scenario Changelog
 
+## 2026-02-20
+
+- Added: compiled-action-chain-round-trip (validates compiled_action record verification in chain mode)
+
 ## 2026-02-18
 
 - Added: chain-round-trip (validates basic chain append + verify)

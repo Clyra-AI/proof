@@ -1,0 +1,1 @@
+{"event_id":"evt-permission-check","timestamp":"2026-02-20T12:01:00Z","event_type":"permission_check","tool_name":"fs.write","verdict":"allow"}
