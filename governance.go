@@ -69,12 +69,17 @@ func NewRecordFromEvent(event GovernanceEvent, source string) (*Record, error) {
 		}
 	}
 	if strings.TrimSpace(event.Verdict) != "" {
+		verdict := strings.TrimSpace(event.Verdict)
 		if recordType == "compiled_action" {
-			if _, ok := eventPayload["gate_verdict"]; !ok {
-				eventPayload["gate_verdict"] = strings.TrimSpace(event.Verdict)
+			if verdict == "pending" {
+				if _, ok := eventPayload["verdict"]; !ok {
+					eventPayload["verdict"] = verdict
+				}
+			} else if _, ok := eventPayload["gate_verdict"]; !ok {
+				eventPayload["gate_verdict"] = verdict
 			}
 		} else if _, ok := eventPayload["verdict"]; !ok {
-			eventPayload["verdict"] = strings.TrimSpace(event.Verdict)
+			eventPayload["verdict"] = verdict
 		}
 	}
 

@@ -187,6 +187,31 @@ func TestNewRecordFromEventErrors(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestNewRecordFromEventScriptEvaluationPendingVerdict(t *testing.T) {
+	r, err := NewRecordFromEvent(GovernanceEvent{
+		EventID:   "evt-pending-script",
+		Timestamp: "2026-02-20T15:03:00Z",
+		EventType: "script_evaluation",
+		Verdict:   "pending",
+		Detail: map[string]any{
+			"script_hash":          "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+			"tool_sequence":        []string{"shell.exec", "http.request"},
+			"step_count":           2,
+			"has_conditionals":     false,
+			"has_loops":            false,
+			"composite_risk_class": "limited",
+			"script_source":        "agent_planner",
+		},
+	}, "axym")
+	require.NoError(t, err)
+	require.Equal(t, "compiled_action", r.RecordType)
+	require.NoError(t, ValidateRecord(r))
+
+	_, hasGateVerdict := r.Event["gate_verdict"]
+	require.False(t, hasGateVerdict)
+	require.Equal(t, "pending", r.Event["verdict"])
+}
+
 func loadGovernanceEventFixture(t *testing.T, name string) GovernanceEvent {
 	t.Helper()
 	path := filepath.Join("testdata", "governance_events", name)
