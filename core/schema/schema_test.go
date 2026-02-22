@@ -106,3 +106,85 @@ func TestValidateGovernanceEventSchema(t *testing.T) {
 	invalid := []byte(`{"timestamp":"2026-02-20T12:00:00Z","event_type":"tool_gate"}`)
 	require.Error(t, ValidateAgainstSchema(invalid, "v1/governance-event-v1.schema.json"))
 }
+
+func TestValidateDynamicToolDiscoverySchema(t *testing.T) {
+	valid := []byte(`{
+	  "record_id":"prf-test",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-22T12:00:00Z",
+	  "source":"gait",
+	  "source_product":"gait",
+	  "record_type":"dynamic_tool_discovery",
+	  "event":{
+	    "tool_name":"filesystem.read",
+	    "discovery_method":"webmcp",
+	    "declared_annotations":{"readOnlyHint":true,"destructiveHint":false},
+	    "policy_verdict":"allow"
+	  },
+	  "controls":{},
+	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	}`)
+	require.NoError(t, ValidateRecord(valid, "dynamic_tool_discovery"))
+
+	invalid := []byte(`{
+	  "record_id":"prf-test",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-22T12:00:00Z",
+	  "source":"gait",
+	  "source_product":"gait",
+	  "record_type":"dynamic_tool_discovery",
+	  "event":{
+	    "tool_name":"filesystem.read",
+	    "discovery_method":"webmcp",
+	    "declared_annotations":{"readOnlyHint":true},
+	    "policy_verdict":"allow"
+	  },
+	  "controls":{},
+	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	}`)
+	require.Error(t, ValidateRecord(invalid, "dynamic_tool_discovery"))
+}
+
+func TestValidateDelegationSchema(t *testing.T) {
+	valid := []byte(`{
+	  "record_id":"prf-test",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-22T12:00:00Z",
+	  "source":"gait",
+	  "source_product":"gait",
+	  "record_type":"delegation",
+	  "event":{
+	    "delegator_id":"agent.lead",
+	    "delegatee_id":"agent.specialist",
+	    "delegation_scope":["tool:tool.write"],
+	    "chain_depth":1,
+	    "delegator_policy_digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111",
+	    "delegatee_policy_digest":"sha256:2222222222222222222222222222222222222222222222222222222222222222",
+	    "verdict":"allow"
+	  },
+	  "controls":{},
+	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	}`)
+	require.NoError(t, ValidateRecord(valid, "delegation"))
+
+	invalid := []byte(`{
+	  "record_id":"prf-test",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-22T12:00:00Z",
+	  "source":"gait",
+	  "source_product":"gait",
+	  "record_type":"delegation",
+	  "event":{
+	    "delegator_id":"agent.lead",
+	    "delegatee_id":"agent.specialist",
+	    "delegation_scope":["tool:tool.write"],
+	    "chain_depth":-1,
+	    "delegator_policy_digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111",
+	    "delegatee_policy_digest":"sha256:2222222222222222222222222222222222222222222222222222222222222222",
+	    "verdict":"allow"
+	  },
+	  "controls":{},
+	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	}`)
+	require.Error(t, ValidateRecord(invalid, "delegation"))
+}

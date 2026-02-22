@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Clyra-AI/proof/schemas/v1/types/dynamic-tool-discovery.schema.json",
+  "type": "object",
+  "required": ["record_type", "event"],
+  "properties": {
+    "record_type": { "const": "dynamic_tool_discovery" },
+    "event": {
+      "type": "object",
+      "required": ["tool_name", "discovery_method", "declared_annotations", "policy_verdict"],
+      "properties": {
+        "tool_name": { "type": "string", "minLength": 1 },
+        "tool_version": { "type": "string", "minLength": 1 },
+        "discovery_method": {
+          "type": "string",
+          "enum": ["webmcp", "a2a", "dynamic_mcp"]
+        },
+        "declared_annotations": {
+          "type": "object",
+          "required": ["readOnlyHint", "destructiveHint"],
+          "properties": {
+            "readOnlyHint": { "type": "boolean" },
+            "destructiveHint": { "type": "boolean" }
+          }
+        },
+        "policy_verdict": {
+          "type": "string",
+          "enum": ["allow", "block", "dry_run", "require_approval"]
+        }
+      }
+    }
+  }
+}

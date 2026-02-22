@@ -40,7 +40,7 @@ An open-source Go module and verification CLI. Four operations:
 PROOF_VERSION="$(gh release view --repo Clyra-AI/proof --json tagName -q .tagName 2>/dev/null || curl -fsSL https://api.github.com/repos/Clyra-AI/proof/releases/latest | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"tag_name\"])')"
 go install github.com/Clyra-AI/proof/cmd/proof@"${PROOF_VERSION}"
 
-proof types list          # 16 built-in record types
+proof types list          # 18 built-in record types
 proof frameworks list     # 8 built-in starter frameworks (12 controls)
 proof verify ./artifact   # Verify any proof artifact offline
 ```
@@ -133,11 +133,12 @@ Records are immutable, deterministic, and JSON-native — readable by any langua
 
 ## Built-in Record Types
 
-16 types covering the full AI governance surface, each with its own JSON Schema:
+18 types covering the full AI governance surface, each with its own JSON Schema:
 
 | Type | Description |
 |---|---|
 | `tool_invocation` | An AI agent invoked a tool |
+| `dynamic_tool_discovery` | A tool was discovered dynamically at runtime |
 | `decision` | An AI agent made a decision |
 | `guardrail_activation` | A guardrail triggered or passed |
 | `permission_check` | A permission was enforced |
@@ -152,6 +153,7 @@ Records are immutable, deterministic, and JSON-native — readable by any langua
 | `data_pipeline_run` | A data pipeline executed |
 | `replay_certification` | A replay was run and certified |
 | `approval` | An approval or delegation was issued |
+| `delegation` | Authority was delegated from one agent to another |
 | `compiled_action` | A compound agent action was compiled for execution |
 
 Record types are extensible. Define a custom type by providing a JSON Schema that extends the base record schema.
@@ -316,7 +318,7 @@ canon/               Compatibility package (Gait migration)
 schema/              Compatibility package (Gait migration)
 exitcode/            Compatibility package (Gait migration)
 schemas/v1/          JSON Schema spec files (language-agnostic contract)
-  types/             16 record type schemas
+  types/             18 record type schemas
 frameworks/          8 compliance framework YAML definitions
 docs/                Supplementary format and interoperability documentation
 testdata/            Golden vectors and test fixtures

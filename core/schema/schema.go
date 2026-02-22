@@ -23,6 +23,7 @@ type RecordType struct {
 
 var builtins = []RecordType{
 	{Name: "tool_invocation", Description: "An AI agent invoked a tool", SchemaPath: "v1/types/tool-invocation.schema.json"},
+	{Name: "dynamic_tool_discovery", Description: "A tool was discovered dynamically at runtime", SchemaPath: "v1/types/dynamic-tool-discovery.schema.json"},
 	{Name: "decision", Description: "An AI agent made a decision", SchemaPath: "v1/types/decision.schema.json"},
 	{Name: "guardrail_activation", Description: "A guardrail triggered or passed", SchemaPath: "v1/types/guardrail-activation.schema.json"},
 	{Name: "permission_check", Description: "A permission was enforced", SchemaPath: "v1/types/permission-check.schema.json"},
@@ -37,6 +38,7 @@ var builtins = []RecordType{
 	{Name: "data_pipeline_run", Description: "A data pipeline executed", SchemaPath: "v1/types/data-pipeline-run.schema.json"},
 	{Name: "replay_certification", Description: "A replay was run and certified", SchemaPath: "v1/types/replay-certification.schema.json"},
 	{Name: "approval", Description: "An approval or delegation was issued", SchemaPath: "v1/types/approval.schema.json"},
+	{Name: "delegation", Description: "Authority was delegated from one agent to another", SchemaPath: "v1/types/delegation.schema.json"},
 	{Name: "compiled_action", Description: "A compound agent action was compiled for execution", SchemaPath: "v1/types/compiled-action.schema.json"},
 }
 
