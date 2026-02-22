@@ -7,6 +7,7 @@ Proof records allow optional `metadata` for context enrichment. These are conven
 - `data_class` (string): `public` | `internal` | `confidential` | `pii` | `credentials`
 - `endpoint_class` (string): `read` | `write` | `exec` | `admin`
 - `risk_level` (string): `minimal` | `limited` | `high` | `unacceptable`
+- `discovery_method` (string): `static` | `webmcp` | `a2a` | `dynamic_mcp`
 - `business_process` (string): workflow identifier or business process id
 - `affected_entities` ([]string): entity identifiers affected by the action
 
