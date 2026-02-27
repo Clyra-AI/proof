@@ -12,8 +12,7 @@
           "enum": ["trace", "run", "session", "intent", "policy", "agent", "evidence"]
         },
         "id": { "type": "string", "minLength": 1 }
-      },
-      "additionalProperties": false
+      }
     },
     "entity_refs": {
       "type": "array",
@@ -27,8 +26,7 @@
             "enum": ["agent", "tool", "resource", "policy", "run", "trace", "delegation", "evidence"]
           },
           "id": { "type": "string", "minLength": 1 }
-        },
-        "additionalProperties": false
+        }
       }
     },
     "policy_ref": {
@@ -42,8 +40,7 @@
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
         }
-      },
-      "additionalProperties": false
+      }
     },
     "agent_chain": {
       "type": "array",
@@ -53,8 +50,7 @@
         "properties": {
           "identity": { "type": "string", "minLength": 1 },
           "role": { "type": "string", "enum": ["requester", "delegator", "delegate"] }
-        },
-        "additionalProperties": false
+        }
       }
     },
     "edges": {
@@ -74,8 +70,7 @@
             "properties": {
               "kind": { "type": "string", "minLength": 1 },
               "id": { "type": "string", "minLength": 1 }
-            },
-            "additionalProperties": false
+            }
           },
           "to": {
             "type": "object",
@@ -83,11 +78,9 @@
             "properties": {
               "kind": { "type": "string", "minLength": 1 },
               "id": { "type": "string", "minLength": 1 }
-            },
-            "additionalProperties": false
+            }
           }
-        },
-        "additionalProperties": false
+        }
       }
     },
     "parent_record_id": { "type": "string", "minLength": 1 },
@@ -110,10 +103,8 @@
           "agent_id": { "type": "string", "minLength": 1 },
           "delegated_by": { "type": "string", "minLength": 1 },
           "delegation_record_id": { "type": "string", "minLength": 1 }
-        },
-        "additionalProperties": false
+        }
       }
     }
-  },
-  "additionalProperties": false
+  }
 }

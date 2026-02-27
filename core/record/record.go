@@ -32,7 +32,8 @@ func New(opts RecordOpts) (*Record, error) {
 		Event:         opts.Event,
 		Controls:      opts.Controls,
 		Metadata:      opts.Metadata,
-		Relationship:  normalizeRelationship(cloneRelationship(firstRelationship(opts))),
+		Relationship:  normalizeRelationship(cloneRelationship(opts.Relationship)),
+		Relations:     normalizeRelationship(cloneRelationship(opts.Relations)),
 		Integrity:     Integrity{},
 	}
 	if err := Validate(r); err != nil {

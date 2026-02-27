@@ -73,7 +73,10 @@ func TestNewRecordLegacyRelationsAliasAccepted(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	require.NotNil(t, r.Relationship)
+	raw, err := json.Marshal(r)
+	require.NoError(t, err)
+	require.Contains(t, string(raw), `"relations"`)
+	require.NotContains(t, string(raw), `"relationship"`)
 }
 
 func TestChainTamperDetection(t *testing.T) {
