@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -31,7 +32,7 @@ func New(opts RecordOpts) (*Record, error) {
 		Event:         opts.Event,
 		Controls:      opts.Controls,
 		Metadata:      opts.Metadata,
-		Relations:     opts.Relations,
+		Relationship:  normalizeRelationship(cloneRelationship(firstRelationship(opts))),
 		Integrity:     Integrity{},
 	}
 	if err := Validate(r); err != nil {
@@ -97,6 +98,9 @@ func ComputeHash(r *Record) (string, error) {
 	if r.Relations != nil {
 		payload["relations"] = r.Relations
 	}
+	if r.Relationship != nil {
+		payload["relationship"] = r.Relationship
+	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return "", fmt.Errorf("marshal payload: %w", err)
@@ -148,21 +152,242 @@ func Clone(r *Record) *Record {
 		}
 	}
 	if r.Relations != nil {
-		cloned := *r.Relations
-		if r.Relations.RelatedRecordIDs != nil {
-			cloned.RelatedRecordIDs = append([]string(nil), r.Relations.RelatedRecordIDs...)
+		out.Relations = cloneRelationship(r.Relations)
+	}
+	if r.Relationship != nil {
+		out.Relationship = cloneRelationship(r.Relationship)
+	}
+	return &out
+}
+
+func firstRelationship(opts RecordOpts) *Relationship {
+	if opts.Relationship != nil {
+		return opts.Relationship
+	}
+	if opts.Relations != nil {
+		return opts.Relations
+	}
+	return nil
+}
+
+func normalizeRelationship(in *Relationship) *Relationship {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	if in.ParentRef != nil {
+		parent := *in.ParentRef
+		parent.Kind = strings.ToLower(strings.TrimSpace(parent.Kind))
+		parent.ID = strings.TrimSpace(parent.ID)
+		out.ParentRef = &parent
+	}
+	out.EntityRefs = normalizedRefs(in.EntityRefs)
+	if in.PolicyRef != nil {
+		policy := *in.PolicyRef
+		policy.PolicyID = strings.TrimSpace(policy.PolicyID)
+		policy.PolicyVersion = strings.TrimSpace(policy.PolicyVersion)
+		policy.PolicyDigest = normalizeDigestRef(policy.PolicyDigest)
+		policy.MatchedRuleIDs = uniqueSortedStrings(policy.MatchedRuleIDs)
+		out.PolicyRef = &policy
+	}
+	out.AgentChain = make([]AgentChainHop, len(in.AgentChain))
+	for i := range in.AgentChain {
+		out.AgentChain[i] = AgentChainHop{
+			Identity: strings.TrimSpace(in.AgentChain[i].Identity),
+			Role:     strings.ToLower(strings.TrimSpace(in.AgentChain[i].Role)),
 		}
-		if r.Relations.RelatedEntityIDs != nil {
-			cloned.RelatedEntityIDs = append([]string(nil), r.Relations.RelatedEntityIDs...)
+	}
+	out.Edges = normalizedEdges(in.Edges)
+
+	// Legacy fields remain normalized for deterministic compatibility.
+	out.ParentRecordID = strings.TrimSpace(in.ParentRecordID)
+	out.RelatedRecordIDs = uniqueSortedStrings(in.RelatedRecordIDs)
+	out.RelatedEntityIDs = uniqueSortedStrings(in.RelatedEntityIDs)
+	out.AgentLineage = make([]AgentLineageHop, len(in.AgentLineage))
+	for i := range in.AgentLineage {
+		out.AgentLineage[i] = AgentLineageHop{
+			AgentID:            strings.TrimSpace(in.AgentLineage[i].AgentID),
+			DelegatedBy:        strings.TrimSpace(in.AgentLineage[i].DelegatedBy),
+			DelegationRecordID: strings.TrimSpace(in.AgentLineage[i].DelegationRecordID),
 		}
-		if r.Relations.PolicyRef != nil {
-			policy := *r.Relations.PolicyRef
-			cloned.PolicyRef = &policy
+	}
+
+	return &out
+}
+
+func normalizedRefs(in []RelationshipRef) []RelationshipRef {
+	if len(in) == 0 {
+		return nil
+	}
+	type keyedRef struct {
+		key string
+		ref RelationshipRef
+	}
+	seen := map[string]struct{}{}
+	refs := make([]keyedRef, 0, len(in))
+	for i := range in {
+		ref := RelationshipRef{
+			Kind: strings.ToLower(strings.TrimSpace(in[i].Kind)),
+			ID:   strings.TrimSpace(in[i].ID),
 		}
-		if r.Relations.AgentLineage != nil {
-			cloned.AgentLineage = append([]AgentLineageHop(nil), r.Relations.AgentLineage...)
+		key := ref.Kind + "\x00" + ref.ID
+		if _, ok := seen[key]; ok {
+			continue
 		}
-		out.Relations = &cloned
+		seen[key] = struct{}{}
+		refs = append(refs, keyedRef{key: key, ref: ref})
+	}
+	sort.SliceStable(refs, func(i, j int) bool {
+		if refs[i].ref.Kind == refs[j].ref.Kind {
+			return refs[i].ref.ID < refs[j].ref.ID
+		}
+		return refs[i].ref.Kind < refs[j].ref.Kind
+	})
+	out := make([]RelationshipRef, 0, len(refs))
+	for i := range refs {
+		out = append(out, refs[i].ref)
+	}
+	return out
+}
+
+func normalizedEdges(in []RelationshipEdge) []RelationshipEdge {
+	if len(in) == 0 {
+		return nil
+	}
+	type keyedEdge struct {
+		key  string
+		edge RelationshipEdge
+	}
+	seen := map[string]struct{}{}
+	edges := make([]keyedEdge, 0, len(in))
+	for i := range in {
+		edge := RelationshipEdge{
+			Kind: strings.ToLower(strings.TrimSpace(in[i].Kind)),
+			From: RelationshipRef{
+				Kind: strings.ToLower(strings.TrimSpace(in[i].From.Kind)),
+				ID:   strings.TrimSpace(in[i].From.ID),
+			},
+			To: RelationshipRef{
+				Kind: strings.ToLower(strings.TrimSpace(in[i].To.Kind)),
+				ID:   strings.TrimSpace(in[i].To.ID),
+			},
+		}
+		key := edge.Kind + "\x00" + edge.From.Kind + "\x00" + edge.From.ID + "\x00" + edge.To.Kind + "\x00" + edge.To.ID
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		edges = append(edges, keyedEdge{key: key, edge: edge})
+	}
+	sort.SliceStable(edges, func(i, j int) bool {
+		if edges[i].edge.Kind != edges[j].edge.Kind {
+			return edges[i].edge.Kind < edges[j].edge.Kind
+		}
+		if edges[i].edge.From.Kind != edges[j].edge.From.Kind {
+			return edges[i].edge.From.Kind < edges[j].edge.From.Kind
+		}
+		if edges[i].edge.From.ID != edges[j].edge.From.ID {
+			return edges[i].edge.From.ID < edges[j].edge.From.ID
+		}
+		if edges[i].edge.To.Kind != edges[j].edge.To.Kind {
+			return edges[i].edge.To.Kind < edges[j].edge.To.Kind
+		}
+		return edges[i].edge.To.ID < edges[j].edge.To.ID
+	})
+	out := make([]RelationshipEdge, 0, len(edges))
+	for i := range edges {
+		out = append(out, edges[i].edge)
+	}
+	return out
+}
+
+func uniqueSortedStrings(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(in))
+	for i := range in {
+		v := strings.TrimSpace(in[i])
+		if v == "" {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func normalizeDigestRef(in string) string {
+	v := strings.TrimSpace(in)
+	if v == "" {
+		return ""
+	}
+	l := strings.ToLower(v)
+	if strings.HasPrefix(l, "sha256:") {
+		digest := l[len("sha256:"):]
+		if isLowerHexLen(digest, 64) {
+			return "sha256:" + digest
+		}
+		return v
+	}
+	if isLowerHexLen(l, 64) {
+		return l
+	}
+	return v
+}
+
+func isLowerHexLen(v string, n int) bool {
+	if len(v) != n {
+		return false
+	}
+	for i := 0; i < len(v); i++ {
+		c := v[i]
+		if (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func cloneRelationship(in *Relationship) *Relationship {
+	if in == nil {
+		return nil
+	}
+	out := *in
+	if in.ParentRef != nil {
+		parent := *in.ParentRef
+		out.ParentRef = &parent
+	}
+	if in.EntityRefs != nil {
+		out.EntityRefs = append([]RelationshipRef(nil), in.EntityRefs...)
+	}
+	if in.PolicyRef != nil {
+		policy := *in.PolicyRef
+		if in.PolicyRef.MatchedRuleIDs != nil {
+			policy.MatchedRuleIDs = append([]string(nil), in.PolicyRef.MatchedRuleIDs...)
+		}
+		out.PolicyRef = &policy
+	}
+	if in.AgentChain != nil {
+		out.AgentChain = append([]AgentChainHop(nil), in.AgentChain...)
+	}
+	if in.Edges != nil {
+		out.Edges = append([]RelationshipEdge(nil), in.Edges...)
+	}
+	if in.RelatedRecordIDs != nil {
+		out.RelatedRecordIDs = append([]string(nil), in.RelatedRecordIDs...)
+	}
+	if in.RelatedEntityIDs != nil {
+		out.RelatedEntityIDs = append([]string(nil), in.RelatedEntityIDs...)
+	}
+	if in.AgentLineage != nil {
+		out.AgentLineage = append([]AgentLineageHop(nil), in.AgentLineage...)
 	}
 	return &out
 }

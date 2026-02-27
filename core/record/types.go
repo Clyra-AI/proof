@@ -13,22 +13,49 @@ type Record struct {
 	Event         map[string]any `json:"event"`
 	Controls      Controls       `json:"controls"`
 	Metadata      map[string]any `json:"metadata,omitempty"`
-	Relations     *Relations     `json:"relations,omitempty"`
-	Integrity     Integrity      `json:"integrity"`
+	Relationship  *Relationship  `json:"relationship,omitempty"`
+	// Deprecated: use relationship. Kept for backward compatibility.
+	Relations *Relations `json:"relations,omitempty"`
+	Integrity Integrity  `json:"integrity"`
 }
 
-type Relations struct {
+type Relationship struct {
+	ParentRef  *RelationshipRef   `json:"parent_ref,omitempty"`
+	EntityRefs []RelationshipRef  `json:"entity_refs,omitempty"`
+	PolicyRef  *PolicyRef         `json:"policy_ref,omitempty"`
+	AgentChain []AgentChainHop    `json:"agent_chain,omitempty"`
+	Edges      []RelationshipEdge `json:"edges,omitempty"`
+
+	// Legacy v1.x compatibility fields (accepted in both relationship and relations).
 	ParentRecordID   string            `json:"parent_record_id,omitempty"`
 	RelatedRecordIDs []string          `json:"related_record_ids,omitempty"`
 	RelatedEntityIDs []string          `json:"related_entity_ids,omitempty"`
-	PolicyRef        *PolicyRef        `json:"policy_ref,omitempty"`
 	AgentLineage     []AgentLineageHop `json:"agent_lineage,omitempty"`
 }
 
+type Relations = Relationship
+
+type RelationshipRef struct {
+	Kind string `json:"kind"`
+	ID   string `json:"id"`
+}
+
+type RelationshipEdge struct {
+	Kind string          `json:"kind"`
+	From RelationshipRef `json:"from"`
+	To   RelationshipRef `json:"to"`
+}
+
+type AgentChainHop struct {
+	Identity string `json:"identity"`
+	Role     string `json:"role"`
+}
+
 type PolicyRef struct {
-	PolicyID      string `json:"policy_id,omitempty"`
-	PolicyVersion string `json:"policy_version,omitempty"`
-	PolicyDigest  string `json:"policy_digest,omitempty"`
+	PolicyID       string   `json:"policy_id,omitempty"`
+	PolicyVersion  string   `json:"policy_version,omitempty"`
+	PolicyDigest   string   `json:"policy_digest,omitempty"`
+	MatchedRuleIDs []string `json:"matched_rule_ids,omitempty"`
 }
 
 type AgentLineageHop struct {
@@ -74,5 +101,7 @@ type RecordOpts struct {
 	Event         map[string]any
 	Controls      Controls
 	Metadata      map[string]any
-	Relations     *Relations
+	Relationship  *Relationship
+	// Deprecated: use Relationship. Kept for backward compatibility.
+	Relations *Relations
 }

@@ -114,17 +114,16 @@ func TestClone(t *testing.T) {
 	require.Equal(t, "f1", r.Event["id"])
 }
 
-func TestNewWithRelationsAffectsHash(t *testing.T) {
+func TestNewWithRelationshipAffectsHash(t *testing.T) {
 	r, err := New(RecordOpts{
 		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
 		Source:        "gait",
 		SourceProduct: "gait",
 		Type:          "policy_enforcement",
 		Event:         map[string]any{"verdict": "allow"},
-		Relations: &Relations{
-			ParentRecordID:   "prf-parent",
-			RelatedRecordIDs: []string{"prf-related-1"},
-			RelatedEntityIDs: []string{"agent:a", "tool:t"},
+		Relationship: &Relationship{
+			ParentRef:  &RelationshipRef{Kind: "trace", ID: "trace-1"},
+			EntityRefs: []RelationshipRef{{Kind: "agent", ID: "agent:a"}, {Kind: "tool", ID: "tool:t"}},
 			PolicyRef: &PolicyRef{
 				PolicyID:      "prod.policy",
 				PolicyVersion: "v3",
@@ -136,42 +135,91 @@ func TestNewWithRelationsAffectsHash(t *testing.T) {
 
 	originalHash := r.Integrity.RecordHash
 	clone := Clone(r)
-	clone.Relations.PolicyRef.PolicyVersion = "v4"
+	clone.Relationship.PolicyRef.PolicyVersion = "v4"
 
 	changedHash, err := ComputeHash(clone)
 	require.NoError(t, err)
 	require.NotEqual(t, originalHash, changedHash)
 }
 
-func TestCloneDeepCopiesRelations(t *testing.T) {
+func TestCloneDeepCopiesRelationship(t *testing.T) {
 	r, err := New(RecordOpts{
 		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
 		Source:        "wrkr",
 		SourceProduct: "wrkr",
 		Type:          "scan_finding",
 		Event:         map[string]any{"id": "f1"},
-		Relations: &Relations{
-			ParentRecordID:   "prf-parent",
-			RelatedRecordIDs: []string{"prf-related-1"},
-			RelatedEntityIDs: []string{"agent:a"},
+		Relationship: &Relationship{
+			ParentRef:  &RelationshipRef{Kind: "trace", ID: "trace-1"},
+			EntityRefs: []RelationshipRef{{Kind: "agent", ID: "agent:a"}},
 			PolicyRef: &PolicyRef{
-				PolicyID:      "security.policy",
-				PolicyVersion: "v1",
-				PolicyDigest:  "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+				PolicyID:       "security.policy",
+				PolicyVersion:  "v1",
+				PolicyDigest:   "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+				MatchedRuleIDs: []string{"rule-1"},
 			},
-			AgentLineage: []AgentLineageHop{
-				{AgentID: "agent:a", DelegatedBy: "agent:root", DelegationRecordID: "prf-del-1"},
+			AgentChain: []AgentChainHop{
+				{Identity: "agent:a", Role: "requester"},
 			},
 		},
 	})
 	require.NoError(t, err)
 
 	c := Clone(r)
-	c.Relations.RelatedRecordIDs[0] = "prf-related-2"
-	c.Relations.PolicyRef.PolicyVersion = "v2"
-	c.Relations.AgentLineage[0].DelegatedBy = "agent:other"
+	c.Relationship.EntityRefs[0].ID = "agent:other"
+	c.Relationship.PolicyRef.PolicyVersion = "v2"
+	c.Relationship.AgentChain[0].Role = "delegate"
 
-	require.Equal(t, "prf-related-1", r.Relations.RelatedRecordIDs[0])
-	require.Equal(t, "v1", r.Relations.PolicyRef.PolicyVersion)
-	require.Equal(t, "agent:root", r.Relations.AgentLineage[0].DelegatedBy)
+	require.Equal(t, "agent:a", r.Relationship.EntityRefs[0].ID)
+	require.Equal(t, "v1", r.Relationship.PolicyRef.PolicyVersion)
+	require.Equal(t, "requester", r.Relationship.AgentChain[0].Role)
+}
+
+func TestNewNormalizesRelationshipDeterministically(t *testing.T) {
+	base := RecordOpts{
+		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
+		Source:        "gait",
+		SourceProduct: "gait",
+		Type:          "policy_enforcement",
+		Event:         map[string]any{"verdict": "allow"},
+	}
+	first := base
+	first.Relationship = &Relationship{
+		EntityRefs: []RelationshipRef{
+			{Kind: "Tool", ID: " tool:b "},
+			{Kind: "agent", ID: "agent:a"},
+			{Kind: "tool", ID: "tool:b"},
+		},
+		PolicyRef: &PolicyRef{
+			PolicyDigest:   "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+			MatchedRuleIDs: []string{"rule-b", "rule-a", "rule-b"},
+		},
+		Edges: []RelationshipEdge{
+			{Kind: "Calls", From: RelationshipRef{Kind: "agent", ID: "agent:a"}, To: RelationshipRef{Kind: "tool", ID: "tool:b"}},
+			{Kind: "calls", From: RelationshipRef{Kind: "agent", ID: "agent:a"}, To: RelationshipRef{Kind: "tool", ID: "tool:b"}},
+		},
+	}
+	second := base
+	second.Relationship = &Relationship{
+		EntityRefs: []RelationshipRef{
+			{Kind: "tool", ID: "tool:b"},
+			{Kind: "agent", ID: "agent:a"},
+		},
+		PolicyRef: &PolicyRef{
+			PolicyDigest:   "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			MatchedRuleIDs: []string{"rule-a", "rule-b"},
+		},
+		Edges: []RelationshipEdge{
+			{Kind: "calls", From: RelationshipRef{Kind: "agent", ID: "agent:a"}, To: RelationshipRef{Kind: "tool", ID: "tool:b"}},
+		},
+	}
+
+	r1, err := New(first)
+	require.NoError(t, err)
+	r2, err := New(second)
+	require.NoError(t, err)
+
+	require.Equal(t, r1.RecordID, r2.RecordID)
+	require.Equal(t, r1.Integrity.RecordHash, r2.Integrity.RecordHash)
+	require.Equal(t, []string{"rule-a", "rule-b"}, r1.Relationship.PolicyRef.MatchedRuleIDs)
 }

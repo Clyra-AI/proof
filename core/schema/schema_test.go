@@ -189,7 +189,7 @@ func TestValidateDelegationSchema(t *testing.T) {
 	require.Error(t, ValidateRecord(invalid, "delegation"))
 }
 
-func TestValidateRecordWithRelations(t *testing.T) {
+func TestValidateRecordWithRelationship(t *testing.T) {
 	valid := []byte(`{
 	  "record_id":"prf-test",
 	  "record_version":"1.0",
@@ -202,23 +202,48 @@ func TestValidateRecordWithRelations(t *testing.T) {
 	    "relationships":[{"relation":"installed_by","target_id":"user:alice","target_kind":"user"}]
 	  },
 	  "controls":{},
-	  "relations":{
-	    "parent_record_id":"prf-prev",
-	    "related_record_ids":["prf-1","prf-2"],
-	    "related_entity_ids":["agent:scanner","pipeline:nightly"],
+	  "relationship":{
+	    "parent_ref":{"kind":"trace","id":"trace-1"},
+	    "entity_refs":[
+	      {"kind":"agent","id":"agent:scanner"},
+	      {"kind":"resource","id":"pipeline:nightly"}
+	    ],
+	    "edges":[
+	      {"kind":"calls","from":{"kind":"agent","id":"agent:scanner"},"to":{"kind":"tool","id":"tool:filesystem.write"}}
+	    ],
 	    "policy_ref":{
 	      "policy_id":"security.tool-access",
 	      "policy_version":"v2",
-	      "policy_digest":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+	      "policy_digest":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+	      "matched_rule_ids":["rule-1"]
 	    },
-	    "agent_lineage":[{"agent_id":"agent:scanner","delegated_by":"agent:root","delegation_record_id":"prf-del-1"}]
+	    "agent_chain":[{"identity":"agent:scanner","role":"requester"}]
 	  },
 	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
 	}`)
 	require.NoError(t, ValidateRecord(valid, "scan_finding"))
 }
 
-func TestValidateRecordWithRelationsRejectsInvalidPolicyDigest(t *testing.T) {
+func TestValidateRecordWithLegacyRelationsAlias(t *testing.T) {
+	valid := []byte(`{
+	  "record_id":"prf-test",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-22T12:00:00Z",
+	  "source":"wrkr",
+	  "source_product":"wrkr",
+	  "record_type":"scan_finding",
+	  "event":{"entity_id":"tool:filesystem.write"},
+	  "controls":{},
+	  "relations":{
+	    "parent_record_id":"prf-prev",
+	    "related_entity_ids":["agent:scanner"]
+	  },
+	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	}`)
+	require.NoError(t, ValidateRecord(valid, "scan_finding"))
+}
+
+func TestValidateRecordWithRelationshipRejectsInvalidPolicyDigest(t *testing.T) {
 	invalid := []byte(`{
 	  "record_id":"prf-test",
 	  "record_version":"1.0",
@@ -235,7 +260,7 @@ func TestValidateRecordWithRelationsRejectsInvalidPolicyDigest(t *testing.T) {
 	    "trigger_record_ids":["prf-a","prf-b"]
 	  },
 	  "controls":{},
-	  "relations":{
+	  "relationship":{
 	    "policy_ref":{
 	      "policy_id":"security.tool-access",
 	      "policy_version":"v2",
@@ -258,10 +283,21 @@ func TestValidatePolicyEnforcementAllowsOpaqueDigestReference(t *testing.T) {
 	  "event":{
 	    "policy_id":"security.tool-access",
 	    "policy_version":"v2",
-	    "policy_digest":"policy-v2:gateway"
+	    "policy_digest":""
 	  },
 	  "controls":{},
 	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
 	}`)
 	require.NoError(t, ValidateRecord(valid, "policy_enforcement"))
+}
+
+func TestValidateRelationshipEnvelopeSchema(t *testing.T) {
+	valid := []byte(`{
+	  "parent_ref":{"kind":"trace","id":"trace-1"},
+	  "entity_refs":[{"kind":"agent","id":"agent:a"}],
+	  "policy_ref":{"policy_id":"p1","policy_version":"v2","policy_digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","matched_rule_ids":["r1","r2"]},
+	  "agent_chain":[{"identity":"agent:a","role":"requester"}],
+	  "edges":[{"kind":"calls","from":{"kind":"agent","id":"agent:a"},"to":{"kind":"tool","id":"tool:b"}}]
+	}`)
+	require.NoError(t, ValidateAgainstSchema(valid, "v1/relationship_envelope.schema.json"))
 }
