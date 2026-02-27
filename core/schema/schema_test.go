@@ -246,3 +246,22 @@ func TestValidateRecordWithRelationsRejectsInvalidPolicyDigest(t *testing.T) {
 	}`)
 	require.Error(t, ValidateRecord(invalid, "policy_enforcement"))
 }
+
+func TestValidatePolicyEnforcementAllowsLegacyBareDigest(t *testing.T) {
+	valid := []byte(`{
+	  "record_id":"prf-test",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-22T12:00:00Z",
+	  "source":"gait",
+	  "source_product":"gait",
+	  "record_type":"policy_enforcement",
+	  "event":{
+	    "policy_id":"security.tool-access",
+	    "policy_version":"v2",
+	    "policy_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+	  },
+	  "controls":{},
+	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	}`)
+	require.NoError(t, ValidateRecord(valid, "policy_enforcement"))
+}
