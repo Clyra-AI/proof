@@ -43,7 +43,7 @@
           "properties": {
             "policy_id": { "type": "string", "minLength": 1 },
             "policy_version": { "type": "string", "minLength": 1 },
-            "policy_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+            "policy_digest": { "type": "string", "pattern": "^(sha256:)?[a-f0-9]{64}$" }
           }
         },
         "agent_lineage": {
