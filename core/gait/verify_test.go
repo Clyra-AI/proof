@@ -391,6 +391,59 @@ func TestVerifyPackProofRecordsErrors(t *testing.T) {
 	require.ErrorContains(t, err, "verify proof records")
 }
 
+func TestVerifyPackProofRecordsRejectsUnknownRelationshipFields(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+
+	rec, err := record.New(record.RecordOpts{
+		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
+		Source:        "gait",
+		SourceProduct: "gait",
+		Type:          "tool_invocation",
+		Event:         map[string]any{"tool": "demo"},
+		Relationship: &record.Relationship{
+			ParentRef: &record.RelationshipRef{Kind: "trace", ID: "trace-1"},
+		},
+	})
+	require.NoError(t, err)
+	_, err = signing.Sign(rec, signing.SigningKey{Private: priv, Public: pub})
+	require.NoError(t, err)
+
+	raw, err := json.Marshal(rec)
+	require.NoError(t, err)
+
+	var obj map[string]any
+	require.NoError(t, json.Unmarshal(raw, &obj))
+	relationship, ok := obj["relationship"].(map[string]any)
+	require.True(t, ok)
+	relationship["unsigned_context"] = "tamper"
+	tampered, err := json.Marshal(obj)
+	require.NoError(t, err)
+	proofRecords := append(tampered, '\n')
+
+	manifest := PackManifest{
+		SchemaID:      "gait.pack.manifest",
+		SchemaVersion: "1",
+		CreatedAt:     "2026-02-17T12:00:00Z",
+		PackID:        "pack-unknown-relationship-field",
+		PackType:      "run",
+		Contents: []PackEntry{
+			{Path: "proof_records.jsonl", SHA256: sha256Hex(proofRecords), Type: "proof.records.v1"},
+		},
+	}
+	manifestRaw, err := json.Marshal(manifest)
+	require.NoError(t, err)
+
+	zipPath := filepath.Join(t.TempDir(), "pack-unknown-relationship-field.zip")
+	writeZip(t, zipPath, map[string][]byte{
+		"pack_manifest.json":  manifestRaw,
+		"proof_records.jsonl": proofRecords,
+	})
+
+	_, err = VerifyPack(zipPath, false, nil)
+	require.ErrorContains(t, err, "validate schema")
+}
+
 func TestVerifyPackProofRecordsCosignRequiresVerifierOptions(t *testing.T) {
 	pub, priv, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
