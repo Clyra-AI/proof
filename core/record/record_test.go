@@ -260,6 +260,53 @@ func TestNormalizedEdgesStableSortAndDedup(t *testing.T) {
 	require.Nil(t, normalizedEdges(nil))
 }
 
+func TestNormalizedRefsKeepsDistinctAdditiveMetadata(t *testing.T) {
+	refs := []RelationshipRef{
+		{Kind: "agent", ID: "agent:a", Extra: map[string]json.RawMessage{"tag": json.RawMessage(`"alpha"`)}},
+		{Kind: "agent", ID: "agent:a", Extra: map[string]json.RawMessage{"tag": json.RawMessage(`"beta"`)}},
+		{Kind: "agent", ID: "agent:a", Extra: map[string]json.RawMessage{"tag": json.RawMessage(`"alpha"`)}},
+	}
+	normalized := normalizedRefs(refs)
+	require.Len(t, normalized, 2)
+	require.Equal(t, `"alpha"`, string(normalized[0].Extra["tag"]))
+	require.Equal(t, `"beta"`, string(normalized[1].Extra["tag"]))
+}
+
+func TestNormalizedEdgesKeepsDistinctAdditiveMetadata(t *testing.T) {
+	edges := []RelationshipEdge{
+		{
+			Kind: "calls",
+			From: RelationshipRef{Kind: "agent", ID: "agent:a", Extra: map[string]json.RawMessage{"ctx": json.RawMessage(`"a"`)}},
+			To:   RelationshipRef{Kind: "tool", ID: "tool:x"},
+			Extra: map[string]json.RawMessage{
+				"label": json.RawMessage(`"first"`),
+			},
+		},
+		{
+			Kind: "calls",
+			From: RelationshipRef{Kind: "agent", ID: "agent:a", Extra: map[string]json.RawMessage{"ctx": json.RawMessage(`"b"`)}},
+			To:   RelationshipRef{Kind: "tool", ID: "tool:x"},
+			Extra: map[string]json.RawMessage{
+				"label": json.RawMessage(`"second"`),
+			},
+		},
+		{
+			Kind: "calls",
+			From: RelationshipRef{Kind: "agent", ID: "agent:a", Extra: map[string]json.RawMessage{"ctx": json.RawMessage(`"a"`)}},
+			To:   RelationshipRef{Kind: "tool", ID: "tool:x"},
+			Extra: map[string]json.RawMessage{
+				"label": json.RawMessage(`"first"`),
+			},
+		},
+	}
+	normalized := normalizedEdges(edges)
+	require.Len(t, normalized, 2)
+	require.Equal(t, `"a"`, string(normalized[0].From.Extra["ctx"]))
+	require.Equal(t, `"first"`, string(normalized[0].Extra["label"]))
+	require.Equal(t, `"b"`, string(normalized[1].From.Extra["ctx"]))
+	require.Equal(t, `"second"`, string(normalized[1].Extra["label"]))
+}
+
 func TestComputeHashIncludesRelationshipAndLegacyAlias(t *testing.T) {
 	base := &Record{
 		RecordID:      "prf-test",

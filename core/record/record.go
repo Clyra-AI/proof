@@ -237,7 +237,8 @@ func normalizedRefs(in []RelationshipRef) []RelationshipRef {
 			ID:    strings.TrimSpace(in[i].ID),
 			Extra: cloneRawMessages(in[i].Extra),
 		}
-		key := ref.Kind + "\x00" + ref.ID
+		extraKey := rawMapStableKey(ref.Extra)
+		key := ref.Kind + "\x00" + ref.ID + "\x00" + extraKey
 		if _, ok := seen[key]; ok {
 			continue
 		}
@@ -246,6 +247,9 @@ func normalizedRefs(in []RelationshipRef) []RelationshipRef {
 	}
 	sort.SliceStable(refs, func(i, j int) bool {
 		if refs[i].ref.Kind == refs[j].ref.Kind {
+			if refs[i].ref.ID == refs[j].ref.ID {
+				return rawMapStableKey(refs[i].ref.Extra) < rawMapStableKey(refs[j].ref.Extra)
+			}
 			return refs[i].ref.ID < refs[j].ref.ID
 		}
 		return refs[i].ref.Kind < refs[j].ref.Kind
@@ -282,7 +286,10 @@ func normalizedEdges(in []RelationshipEdge) []RelationshipEdge {
 			},
 			Extra: cloneRawMessages(in[i].Extra),
 		}
-		key := edge.Kind + "\x00" + edge.From.Kind + "\x00" + edge.From.ID + "\x00" + edge.To.Kind + "\x00" + edge.To.ID
+		fromExtraKey := rawMapStableKey(edge.From.Extra)
+		toExtraKey := rawMapStableKey(edge.To.Extra)
+		edgeExtraKey := rawMapStableKey(edge.Extra)
+		key := edge.Kind + "\x00" + edge.From.Kind + "\x00" + edge.From.ID + "\x00" + fromExtraKey + "\x00" + edge.To.Kind + "\x00" + edge.To.ID + "\x00" + toExtraKey + "\x00" + edgeExtraKey
 		if _, ok := seen[key]; ok {
 			continue
 		}
@@ -299,10 +306,19 @@ func normalizedEdges(in []RelationshipEdge) []RelationshipEdge {
 		if edges[i].edge.From.ID != edges[j].edge.From.ID {
 			return edges[i].edge.From.ID < edges[j].edge.From.ID
 		}
+		if left, right := rawMapStableKey(edges[i].edge.From.Extra), rawMapStableKey(edges[j].edge.From.Extra); left != right {
+			return left < right
+		}
 		if edges[i].edge.To.Kind != edges[j].edge.To.Kind {
 			return edges[i].edge.To.Kind < edges[j].edge.To.Kind
 		}
-		return edges[i].edge.To.ID < edges[j].edge.To.ID
+		if edges[i].edge.To.ID != edges[j].edge.To.ID {
+			return edges[i].edge.To.ID < edges[j].edge.To.ID
+		}
+		if left, right := rawMapStableKey(edges[i].edge.To.Extra), rawMapStableKey(edges[j].edge.To.Extra); left != right {
+			return left < right
+		}
+		return rawMapStableKey(edges[i].edge.Extra) < rawMapStableKey(edges[j].edge.Extra)
 	})
 	out := make([]RelationshipEdge, 0, len(edges))
 	for i := range edges {
@@ -452,4 +468,31 @@ func cloneRawMessages(in map[string]json.RawMessage) map[string]json.RawMessage 
 		out[k] = append(json.RawMessage(nil), v...)
 	}
 	return out
+}
+
+func rawMapStableKey(in map[string]json.RawMessage) string {
+	if len(in) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(in))
+	for k := range in {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var b strings.Builder
+	for i := range keys {
+		key := keys[i]
+		val := in[key]
+		canonical := val
+		if len(val) > 0 {
+			if normalized, err := canon.Canonicalize(val, canon.DomainJSON); err == nil {
+				canonical = normalized
+			}
+		}
+		b.WriteString(key)
+		b.WriteByte('\x1f')
+		b.Write(canonical)
+		b.WriteByte('\x1e')
+	}
+	return b.String()
 }
