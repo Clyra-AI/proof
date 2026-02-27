@@ -224,6 +224,24 @@ func TestValidateRecordWithRelationship(t *testing.T) {
 	require.NoError(t, ValidateRecord(valid, "scan_finding"))
 }
 
+func TestValidateRecordWithRelationshipRejectsUnknownFields(t *testing.T) {
+	invalid := []byte(`{
+	  "record_id":"prf-test",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-22T12:00:00Z",
+	  "source":"wrkr",
+	  "source_product":"wrkr",
+	  "record_type":"scan_finding",
+	  "event":{"entity_id":"tool:filesystem.write"},
+	  "controls":{},
+	  "relationship":{
+	    "parent_ref":{"kind":"trace","id":"trace-1","extra":"nope"}
+	  },
+	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	}`)
+	require.Error(t, ValidateRecord(invalid, "scan_finding"))
+}
+
 func TestValidateRecordWithLegacyRelationsAlias(t *testing.T) {
 	valid := []byte(`{
 	  "record_id":"prf-test",
