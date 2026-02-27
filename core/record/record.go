@@ -176,10 +176,12 @@ func normalizeRelationship(in *Relationship) *Relationship {
 		return nil
 	}
 	out := *in
+	out.Extra = cloneRawMessages(in.Extra)
 	if in.ParentRef != nil {
 		parent := *in.ParentRef
 		parent.Kind = strings.ToLower(strings.TrimSpace(parent.Kind))
 		parent.ID = strings.TrimSpace(parent.ID)
+		parent.Extra = cloneRawMessages(in.ParentRef.Extra)
 		out.ParentRef = &parent
 	}
 	out.EntityRefs = normalizedRefs(in.EntityRefs)
@@ -189,6 +191,7 @@ func normalizeRelationship(in *Relationship) *Relationship {
 		policy.PolicyVersion = strings.TrimSpace(policy.PolicyVersion)
 		policy.PolicyDigest = normalizeDigestRef(policy.PolicyDigest)
 		policy.MatchedRuleIDs = uniqueSortedStrings(policy.MatchedRuleIDs)
+		policy.Extra = cloneRawMessages(in.PolicyRef.Extra)
 		out.PolicyRef = &policy
 	}
 	out.AgentChain = make([]AgentChainHop, len(in.AgentChain))
@@ -196,6 +199,7 @@ func normalizeRelationship(in *Relationship) *Relationship {
 		out.AgentChain[i] = AgentChainHop{
 			Identity: strings.TrimSpace(in.AgentChain[i].Identity),
 			Role:     strings.ToLower(strings.TrimSpace(in.AgentChain[i].Role)),
+			Extra:    cloneRawMessages(in.AgentChain[i].Extra),
 		}
 	}
 	out.Edges = normalizedEdges(in.Edges)
@@ -210,6 +214,7 @@ func normalizeRelationship(in *Relationship) *Relationship {
 			AgentID:            strings.TrimSpace(in.AgentLineage[i].AgentID),
 			DelegatedBy:        strings.TrimSpace(in.AgentLineage[i].DelegatedBy),
 			DelegationRecordID: strings.TrimSpace(in.AgentLineage[i].DelegationRecordID),
+			Extra:              cloneRawMessages(in.AgentLineage[i].Extra),
 		}
 	}
 
@@ -228,8 +233,9 @@ func normalizedRefs(in []RelationshipRef) []RelationshipRef {
 	refs := make([]keyedRef, 0, len(in))
 	for i := range in {
 		ref := RelationshipRef{
-			Kind: strings.ToLower(strings.TrimSpace(in[i].Kind)),
-			ID:   strings.TrimSpace(in[i].ID),
+			Kind:  strings.ToLower(strings.TrimSpace(in[i].Kind)),
+			ID:    strings.TrimSpace(in[i].ID),
+			Extra: cloneRawMessages(in[i].Extra),
 		}
 		key := ref.Kind + "\x00" + ref.ID
 		if _, ok := seen[key]; ok {
@@ -265,13 +271,16 @@ func normalizedEdges(in []RelationshipEdge) []RelationshipEdge {
 		edge := RelationshipEdge{
 			Kind: strings.ToLower(strings.TrimSpace(in[i].Kind)),
 			From: RelationshipRef{
-				Kind: strings.ToLower(strings.TrimSpace(in[i].From.Kind)),
-				ID:   strings.TrimSpace(in[i].From.ID),
+				Kind:  strings.ToLower(strings.TrimSpace(in[i].From.Kind)),
+				ID:    strings.TrimSpace(in[i].From.ID),
+				Extra: cloneRawMessages(in[i].From.Extra),
 			},
 			To: RelationshipRef{
-				Kind: strings.ToLower(strings.TrimSpace(in[i].To.Kind)),
-				ID:   strings.TrimSpace(in[i].To.ID),
+				Kind:  strings.ToLower(strings.TrimSpace(in[i].To.Kind)),
+				ID:    strings.TrimSpace(in[i].To.ID),
+				Extra: cloneRawMessages(in[i].To.Extra),
 			},
+			Extra: cloneRawMessages(in[i].Extra),
 		}
 		key := edge.Kind + "\x00" + edge.From.Kind + "\x00" + edge.From.ID + "\x00" + edge.To.Kind + "\x00" + edge.To.ID
 		if _, ok := seen[key]; ok {
@@ -361,25 +370,58 @@ func cloneRelationship(in *Relationship) *Relationship {
 		return nil
 	}
 	out := *in
+	out.Extra = cloneRawMessages(in.Extra)
 	if in.ParentRef != nil {
 		parent := *in.ParentRef
+		parent.Extra = cloneRawMessages(in.ParentRef.Extra)
 		out.ParentRef = &parent
 	}
 	if in.EntityRefs != nil {
-		out.EntityRefs = append([]RelationshipRef(nil), in.EntityRefs...)
+		out.EntityRefs = make([]RelationshipRef, len(in.EntityRefs))
+		for i := range in.EntityRefs {
+			out.EntityRefs[i] = RelationshipRef{
+				Kind:  in.EntityRefs[i].Kind,
+				ID:    in.EntityRefs[i].ID,
+				Extra: cloneRawMessages(in.EntityRefs[i].Extra),
+			}
+		}
 	}
 	if in.PolicyRef != nil {
 		policy := *in.PolicyRef
 		if in.PolicyRef.MatchedRuleIDs != nil {
 			policy.MatchedRuleIDs = append([]string(nil), in.PolicyRef.MatchedRuleIDs...)
 		}
+		policy.Extra = cloneRawMessages(in.PolicyRef.Extra)
 		out.PolicyRef = &policy
 	}
 	if in.AgentChain != nil {
-		out.AgentChain = append([]AgentChainHop(nil), in.AgentChain...)
+		out.AgentChain = make([]AgentChainHop, len(in.AgentChain))
+		for i := range in.AgentChain {
+			out.AgentChain[i] = AgentChainHop{
+				Identity: in.AgentChain[i].Identity,
+				Role:     in.AgentChain[i].Role,
+				Extra:    cloneRawMessages(in.AgentChain[i].Extra),
+			}
+		}
 	}
 	if in.Edges != nil {
-		out.Edges = append([]RelationshipEdge(nil), in.Edges...)
+		out.Edges = make([]RelationshipEdge, len(in.Edges))
+		for i := range in.Edges {
+			out.Edges[i] = RelationshipEdge{
+				Kind: in.Edges[i].Kind,
+				From: RelationshipRef{
+					Kind:  in.Edges[i].From.Kind,
+					ID:    in.Edges[i].From.ID,
+					Extra: cloneRawMessages(in.Edges[i].From.Extra),
+				},
+				To: RelationshipRef{
+					Kind:  in.Edges[i].To.Kind,
+					ID:    in.Edges[i].To.ID,
+					Extra: cloneRawMessages(in.Edges[i].To.Extra),
+				},
+				Extra: cloneRawMessages(in.Edges[i].Extra),
+			}
+		}
 	}
 	if in.RelatedRecordIDs != nil {
 		out.RelatedRecordIDs = append([]string(nil), in.RelatedRecordIDs...)
@@ -388,7 +430,26 @@ func cloneRelationship(in *Relationship) *Relationship {
 		out.RelatedEntityIDs = append([]string(nil), in.RelatedEntityIDs...)
 	}
 	if in.AgentLineage != nil {
-		out.AgentLineage = append([]AgentLineageHop(nil), in.AgentLineage...)
+		out.AgentLineage = make([]AgentLineageHop, len(in.AgentLineage))
+		for i := range in.AgentLineage {
+			out.AgentLineage[i] = AgentLineageHop{
+				AgentID:            in.AgentLineage[i].AgentID,
+				DelegatedBy:        in.AgentLineage[i].DelegatedBy,
+				DelegationRecordID: in.AgentLineage[i].DelegationRecordID,
+				Extra:              cloneRawMessages(in.AgentLineage[i].Extra),
+			}
+		}
 	}
 	return &out
+}
+
+func cloneRawMessages(in map[string]json.RawMessage) map[string]json.RawMessage {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]json.RawMessage, len(in))
+	for k, v := range in {
+		out[k] = append(json.RawMessage(nil), v...)
+	}
+	return out
 }

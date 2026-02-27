@@ -224,8 +224,8 @@ func TestValidateRecordWithRelationship(t *testing.T) {
 	require.NoError(t, ValidateRecord(valid, "scan_finding"))
 }
 
-func TestValidateRecordWithRelationshipRejectsUnknownFields(t *testing.T) {
-	invalid := []byte(`{
+func TestValidateRecordWithRelationshipAllowsAdditiveFields(t *testing.T) {
+	valid := []byte(`{
 	  "record_id":"prf-test",
 	  "record_version":"1.0",
 	  "timestamp":"2026-02-22T12:00:00Z",
@@ -235,11 +235,12 @@ func TestValidateRecordWithRelationshipRejectsUnknownFields(t *testing.T) {
 	  "event":{"entity_id":"tool:filesystem.write"},
 	  "controls":{},
 	  "relationship":{
-	    "parent_ref":{"kind":"trace","id":"trace-1","extra":"nope"}
+	    "parent_ref":{"kind":"trace","id":"trace-1","extra":"nope"},
+	    "future_field":{"enabled":true}
 	  },
 	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
 	}`)
-	require.Error(t, ValidateRecord(invalid, "scan_finding"))
+	require.NoError(t, ValidateRecord(valid, "scan_finding"))
 }
 
 func TestValidateRecordWithLegacyRelationsAlias(t *testing.T) {
