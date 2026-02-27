@@ -223,3 +223,68 @@ func TestNewNormalizesRelationshipDeterministically(t *testing.T) {
 	require.Equal(t, r1.Integrity.RecordHash, r2.Integrity.RecordHash)
 	require.Equal(t, []string{"rule-a", "rule-b"}, r1.Relationship.PolicyRef.MatchedRuleIDs)
 }
+
+func TestFirstRelationshipSelection(t *testing.T) {
+	primary := &Relationship{ParentRecordID: "primary"}
+	alias := &Relations{ParentRecordID: "alias"}
+
+	require.Equal(t, primary, firstRelationship(RecordOpts{Relationship: primary, Relations: alias}))
+	require.Equal(t, alias, firstRelationship(RecordOpts{Relations: alias}))
+	require.Nil(t, firstRelationship(RecordOpts{}))
+}
+
+func TestNormalizeDigestRefAndHexValidation(t *testing.T) {
+	require.Equal(t, "", normalizeDigestRef(""))
+	require.Equal(t, "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", normalizeDigestRef("SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))
+	require.Equal(t, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", normalizeDigestRef("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))
+	require.Equal(t, "policy-ref-v2", normalizeDigestRef("policy-ref-v2"))
+	require.False(t, isLowerHexLen("nothex", 64))
+	require.False(t, isLowerHexLen("abc", 64))
+}
+
+func TestNormalizedEdgesStableSortAndDedup(t *testing.T) {
+	edges := []RelationshipEdge{
+		{Kind: "calls", From: RelationshipRef{Kind: "agent", ID: "a"}, To: RelationshipRef{Kind: "tool", ID: "b"}},
+		{Kind: "Calls", From: RelationshipRef{Kind: "agent", ID: "a"}, To: RelationshipRef{Kind: "tool", ID: "b"}},
+		{Kind: "targets", From: RelationshipRef{Kind: "agent", ID: "a"}, To: RelationshipRef{Kind: "resource", ID: "z"}},
+		{Kind: "calls", From: RelationshipRef{Kind: "agent", ID: "a"}, To: RelationshipRef{Kind: "tool", ID: "a"}},
+	}
+	normalized := normalizedEdges(edges)
+	require.Len(t, normalized, 3)
+	require.Equal(t, "calls", normalized[0].Kind)
+	require.Equal(t, "a", normalized[0].To.ID)
+	require.Equal(t, "calls", normalized[1].Kind)
+	require.Equal(t, "b", normalized[1].To.ID)
+	require.Equal(t, "targets", normalized[2].Kind)
+	require.Nil(t, normalizedEdges(nil))
+}
+
+func TestComputeHashIncludesRelationshipAndLegacyAlias(t *testing.T) {
+	base := &Record{
+		RecordID:      "prf-test",
+		RecordVersion: SchemaVersion,
+		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
+		Source:        "gait",
+		SourceProduct: "gait",
+		RecordType:    "policy_enforcement",
+		Event:         map[string]any{"verdict": "allow"},
+	}
+	r1 := Clone(base)
+	r1.Relationship = &Relationship{ParentRef: &RelationshipRef{Kind: "trace", ID: "t1"}}
+	h1, err := ComputeHash(r1)
+	require.NoError(t, err)
+
+	r2 := Clone(base)
+	r2.Relations = &Relations{ParentRecordID: "prf-prev"}
+	h2, err := ComputeHash(r2)
+	require.NoError(t, err)
+
+	r3 := Clone(base)
+	r3.Relationship = &Relationship{ParentRef: &RelationshipRef{Kind: "trace", ID: "t1"}}
+	r3.Relations = &Relations{ParentRecordID: "prf-prev"}
+	h3, err := ComputeHash(r3)
+	require.NoError(t, err)
+
+	require.NotEqual(t, h1, h2)
+	require.NotEqual(t, h2, h3)
+}
