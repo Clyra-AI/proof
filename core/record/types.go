@@ -13,7 +13,28 @@ type Record struct {
 	Event         map[string]any `json:"event"`
 	Controls      Controls       `json:"controls"`
 	Metadata      map[string]any `json:"metadata,omitempty"`
+	Relations     *Relations     `json:"relations,omitempty"`
 	Integrity     Integrity      `json:"integrity"`
+}
+
+type Relations struct {
+	ParentRecordID   string            `json:"parent_record_id,omitempty"`
+	RelatedRecordIDs []string          `json:"related_record_ids,omitempty"`
+	RelatedEntityIDs []string          `json:"related_entity_ids,omitempty"`
+	PolicyRef        *PolicyRef        `json:"policy_ref,omitempty"`
+	AgentLineage     []AgentLineageHop `json:"agent_lineage,omitempty"`
+}
+
+type PolicyRef struct {
+	PolicyID      string `json:"policy_id,omitempty"`
+	PolicyVersion string `json:"policy_version,omitempty"`
+	PolicyDigest  string `json:"policy_digest,omitempty"`
+}
+
+type AgentLineageHop struct {
+	AgentID            string `json:"agent_id"`
+	DelegatedBy        string `json:"delegated_by,omitempty"`
+	DelegationRecordID string `json:"delegation_record_id,omitempty"`
 }
 
 type Controls struct {
@@ -53,4 +74,5 @@ type RecordOpts struct {
 	Event         map[string]any
 	Controls      Controls
 	Metadata      map[string]any
+	Relations     *Relations
 }

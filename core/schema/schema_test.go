@@ -188,3 +188,61 @@ func TestValidateDelegationSchema(t *testing.T) {
 	}`)
 	require.Error(t, ValidateRecord(invalid, "delegation"))
 }
+
+func TestValidateRecordWithRelations(t *testing.T) {
+	valid := []byte(`{
+	  "record_id":"prf-test",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-22T12:00:00Z",
+	  "source":"wrkr",
+	  "source_product":"wrkr",
+	  "record_type":"scan_finding",
+	  "event":{
+	    "entity_id":"tool:filesystem.write",
+	    "relationships":[{"relation":"installed_by","target_id":"user:alice","target_kind":"user"}]
+	  },
+	  "controls":{},
+	  "relations":{
+	    "parent_record_id":"prf-prev",
+	    "related_record_ids":["prf-1","prf-2"],
+	    "related_entity_ids":["agent:scanner","pipeline:nightly"],
+	    "policy_ref":{
+	      "policy_id":"security.tool-access",
+	      "policy_version":"v2",
+	      "policy_digest":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+	    },
+	    "agent_lineage":[{"agent_id":"agent:scanner","delegated_by":"agent:root","delegation_record_id":"prf-del-1"}]
+	  },
+	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	}`)
+	require.NoError(t, ValidateRecord(valid, "scan_finding"))
+}
+
+func TestValidateRecordWithRelationsRejectsInvalidPolicyDigest(t *testing.T) {
+	invalid := []byte(`{
+	  "record_id":"prf-test",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-22T12:00:00Z",
+	  "source":"gait",
+	  "source_product":"gait",
+	  "record_type":"policy_enforcement",
+	  "event":{
+	    "policy_id":"security.tool-access",
+	    "policy_version":"v2",
+	    "policy_digest":"sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+	    "applied_to_entity_id":"agent:assistant",
+	    "evaluation_context_id":"ctx-1",
+	    "trigger_record_ids":["prf-a","prf-b"]
+	  },
+	  "controls":{},
+	  "relations":{
+	    "policy_ref":{
+	      "policy_id":"security.tool-access",
+	      "policy_version":"v2",
+	      "policy_digest":"sha256:not-a-valid-digest"
+	    }
+	  },
+	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	}`)
+	require.Error(t, ValidateRecord(invalid, "policy_enforcement"))
+}

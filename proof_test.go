@@ -27,6 +27,36 @@ func TestNewRecordDeterministicID(t *testing.T) {
 	require.Equal(t, r1.RecordID, r2.RecordID)
 }
 
+func TestNewRecordRelationsDoNotChangeDeterministicID(t *testing.T) {
+	ts := time.Date(2026, 2, 17, 12, 30, 0, 0, time.UTC)
+	base := RecordOpts{
+		Timestamp:     ts,
+		Source:        "axym-mcp-collector",
+		SourceProduct: "axym",
+		Type:          "policy_enforcement",
+		Event:         map[string]any{"verdict": "allow"},
+	}
+
+	r1, err := NewRecord(base)
+	require.NoError(t, err)
+
+	withRelations := base
+	withRelations.Relations = &Relations{
+		ParentRecordID:   "prf-prev",
+		RelatedEntityIDs: []string{"agent:a"},
+		PolicyRef: &PolicyRef{
+			PolicyID:      "policy.main",
+			PolicyVersion: "v1",
+			PolicyDigest:  "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+		},
+	}
+	r2, err := NewRecord(withRelations)
+	require.NoError(t, err)
+
+	require.Equal(t, r1.RecordID, r2.RecordID)
+	require.NotEqual(t, r1.Integrity.RecordHash, r2.Integrity.RecordHash)
+}
+
 func TestChainTamperDetection(t *testing.T) {
 	c := NewChain("test")
 	r1, _ := NewRecord(RecordOpts{

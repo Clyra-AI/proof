@@ -21,6 +21,9 @@ import (
 type Record = record.Record
 type RecordOpts = record.RecordOpts
 type Controls = record.Controls
+type Relations = record.Relations
+type PolicyRef = record.PolicyRef
+type AgentLineageHop = record.AgentLineageHop
 type Chain = chain.Chain
 type ChainVerification = chain.Verification
 type SigningKey = signing.SigningKey

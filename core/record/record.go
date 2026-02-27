@@ -31,6 +31,7 @@ func New(opts RecordOpts) (*Record, error) {
 		Event:         opts.Event,
 		Controls:      opts.Controls,
 		Metadata:      opts.Metadata,
+		Relations:     opts.Relations,
 		Integrity:     Integrity{},
 	}
 	if err := Validate(r); err != nil {
@@ -93,6 +94,9 @@ func ComputeHash(r *Record) (string, error) {
 			"previous_record_hash": r.Integrity.PreviousRecordHash,
 		},
 	}
+	if r.Relations != nil {
+		payload["relations"] = r.Relations
+	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return "", fmt.Errorf("marshal payload: %w", err)
@@ -142,6 +146,23 @@ func Clone(r *Record) *Record {
 		for k, v := range r.Metadata {
 			out.Metadata[k] = v
 		}
+	}
+	if r.Relations != nil {
+		cloned := *r.Relations
+		if r.Relations.RelatedRecordIDs != nil {
+			cloned.RelatedRecordIDs = append([]string(nil), r.Relations.RelatedRecordIDs...)
+		}
+		if r.Relations.RelatedEntityIDs != nil {
+			cloned.RelatedEntityIDs = append([]string(nil), r.Relations.RelatedEntityIDs...)
+		}
+		if r.Relations.PolicyRef != nil {
+			policy := *r.Relations.PolicyRef
+			cloned.PolicyRef = &policy
+		}
+		if r.Relations.AgentLineage != nil {
+			cloned.AgentLineage = append([]AgentLineageHop(nil), r.Relations.AgentLineage...)
+		}
+		out.Relations = &cloned
 	}
 	return &out
 }
