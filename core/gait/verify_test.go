@@ -441,7 +441,72 @@ func TestVerifyPackProofRecordsRejectsUnknownRelationshipFields(t *testing.T) {
 	})
 
 	_, err = VerifyPack(zipPath, false, nil)
-	require.ErrorContains(t, err, "validate schema")
+	require.ErrorContains(t, err, "record hash mismatch")
+}
+
+func TestVerifyPackProofRecordsAllowsSignedAdditiveRelationshipFields(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+
+	rec, err := record.New(record.RecordOpts{
+		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
+		Source:        "gait",
+		SourceProduct: "gait",
+		Type:          "tool_invocation",
+		Event:         map[string]any{"tool": "demo"},
+		Relationship: &record.Relationship{
+			ParentRef: &record.RelationshipRef{Kind: "trace", ID: "trace-1"},
+		},
+	})
+	require.NoError(t, err)
+	_, err = signing.Sign(rec, signing.SigningKey{Private: priv, Public: pub})
+	require.NoError(t, err)
+
+	raw, err := json.Marshal(rec)
+	require.NoError(t, err)
+
+	var obj map[string]any
+	require.NoError(t, json.Unmarshal(raw, &obj))
+	relationship, ok := obj["relationship"].(map[string]any)
+	require.True(t, ok)
+	relationship["future_field"] = map[string]any{"enabled": true}
+	withExtra, err := json.Marshal(obj)
+	require.NoError(t, err)
+
+	var recWithExtra record.Record
+	require.NoError(t, json.Unmarshal(withExtra, &recWithExtra))
+	recWithExtra.Integrity.RecordHash = ""
+	recWithExtra.Integrity.Signature = ""
+	recWithExtra.Integrity.SigningKeyID = ""
+	_, err = signing.Sign(&recWithExtra, signing.SigningKey{Private: priv, Public: pub})
+	require.NoError(t, err)
+
+	recWithExtraRaw, err := json.Marshal(&recWithExtra)
+	require.NoError(t, err)
+	proofRecords := append(recWithExtraRaw, '\n')
+
+	manifest := PackManifest{
+		SchemaID:      "gait.pack.manifest",
+		SchemaVersion: "1",
+		CreatedAt:     "2026-02-17T12:00:00Z",
+		PackID:        "pack-additive-relationship-field",
+		PackType:      "run",
+		Contents: []PackEntry{
+			{Path: "proof_records.jsonl", SHA256: sha256Hex(proofRecords), Type: "proof.records.v1"},
+		},
+	}
+	manifestRaw, err := json.Marshal(manifest)
+	require.NoError(t, err)
+
+	zipPath := filepath.Join(t.TempDir(), "pack-additive-relationship-field.zip")
+	writeZip(t, zipPath, map[string][]byte{
+		"pack_manifest.json":  manifestRaw,
+		"proof_records.jsonl": proofRecords,
+	})
+
+	res, err := VerifyPack(zipPath, false, nil)
+	require.NoError(t, err)
+	require.Equal(t, 1, res.ProofRecordsVerified)
 }
 
 func TestVerifyPackProofRecordsCosignRequiresVerifierOptions(t *testing.T) {

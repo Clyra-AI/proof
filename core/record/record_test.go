@@ -1,6 +1,7 @@
 package record
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -287,4 +288,75 @@ func TestComputeHashIncludesRelationshipAndLegacyAlias(t *testing.T) {
 
 	require.NotEqual(t, h1, h2)
 	require.NotEqual(t, h2, h3)
+}
+
+func TestComputeHashIncludesAdditiveRelationshipFields(t *testing.T) {
+	raw := []byte(`{
+	  "record_id":"prf-test",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-17T12:00:00Z",
+	  "source":"gait",
+	  "source_product":"gait",
+	  "record_type":"policy_enforcement",
+	  "event":{"verdict":"allow"},
+	  "controls":{},
+	  "relationship":{
+	    "parent_ref":{"kind":"trace","id":"t1","ctx":"alpha"},
+	    "future_field":{"enabled":true}
+	  },
+	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	}`)
+	var rec Record
+	require.NoError(t, json.Unmarshal(raw, &rec))
+
+	h1, err := ComputeHash(&rec)
+	require.NoError(t, err)
+
+	tampered := []byte(`{
+	  "record_id":"prf-test",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-17T12:00:00Z",
+	  "source":"gait",
+	  "source_product":"gait",
+	  "record_type":"policy_enforcement",
+	  "event":{"verdict":"allow"},
+	  "controls":{},
+	  "relationship":{
+	    "parent_ref":{"kind":"trace","id":"t1","ctx":"beta"},
+	    "future_field":{"enabled":true}
+	  },
+	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	}`)
+	var recTampered Record
+	require.NoError(t, json.Unmarshal(tampered, &recTampered))
+
+	h2, err := ComputeHash(&recTampered)
+	require.NoError(t, err)
+	require.NotEqual(t, h1, h2)
+}
+
+func TestCloneDeepCopiesRelationshipExtras(t *testing.T) {
+	r, err := New(RecordOpts{
+		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
+		Source:        "wrkr",
+		SourceProduct: "wrkr",
+		Type:          "scan_finding",
+		Event:         map[string]any{"id": "f1"},
+		Relationship: &Relationship{
+			ParentRef: &RelationshipRef{
+				Kind:  "trace",
+				ID:    "trace-1",
+				Extra: map[string]json.RawMessage{"ctx": json.RawMessage(`"alpha"`)},
+			},
+			Extra: map[string]json.RawMessage{"future": json.RawMessage(`{"enabled":true}`)},
+		},
+	})
+	require.NoError(t, err)
+
+	c := Clone(r)
+	c.Relationship.Extra["future"] = json.RawMessage(`{"enabled":false}`)
+	c.Relationship.ParentRef.Extra["ctx"] = json.RawMessage(`"beta"`)
+
+	require.Equal(t, `{"enabled":true}`, string(r.Relationship.Extra["future"]))
+	require.Equal(t, `"alpha"`, string(r.Relationship.ParentRef.Extra["ctx"]))
 }

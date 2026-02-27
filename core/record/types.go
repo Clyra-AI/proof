@@ -1,6 +1,9 @@
 package record
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Record struct {
 	RecordID      string         `json:"record_id"`
@@ -31,6 +34,9 @@ type Relationship struct {
 	RelatedRecordIDs []string          `json:"related_record_ids,omitempty"`
 	RelatedEntityIDs []string          `json:"related_entity_ids,omitempty"`
 	AgentLineage     []AgentLineageHop `json:"agent_lineage,omitempty"`
+
+	// Extra preserves additive fields so they remain hash/signature covered.
+	Extra map[string]json.RawMessage `json:"-"`
 }
 
 type Relations = Relationship
@@ -38,17 +44,23 @@ type Relations = Relationship
 type RelationshipRef struct {
 	Kind string `json:"kind"`
 	ID   string `json:"id"`
+
+	Extra map[string]json.RawMessage `json:"-"`
 }
 
 type RelationshipEdge struct {
 	Kind string          `json:"kind"`
 	From RelationshipRef `json:"from"`
 	To   RelationshipRef `json:"to"`
+
+	Extra map[string]json.RawMessage `json:"-"`
 }
 
 type AgentChainHop struct {
 	Identity string `json:"identity"`
 	Role     string `json:"role"`
+
+	Extra map[string]json.RawMessage `json:"-"`
 }
 
 type PolicyRef struct {
@@ -56,12 +68,16 @@ type PolicyRef struct {
 	PolicyVersion  string   `json:"policy_version,omitempty"`
 	PolicyDigest   string   `json:"policy_digest,omitempty"`
 	MatchedRuleIDs []string `json:"matched_rule_ids,omitempty"`
+
+	Extra map[string]json.RawMessage `json:"-"`
 }
 
 type AgentLineageHop struct {
 	AgentID            string `json:"agent_id"`
 	DelegatedBy        string `json:"delegated_by,omitempty"`
 	DelegationRecordID string `json:"delegation_record_id,omitempty"`
+
+	Extra map[string]json.RawMessage `json:"-"`
 }
 
 type Controls struct {
