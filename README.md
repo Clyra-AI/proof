@@ -122,9 +122,17 @@ controls:
   approved_scope: "read-only on payments.*"
   within_scope: true
 
-relations:
-  parent_record_id: "prf-2026-09-15T10:29:58Z-3e4f7c2a"
-  related_entity_ids: ["agent:billing-assistant", "tool:postgres_query", "resource:payments.transactions"]
+relationship:
+  parent_ref:
+    kind: "trace"
+    id: "trace_2026_09_15_1030"
+  entity_refs:
+    - kind: "agent"
+      id: "agent:billing-assistant"
+    - kind: "tool"
+      id: "tool:postgres_query"
+    - kind: "resource"
+      id: "resource:payments.transactions"
   policy_ref:
     policy_id: "prod.tool-access"
     policy_version: "v3"

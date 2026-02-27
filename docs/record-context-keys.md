@@ -2,19 +2,23 @@
 
 Proof records allow optional `metadata` for context enrichment. These are conventions for cross-product interoperability, not schema-required fields.
 
-## Relation envelope
+## Relationship Envelope
 
-For graph-ready linkage, prefer the first-class `relations` object on records:
+For graph-ready linkage, prefer the first-class `relationship` object on records:
 
-- `parent_record_id` (string): immediate upstream proof record
-- `related_record_ids` ([]string): additional linked proof records
-- `related_entity_ids` ([]string): linked entities (agent/tool/resource IDs)
-- `policy_ref.policy_id` (string): policy identifier
-- `policy_ref.policy_version` (string): policy version label
-- `policy_ref.policy_digest` (string): `sha256:<hex>` or legacy bare `<hex>` policy content digest
-- `agent_lineage` ([]object): delegation path with `agent_id`, optional `delegated_by`, optional `delegation_record_id`
+- `parent_ref` (object): parent node with `kind` and `id`
+- `entity_refs` ([]object): related nodes with `kind` and `id`
+- `policy_ref` (object): optional `policy_id`, `policy_version`, `policy_digest`, and `matched_rule_ids`
+- `agent_chain` ([]object): ordered hops with `identity` and `role`
+- `edges` ([]object): relation edges with `kind`, `from`, and `to`
 
-This keeps relationship semantics explicit while preserving policy neutrality.
+Legacy `relations` is still accepted for backward compatibility.
+
+## Determinism Rules
+
+- Digest values are normalized to lowercase when they are valid SHA-256 references.
+- `entity_refs`, `edges`, and string ID arrays are deduplicated and sorted deterministically.
+- Record timestamps remain RFC3339 UTC in canonical hashing/signing paths.
 
 ## Recommended keys
 

@@ -13,20 +13,97 @@
     "controls",
     "integrity"
   ],
-  "properties": {
-    "record_id": { "type": "string", "minLength": 1 },
-    "record_version": { "type": "string", "minLength": 1 },
-    "timestamp": { "type": "string", "format": "date-time" },
-    "source": { "type": "string", "minLength": 1 },
-    "source_product": { "type": "string", "minLength": 1 },
-    "agent_id": { "type": "string" },
-    "record_type": { "type": "string", "minLength": 1 },
-    "event": { "type": "object" },
-    "controls": { "type": "object" },
-    "metadata": { "type": "object" },
-    "relations": {
+  "$defs": {
+    "relationship_envelope": {
       "type": "object",
       "properties": {
+        "parent_ref": {
+          "type": "object",
+          "required": ["kind", "id"],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["trace", "run", "session", "intent", "policy", "agent", "evidence"]
+            },
+            "id": { "type": "string", "minLength": 1 }
+          },
+          "additionalProperties": false
+        },
+        "entity_refs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "required": ["kind", "id"],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["agent", "tool", "resource", "policy", "run", "trace", "delegation", "evidence"]
+              },
+              "id": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "policy_ref": {
+          "type": "object",
+          "properties": {
+            "policy_id": { "type": "string", "minLength": 1 },
+            "policy_version": { "type": "string", "minLength": 1 },
+            "policy_digest": { "type": "string", "pattern": "^(sha256:)?[a-f0-9]{64}$" },
+            "matched_rule_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          },
+          "additionalProperties": false
+        },
+        "agent_chain": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["identity", "role"],
+            "properties": {
+              "identity": { "type": "string", "minLength": 1 },
+              "role": { "type": "string", "enum": ["requester", "delegator", "delegate"] }
+            },
+            "additionalProperties": false
+          }
+        },
+        "edges": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "required": ["kind", "from", "to"],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["delegates_to", "calls", "governed_by", "targets", "derived_from", "emits_evidence"]
+              },
+              "from": {
+                "type": "object",
+                "required": ["kind", "id"],
+                "properties": {
+                  "kind": { "type": "string", "minLength": 1 },
+                  "id": { "type": "string", "minLength": 1 }
+                },
+                "additionalProperties": false
+              },
+              "to": {
+                "type": "object",
+                "required": ["kind", "id"],
+                "properties": {
+                  "kind": { "type": "string", "minLength": 1 },
+                  "id": { "type": "string", "minLength": 1 }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        },
         "parent_record_id": { "type": "string", "minLength": 1 },
         "related_record_ids": {
           "type": "array",
@@ -38,14 +115,6 @@
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 }
         },
-        "policy_ref": {
-          "type": "object",
-          "properties": {
-            "policy_id": { "type": "string", "minLength": 1 },
-            "policy_version": { "type": "string", "minLength": 1 },
-            "policy_digest": { "type": "string", "pattern": "^(sha256:)?[a-f0-9]{64}$" }
-          }
-        },
         "agent_lineage": {
           "type": "array",
           "items": {
@@ -55,11 +124,27 @@
               "agent_id": { "type": "string", "minLength": 1 },
               "delegated_by": { "type": "string", "minLength": 1 },
               "delegation_record_id": { "type": "string", "minLength": 1 }
-            }
+            },
+            "additionalProperties": false
           }
         }
-      }
-    },
+      },
+      "additionalProperties": false
+    }
+  },
+  "properties": {
+    "record_id": { "type": "string", "minLength": 1 },
+    "record_version": { "type": "string", "minLength": 1 },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "source": { "type": "string", "minLength": 1 },
+    "source_product": { "type": "string", "minLength": 1 },
+    "agent_id": { "type": "string" },
+    "record_type": { "type": "string", "minLength": 1 },
+    "event": { "type": "object" },
+    "controls": { "type": "object" },
+    "metadata": { "type": "object" },
+    "relationship": { "$ref": "#/$defs/relationship_envelope" },
+    "relations": { "$ref": "#/$defs/relationship_envelope" },
     "integrity": {
       "type": "object",
       "required": ["record_hash"],
