@@ -247,7 +247,7 @@ func TestValidateRecordWithRelationsRejectsInvalidPolicyDigest(t *testing.T) {
 	require.Error(t, ValidateRecord(invalid, "policy_enforcement"))
 }
 
-func TestValidatePolicyEnforcementAllowsLegacyBareDigest(t *testing.T) {
+func TestValidatePolicyEnforcementAllowsOpaqueDigestReference(t *testing.T) {
 	valid := []byte(`{
 	  "record_id":"prf-test",
 	  "record_version":"1.0",
@@ -258,7 +258,7 @@ func TestValidatePolicyEnforcementAllowsLegacyBareDigest(t *testing.T) {
 	  "event":{
 	    "policy_id":"security.tool-access",
 	    "policy_version":"v2",
-	    "policy_digest":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+	    "policy_digest":"policy-v2:gateway"
 	  },
 	  "controls":{},
 	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
