@@ -5,6 +5,23 @@
   "required": ["record_type", "event"],
   "properties": {
     "record_type": { "const": "scan_finding" },
-    "event": { "type": "object" }
+    "event": {
+      "type": "object",
+      "properties": {
+        "entity_id": { "type": "string", "minLength": 1 },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["relation", "target_id"],
+            "properties": {
+              "relation": { "type": "string", "minLength": 1 },
+              "target_id": { "type": "string", "minLength": 1 },
+              "target_kind": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
   }
 }

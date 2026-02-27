@@ -122,6 +122,14 @@ controls:
   approved_scope: "read-only on payments.*"
   within_scope: true
 
+relations:
+  parent_record_id: "prf-2026-09-15T10:29:58Z-3e4f7c2a"
+  related_entity_ids: ["agent:billing-assistant", "tool:postgres_query", "resource:payments.transactions"]
+  policy_ref:
+    policy_id: "prod.tool-access"
+    policy_version: "v3"
+    policy_digest: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
 integrity:
   record_hash: "sha256:def456..."
   previous_record_hash: "sha256:ghi789..."   # chain link
@@ -130,6 +138,7 @@ integrity:
 ```
 
 Records are immutable, deterministic, and JSON-native — readable by any language, any tool, any text editor.
+Relationship fields are optional and schema-defined, so products can build graph queries later without changing the proof format.
 
 ## Built-in Record Types
 

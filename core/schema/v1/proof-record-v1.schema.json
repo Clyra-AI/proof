@@ -24,6 +24,42 @@
     "event": { "type": "object" },
     "controls": { "type": "object" },
     "metadata": { "type": "object" },
+    "relations": {
+      "type": "object",
+      "properties": {
+        "parent_record_id": { "type": "string", "minLength": 1 },
+        "related_record_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "related_entity_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "policy_ref": {
+          "type": "object",
+          "properties": {
+            "policy_id": { "type": "string", "minLength": 1 },
+            "policy_version": { "type": "string", "minLength": 1 },
+            "policy_digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+          }
+        },
+        "agent_lineage": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["agent_id"],
+            "properties": {
+              "agent_id": { "type": "string", "minLength": 1 },
+              "delegated_by": { "type": "string", "minLength": 1 },
+              "delegation_record_id": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
     "integrity": {
       "type": "object",
       "required": ["record_hash"],
