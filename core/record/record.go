@@ -4,13 +4,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/Clyra-AI/proof/core/canon"
+	coreerr "github.com/Clyra-AI/proof/core/errors"
 )
 
 const SchemaVersion = "1.0"
@@ -54,32 +54,32 @@ func New(opts RecordOpts) (*Record, error) {
 
 func Validate(r *Record) error {
 	if r == nil {
-		return errors.New("record is nil")
+		return coreerr.New(coreerr.KindInvalidInput, "record.nil", "record is nil", coreerr.WithField("record"))
 	}
 	if strings.TrimSpace(r.RecordVersion) == "" {
-		return errors.New("record_version is required")
+		return coreerr.New(coreerr.KindValidation, "record.record_version_required", "record_version is required", coreerr.WithField("record_version"))
 	}
 	if r.Timestamp.IsZero() {
-		return errors.New("timestamp is required")
+		return coreerr.New(coreerr.KindValidation, "record.timestamp_required", "timestamp is required", coreerr.WithField("timestamp"))
 	}
 	if strings.TrimSpace(r.Source) == "" {
-		return errors.New("source is required")
+		return coreerr.New(coreerr.KindValidation, "record.source_required", "source is required", coreerr.WithField("source"))
 	}
 	if strings.TrimSpace(r.SourceProduct) == "" {
-		return errors.New("source_product is required")
+		return coreerr.New(coreerr.KindValidation, "record.source_product_required", "source_product is required", coreerr.WithField("source_product"))
 	}
 	if strings.TrimSpace(r.RecordType) == "" {
-		return errors.New("record_type is required")
+		return coreerr.New(coreerr.KindValidation, "record.record_type_required", "record_type is required", coreerr.WithField("record_type"))
 	}
 	if r.Event == nil {
-		return errors.New("event is required")
+		return coreerr.New(coreerr.KindValidation, "record.event_required", "event is required", coreerr.WithField("event"))
 	}
 	return nil
 }
 
 func ComputeHash(r *Record) (string, error) {
 	if r == nil {
-		return "", errors.New("record is nil")
+		return "", coreerr.New(coreerr.KindInvalidInput, "record.nil", "record is nil", coreerr.WithField("record"))
 	}
 	payload := map[string]any{
 		"record_id":      r.RecordID,
@@ -104,11 +104,11 @@ func ComputeHash(r *Record) (string, error) {
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
-		return "", fmt.Errorf("marshal payload: %w", err)
+		return "", coreerr.Wrap(coreerr.KindInternal, "record.compute_hash_marshal_payload", "marshal payload", err)
 	}
 	canonical, err := canon.Canonicalize(raw, canon.DomainJSON)
 	if err != nil {
-		return "", fmt.Errorf("canonicalize payload: %w", err)
+		return "", coreerr.Wrap(coreerr.KindInternal, "record.compute_hash_canonicalize_payload", "canonicalize payload", err)
 	}
 	sum := sha256.Sum256(canonical)
 	return "sha256:" + hex.EncodeToString(sum[:]), nil
@@ -124,11 +124,11 @@ func deterministicID(r *Record) (string, error) {
 		"event":          r.Event,
 	})
 	if err != nil {
-		return "", err
+		return "", coreerr.Wrap(coreerr.KindInternal, "record.deterministic_id_marshal_payload", "marshal deterministic id payload", err)
 	}
 	canonical, err := canon.Canonicalize(raw, canon.DomainJSON)
 	if err != nil {
-		return "", err
+		return "", coreerr.Wrap(coreerr.KindInternal, "record.deterministic_id_canonicalize_payload", "canonicalize deterministic id payload", err)
 	}
 	sum := sha256.Sum256(canonical)
 	prefix := hex.EncodeToString(sum[:])[:8]

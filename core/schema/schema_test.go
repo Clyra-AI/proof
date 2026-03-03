@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	coreerr "github.com/Clyra-AI/proof/core/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,6 +28,25 @@ func TestValidateRecord(t *testing.T) {
 	}`)
 	require.NoError(t, ValidateRecord(raw, "decision"))
 	require.Error(t, ValidateRecord(raw, "unknown_type"))
+}
+
+func TestValidateRecordTypedError(t *testing.T) {
+	raw := []byte(`{
+	  "record_id":"prf-test",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-17T12:00:00Z",
+	  "source":"axym",
+	  "source_product":"axym",
+	  "record_type":"decision",
+	  "event":{"action":"allow"},
+	  "controls":{},
+	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	}`)
+	err := ValidateRecord(raw, "unknown_type")
+	require.Error(t, err)
+	typed, ok := coreerr.As(err)
+	require.True(t, ok)
+	require.Equal(t, coreerr.KindValidation, typed.Kind)
 }
 
 func TestValidateCustomSchema(t *testing.T) {

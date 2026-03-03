@@ -1,0 +1,55 @@
+framework:
+  id: owasp-agentic-top-10
+  version: "2025"
+  title: OWASP Agentic Top 10
+controls:
+  - id: ASI01
+    title: Agent Goal Hijack
+    required_record_types: &owasp_agentic_types [tool_invocation, policy_enforcement, permission_check, guardrail_activation, incident, risk_assessment]
+    required_fields: &proof_required_fields [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+    minimum_frequency: continuous
+  - id: ASI02
+    title: Tool Misuse & Exploitation
+    required_record_types: *owasp_agentic_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: ASI03
+    title: Identity & Privilege Abuse
+    required_record_types: *owasp_agentic_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: ASI04
+    title: Agentic Supply Chain Vulnerabilities
+    required_record_types: *owasp_agentic_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: ASI05
+    title: Unexpected Code Execution (RCE)
+    required_record_types: *owasp_agentic_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: ASI06
+    title: Memory & Context Poisoning
+    required_record_types: *owasp_agentic_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: ASI07
+    title: Insecure Inter-Agent Communication
+    required_record_types: *owasp_agentic_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: ASI08
+    title: Cascading Failures
+    required_record_types: *owasp_agentic_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: ASI09
+    title: Human-Agent Trust Exploitation
+    required_record_types: *owasp_agentic_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: ASI10
+    title: Rogue Agents
+    required_record_types: *owasp_agentic_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous

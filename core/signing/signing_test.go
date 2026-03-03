@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	coreerr "github.com/Clyra-AI/proof/core/errors"
 	"github.com/Clyra-AI/proof/core/record"
 	"github.com/stretchr/testify/require"
 )
@@ -78,6 +79,19 @@ func TestSignAndVerifyDigest(t *testing.T) {
 	require.NoError(t, err)
 	err = VerifyDigest(sig, "abcd1234", PublicKey{Public: key.Public})
 	require.NoError(t, err)
+}
+
+func TestVerifyDigestTypedError(t *testing.T) {
+	key, err := GenerateKey()
+	require.NoError(t, err)
+	sig, err := SignDigest("abcd1234", key)
+	require.NoError(t, err)
+
+	err = VerifyDigest(sig, "different", PublicKey{Public: key.Public})
+	require.Error(t, err)
+	typed, ok := coreerr.As(err)
+	require.True(t, ok)
+	require.Equal(t, coreerr.KindVerification, typed.Kind)
 }
 
 func TestGenerateKeyErrorBranch(t *testing.T) {

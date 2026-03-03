@@ -30,3 +30,15 @@ release:
   github:
     owner: Clyra-AI
     name: proof
+
+brews:
+  - name: proof
+    repository:
+      owner: Clyra-AI
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/Clyra-AI/proof"
+    description: "Deterministic proof records and offline verification CLI"
+    license: "Apache-2.0"
+    skip_upload: auto
