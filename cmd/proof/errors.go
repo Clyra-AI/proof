@@ -23,6 +23,8 @@ func verificationErrorCode(err error) int {
 		switch typed.Kind {
 		case coreerr.KindDependencyMissing:
 			return exitcode.DependencyMiss
+		case coreerr.KindInternal:
+			return exitcode.InternalError
 		case coreerr.KindInvalidInput:
 			return exitcode.InvalidInput
 		case coreerr.KindValidation:
