@@ -10,6 +10,8 @@ import (
 	"sync"
 
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
+
+	coreerr "github.com/Clyra-AI/proof/core/errors"
 )
 
 //go:embed v1/*.json v1/types/*.json
@@ -60,7 +62,13 @@ func ListRecordTypes() []RecordType {
 
 func ValidateRecord(data []byte, recordType string) error {
 	if err := validateWithSchema(data, "v1/proof-record-v1.schema.json"); err != nil {
-		return err
+		return coreerr.Wrap(
+			coreerr.KindValidation,
+			"schema.record.base_validation_failed",
+			"record schema validation failed",
+			err,
+			coreerr.WithPath("v1/proof-record-v1.schema.json"),
+		)
 	}
 	path, ok := schemaPathForType(recordType)
 	if !ok {
@@ -68,17 +76,46 @@ func ValidateRecord(data []byte, recordType string) error {
 		customSchema, customOK := customSchemas[recordType]
 		customMu.RUnlock()
 		if !customOK {
-			return fmt.Errorf("unknown record type: %s", recordType)
+			return coreerr.New(
+				coreerr.KindValidation,
+				"schema.record.unknown_record_type",
+				fmt.Sprintf("unknown record type: %s", recordType),
+				coreerr.WithField("record_type"),
+			)
 		}
-		return validateWithCompiledSchema(data, customSchema)
+		if err := validateWithCompiledSchema(data, customSchema); err != nil {
+			return coreerr.Wrap(
+				coreerr.KindValidation,
+				"schema.record.custom_type_validation_failed",
+				"custom record type schema validation failed",
+				err,
+				coreerr.WithField("record_type"),
+			)
+		}
+		return nil
 	}
-	return validateWithSchema(data, path)
+	if err := validateWithSchema(data, path); err != nil {
+		return coreerr.Wrap(
+			coreerr.KindValidation,
+			"schema.record.type_validation_failed",
+			"record type schema validation failed",
+			err,
+			coreerr.WithPath(path),
+		)
+	}
+	return nil
 }
 
 func ValidateCustomSchema(schemaPath string, data []byte) error {
 	_, err := compileSchema("custom.json", data)
 	if err != nil {
-		return fmt.Errorf("compile custom schema %s: %w", filepath.Base(schemaPath), err)
+		return coreerr.Wrap(
+			coreerr.KindValidation,
+			"schema.custom.compile_failed",
+			fmt.Sprintf("compile custom schema %s", filepath.Base(schemaPath)),
+			err,
+			coreerr.WithPath(schemaPath),
+		)
 	}
 	return nil
 }
@@ -86,14 +123,30 @@ func ValidateCustomSchema(schemaPath string, data []byte) error {
 func RegisterCustomType(recordType string, schemaPath string, data []byte) error {
 	recordType = strings.TrimSpace(recordType)
 	if recordType == "" {
-		return fmt.Errorf("record type is required")
+		return coreerr.New(
+			coreerr.KindInvalidInput,
+			"schema.custom.record_type_required",
+			"record type is required",
+			coreerr.WithField("record_type"),
+		)
 	}
 	if _, ok := schemaPathForType(recordType); ok {
-		return fmt.Errorf("record type %s conflicts with built-in type", recordType)
+		return coreerr.New(
+			coreerr.KindValidation,
+			"schema.custom.record_type_conflicts_builtin",
+			fmt.Sprintf("record type %s conflicts with built-in type", recordType),
+			coreerr.WithField("record_type"),
+		)
 	}
 	s, err := compileSchema("custom.json", data)
 	if err != nil {
-		return fmt.Errorf("compile custom schema %s: %w", filepath.Base(schemaPath), err)
+		return coreerr.Wrap(
+			coreerr.KindValidation,
+			"schema.custom.compile_failed",
+			fmt.Sprintf("compile custom schema %s", filepath.Base(schemaPath)),
+			err,
+			coreerr.WithPath(schemaPath),
+		)
 	}
 	customMu.Lock()
 	customTypes[recordType] = RecordType{
@@ -120,7 +173,7 @@ func ValidateAgainstSchema(data []byte, schemaPath string) error {
 func validateWithSchema(data []byte, schemaPath string) error {
 	raw, err := schemaFS.ReadFile(schemaPath)
 	if err != nil {
-		return err
+		return coreerr.Wrap(coreerr.KindInternal, "schema.read_embedded_schema_failed", "read embedded schema", err, coreerr.WithPath(schemaPath))
 	}
 	s, err := compileSchema("schema.json", raw)
 	if err != nil {
@@ -132,17 +185,24 @@ func validateWithSchema(data []byte, schemaPath string) error {
 func validateWithCompiledSchema(data []byte, s *jsonschema.Schema) error {
 	var v any
 	if err := json.Unmarshal(data, &v); err != nil {
-		return err
+		return coreerr.Wrap(coreerr.KindInvalidInput, "schema.invalid_json", "parse json", err)
 	}
-	return s.Validate(v)
+	if err := s.Validate(v); err != nil {
+		return coreerr.Wrap(coreerr.KindValidation, "schema.validation_failed", "schema validation failed", err)
+	}
+	return nil
 }
 
 func compileSchema(name string, raw []byte) (*jsonschema.Schema, error) {
 	compiler := jsonschema.NewCompiler()
 	if err := compiler.AddResource(name, strings.NewReader(string(raw))); err != nil {
-		return nil, err
+		return nil, coreerr.Wrap(coreerr.KindValidation, "schema.compile_resource_failed", "compile schema resource", err)
 	}
-	return compiler.Compile(name)
+	compiled, err := compiler.Compile(name)
+	if err != nil {
+		return nil, coreerr.Wrap(coreerr.KindValidation, "schema.compile_failed", "compile schema", err)
+	}
+	return compiled, nil
 }
 
 func schemaPathForType(recordType string) (string, bool) {

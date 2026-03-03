@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	coreerr "github.com/Clyra-AI/proof/core/errors"
 	"github.com/Clyra-AI/proof/core/record"
 )
 
@@ -28,15 +29,18 @@ var cosignRun = func(args ...string) ([]byte, error) {
 }
 
 func IsDependencyMissing(err error) bool {
+	if typed, ok := coreerr.As(err); ok && typed.Kind == coreerr.KindDependencyMissing {
+		return true
+	}
 	return errors.Is(err, ErrDependencyMissing)
 }
 
 func SignRecordCosign(r *record.Record, keyPath string) (*record.Record, error) {
 	if r == nil {
-		return nil, fmt.Errorf("record is nil")
+		return nil, coreerr.New(coreerr.KindInvalidInput, "signing.record_nil", "record is nil", coreerr.WithField("record"))
 	}
 	if strings.TrimSpace(keyPath) == "" {
-		return nil, fmt.Errorf("cosign key path is required")
+		return nil, coreerr.New(coreerr.KindInvalidInput, "signing.cosign.key_path_required", "cosign key path is required", coreerr.WithField("key_path"))
 	}
 	if r.Integrity.RecordHash == "" {
 		h, err := record.ComputeHash(r)
@@ -56,10 +60,15 @@ func SignRecordCosign(r *record.Record, keyPath string) (*record.Record, error) 
 
 func SignDigestCosign(digest string, keyPath string) (Signature, error) {
 	if strings.TrimSpace(keyPath) == "" {
-		return Signature{}, fmt.Errorf("cosign key path is required")
+		return Signature{}, coreerr.New(coreerr.KindInvalidInput, "signing.cosign.key_path_required", "cosign key path is required", coreerr.WithField("key_path"))
 	}
 	if _, err := cosignLookPath("cosign"); err != nil {
-		return Signature{}, fmt.Errorf("%w: cosign binary not found: %v", ErrDependencyMissing, err)
+		return Signature{}, coreerr.Wrap(
+			coreerr.KindDependencyMissing,
+			"signing.cosign.binary_missing",
+			"cosign binary not found",
+			fmt.Errorf("%w: %v", ErrDependencyMissing, err),
+		)
 	}
 	tmpDir, err := os.MkdirTemp("", "proof-cosign-")
 	if err != nil {
@@ -75,7 +84,11 @@ func SignDigestCosign(digest string, keyPath string) (Signature, error) {
 
 	args := []string{"sign-blob", "--key", keyPath, "--output-signature", sigPath, blobPath}
 	if out, err := cosignRun(args...); err != nil {
-		return Signature{}, fmt.Errorf("cosign sign-blob failed: %v (%s)", err, strings.TrimSpace(string(out)))
+		return Signature{}, coreerr.New(
+			coreerr.KindVerification,
+			"signing.cosign.sign_blob_failed",
+			fmt.Sprintf("cosign sign-blob failed: %v (%s)", err, strings.TrimSpace(string(out))),
+		)
 	}
 	// #nosec G304 -- signature path is generated in process-owned temp dir.
 	rawSig, err := os.ReadFile(sigPath)
@@ -92,17 +105,22 @@ func SignDigestCosign(digest string, keyPath string) (Signature, error) {
 
 func VerifyRecordCosign(r *record.Record, opts CosignVerifyOpts) error {
 	if r == nil {
-		return fmt.Errorf("record is nil")
+		return coreerr.New(coreerr.KindInvalidInput, "signing.record_nil", "record is nil", coreerr.WithField("record"))
 	}
 	if !strings.HasPrefix(r.Integrity.Signature, "cosign:") {
-		return fmt.Errorf("record does not contain cosign signature")
+		return coreerr.New(coreerr.KindInvalidInput, "signing.cosign.signature_missing", "record does not contain cosign signature", coreerr.WithField("integrity.signature"))
 	}
 	expected, err := record.ComputeHash(r)
 	if err != nil {
 		return err
 	}
 	if expected != r.Integrity.RecordHash {
-		return fmt.Errorf("record hash mismatch: expected %s got %s", expected, r.Integrity.RecordHash)
+		return coreerr.New(
+			coreerr.KindVerification,
+			"signing.record_hash_mismatch",
+			fmt.Sprintf("record hash mismatch: expected %s got %s", expected, r.Integrity.RecordHash),
+			coreerr.WithField("integrity.record_hash"),
+		)
 	}
 	sig := Signature{
 		Alg:          "cosign",
@@ -115,16 +133,30 @@ func VerifyRecordCosign(r *record.Record, opts CosignVerifyOpts) error {
 
 func VerifyDigestCosign(sig Signature, digest string, opts CosignVerifyOpts) error {
 	if strings.TrimSpace(opts.KeyPath) == "" && strings.TrimSpace(opts.CertificatePath) == "" {
-		return fmt.Errorf("cosign verification requires --cosign-key or --cosign-cert")
+		return coreerr.New(
+			coreerr.KindInvalidInput,
+			"signing.cosign.verify_material_required",
+			"cosign verification requires --cosign-key or --cosign-cert",
+		)
 	}
 	if _, err := cosignLookPath("cosign"); err != nil {
-		return fmt.Errorf("%w: cosign binary not found: %v", ErrDependencyMissing, err)
+		return coreerr.Wrap(
+			coreerr.KindDependencyMissing,
+			"signing.cosign.binary_missing",
+			"cosign binary not found",
+			fmt.Errorf("%w: %v", ErrDependencyMissing, err),
+		)
 	}
 	if strings.TrimSpace(sig.SignedDigest) == "" {
-		return fmt.Errorf("signed digest is required")
+		return coreerr.New(coreerr.KindInvalidInput, "signing.cosign.signed_digest_required", "signed digest is required", coreerr.WithField("signed_digest"))
 	}
 	if strings.TrimSpace(sig.SignedDigest) != strings.TrimSpace(digest) {
-		return fmt.Errorf("signed digest mismatch: expected %s got %s", digest, sig.SignedDigest)
+		return coreerr.New(
+			coreerr.KindVerification,
+			"signing.signed_digest_mismatch",
+			fmt.Sprintf("signed digest mismatch: expected %s got %s", digest, sig.SignedDigest),
+			coreerr.WithField("signed_digest"),
+		)
 	}
 	tmpDir, err := os.MkdirTemp("", "proof-cosign-")
 	if err != nil {
@@ -157,7 +189,11 @@ func VerifyDigestCosign(sig Signature, digest string, opts CosignVerifyOpts) err
 	args = append(args, blobPath)
 
 	if out, err := cosignRun(args...); err != nil {
-		return fmt.Errorf("cosign verify-blob failed: %v (%s)", err, strings.TrimSpace(string(out)))
+		return coreerr.New(
+			coreerr.KindVerification,
+			"signing.cosign.verify_blob_failed",
+			fmt.Sprintf("cosign verify-blob failed: %v (%s)", err, strings.TrimSpace(string(out))),
+		)
 	}
 	return nil
 }

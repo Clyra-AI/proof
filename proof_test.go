@@ -189,6 +189,10 @@ func TestWriteReadAndCustomSchemaValidation(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, r.RecordID, read.RecordID)
 
+	validated, err := ReadAndValidateRecord(p)
+	require.NoError(t, err)
+	require.Equal(t, r.RecordID, validated.RecordID)
+
 	schemaPath := filepath.Join(t.TempDir(), "custom.schema.json")
 	require.NoError(t, os.WriteFile(schemaPath, []byte(`{"$schema":"http://json-schema.org/draft-07/schema#","type":"object"}`), 0o644))
 	require.NoError(t, ValidateCustomTypeSchema(schemaPath))
@@ -217,6 +221,14 @@ func TestWriteReadAndCustomSchemaValidation(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.Equal(t, "vendor.custom_event", customRecord.RecordType)
+}
+
+func TestReadAndValidateRecordRejectsInvalidSchema(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "record.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"record_type":"decision"}`), 0o644))
+
+	_, err := ReadAndValidateRecord(path)
+	require.Error(t, err)
 }
 
 func TestRevocationListAPI(t *testing.T) {
@@ -298,6 +310,29 @@ func TestBundleSignAndVerify(t *testing.T) {
 		PublicKey:        PublicKey{Public: key.Public},
 	})
 	require.NoError(t, err)
+}
+
+func TestSignBundleManifestPure(t *testing.T) {
+	manifest := BundleManifest{
+		Files: []BundleManifestEntry{
+			{Path: "records.jsonl", SHA256: "sha256:ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"},
+		},
+	}
+	key, err := GenerateSigningKey()
+	require.NoError(t, err)
+
+	signed, err := SignBundleManifest(manifest, key)
+	require.NoError(t, err)
+	require.Empty(t, manifest.Signatures)
+	require.Len(t, signed.Signatures, 1)
+}
+
+func TestAsLibraryError(t *testing.T) {
+	_, err := SignBundleManifest(BundleManifest{}, SigningKey{})
+	require.Error(t, err)
+	typed, ok := AsLibraryError(err)
+	require.True(t, ok)
+	require.Equal(t, ErrorKindInvalidInput, typed.Kind)
 }
 
 func TestRegisterCustomTypeInline(t *testing.T) {

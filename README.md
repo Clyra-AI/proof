@@ -41,27 +41,37 @@ PROOF_VERSION="$(gh release view --repo Clyra-AI/proof --json tagName -q .tagNam
 go install github.com/Clyra-AI/proof/cmd/proof@"${PROOF_VERSION}"
 
 proof types list          # 18 built-in record types
-proof frameworks list     # 8 built-in starter frameworks (12 controls)
+proof frameworks list     # 10 built-in starter frameworks (73 controls)
 proof verify ./artifact   # Verify any proof artifact offline
 ```
 
-### Library Usage (4 lines)
+### Library Usage
 
 ```go
 import "github.com/Clyra-AI/proof"
 
-record, _ := proof.NewRecord(proof.RecordOpts{
-    Source:        "my-mcp-server",
-    SourceProduct: "my-product",
-    Type:          "tool_invocation",
-    Event:         map[string]any{"tool": "postgres_query", "action": "SELECT"},
+record, err := proof.NewRecord(proof.RecordOpts{
+	Source:        "my-mcp-server",
+	SourceProduct: "my-product",
+	Type:          "tool_invocation",
+	Event:         map[string]any{"tool": "postgres_query", "action": "SELECT"},
 })
+if err != nil {
+	return err
+}
 
 chain := proof.NewChain("default")
-_ = proof.AppendToChain(chain, record)
+if err := proof.AppendToChain(chain, record); err != nil {
+	return err
+}
 
-key, _ := proof.GenerateSigningKey()
-_, _ = proof.Sign(&chain.Records[0], key)
+key, err := proof.GenerateSigningKey()
+if err != nil {
+	return err
+}
+if _, err := proof.Sign(&chain.Records[0], key); err != nil {
+	return err
+}
 ```
 
 Every tool invocation now produces a signed, chainable, verifiable proof record. No configuration files, no account, no network access.
@@ -69,20 +79,30 @@ Every tool invocation now produces a signed, chainable, verifiable proof record.
 ### Custom Record Types
 
 ```go
-_ = proof.RegisterCustomTypeSchema("vendor.custom_event", "./custom.schema.json")
+if err := proof.RegisterCustomTypeSchema("vendor.custom_event", "./custom.schema.json"); err != nil {
+	return err
+}
 ```
 
 Custom types validate against the base proof record schema plus your type-specific schema. They chain and sign identically to built-in types.
 
+### Read Paths
+
+- `proof.ReadRecord(path)` parses JSON into a `Record` without schema validation.
+- `proof.ReadAndValidateRecord(path)` parses and validates both record structure and type-specific schema.
+
 ### Governance Events
 
 ```go
-record, _ := proof.NewRecordFromEvent(proof.GovernanceEvent{
-    EventID:   "evt-1",
-    Timestamp: "2026-02-20T12:00:00Z",
-    EventType: "tool_gate",
-    Detail:    map[string]any{"verdict": "allow"},
+record, err := proof.NewRecordFromEvent(proof.GovernanceEvent{
+	EventID:   "evt-1",
+	Timestamp: "2026-02-20T12:00:00Z",
+	EventType: "tool_gate",
+	Detail:    map[string]any{"verdict": "allow"},
 }, "axym")
+if err != nil {
+	return err
+}
 ```
 
 Use `schemas/v1/governance-event-v1.schema.json` for event validation. See `docs/governance-events.md` and `docs/record-context-keys.md`.
@@ -90,59 +110,75 @@ Use `schemas/v1/governance-event-v1.schema.json` for event validation. See `docs
 ### Bundle Signing and Verification
 
 ```go
-manifest, _ := proof.SignBundle("./bundle", key)
+signedManifest, err := proof.SignBundleManifest(inputManifest, key) // pure: no file mutation
+if err != nil {
+	return err
+}
 
-result, _ := proof.VerifyBundle("./bundle", proof.BundleVerifyOpts{
-    VerifySignatures: true,
-    PublicKey:        proof.PublicKey{Public: key.Public},
+_, err = proof.SignBundleFile("./bundle", key) // explicit file mutation of ./bundle/manifest.json
+if err != nil {
+	return err
+}
+
+verified, err := proof.VerifyBundle("./bundle", proof.BundleVerifyOpts{
+	VerifySignatures: true,
+	PublicKey:        proof.PublicKey{Public: key.Public},
 })
+if err != nil {
+	return err
+}
+_ = signedManifest
+_ = verified
 ```
 
 ## Record Format
 
 The atomic unit is the proof record — a structured, signed artifact that captures what happened, what controls were in place, and the cryptographic integrity needed to prove it wasn't tampered with.
 
-```yaml
-record_id: "prf-2026-09-15T10:30:00Z-a7f3b2c1"
-record_version: "1.0"
-timestamp: "2026-09-15T10:30:00Z"
-source: "my-mcp-server"
-source_product: "my-product"
-record_type: "tool_invocation"
-
-event:
-  tool: "postgres_query"
-  action: "SELECT"
-  parameters:
-    query_hash: "sha256:abc123..."    # digest, not the query itself
-    target: "payments.transactions"
-
-controls:
-  permissions_enforced: true
-  approved_scope: "read-only on payments.*"
-  within_scope: true
-
-relationship:
-  parent_ref:
-    kind: "trace"
-    id: "trace_2026_09_15_1030"
-  entity_refs:
-    - kind: "agent"
-      id: "agent:billing-assistant"
-    - kind: "tool"
-      id: "tool:postgres_query"
-    - kind: "resource"
-      id: "resource:payments.transactions"
-  policy_ref:
-    policy_id: "prod.tool-access"
-    policy_version: "v3"
-    policy_digest: "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-
-integrity:
-  record_hash: "sha256:def456..."
-  previous_record_hash: "sha256:ghi789..."   # chain link
-  signing_key_id: "a1b2c3..."
-  signature: "base64:..."
+```json
+{
+  "record_id": "prf-2026-09-15T10:30:00Z-a7f3b2c1",
+  "record_version": "1.0",
+  "timestamp": "2026-09-15T10:30:00Z",
+  "source": "my-mcp-server",
+  "source_product": "my-product",
+  "record_type": "tool_invocation",
+  "event": {
+    "tool": "postgres_query",
+    "action": "SELECT",
+    "parameters": {
+      "query_hash": "sha256:abc123...",
+      "target": "payments.transactions"
+    }
+  },
+  "controls": {
+    "permissions_enforced": true,
+    "approved_scope": "read-only on payments.*",
+    "within_scope": true
+  },
+  "relationship": {
+    "parent_ref": {
+      "kind": "trace",
+      "id": "trace_2026_09_15_1030"
+    },
+    "entity_refs": [
+      {"kind": "agent", "id": "agent:billing-assistant"},
+      {"kind": "tool", "id": "tool:postgres_query"},
+      {"kind": "resource", "id": "resource:payments.transactions"}
+    ],
+    "policy_ref": {
+      "policy_id": "prod.tool-access",
+      "policy_version": "v3",
+      "policy_digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    }
+  },
+  "integrity": {
+    "record_hash": "sha256:def456...",
+    "previous_record_hash": "sha256:ghi789...",
+    "signing_key_id": "a1b2c3...",
+    "signature": "base64:..."
+  }
+}
 ```
 
 Records are immutable, deterministic, and JSON-native — readable by any language, any tool, any text editor.
@@ -225,7 +261,7 @@ controls:
     minimum_frequency: continuous
 ```
 
-8 built-in starter frameworks ship with v1 (12 controls total). Add custom frameworks via YAML.
+10 built-in starter frameworks ship with v1 (73 controls total). Add custom frameworks via YAML.
 
 | Framework | Scope |
 |---|---|
@@ -237,8 +273,14 @@ controls:
 | Colorado AI Act | State AI regulation |
 | ISO 42001 | AI Management System |
 | NIST AI 600-1 | Agent security guidance |
+| AIUC-1 | AI use case controls and assurance requirements |
+| OWASP Agentic Top 10 | Agentic application security risk coverage |
 
 Built-ins are starter definitions; teams can add custom frameworks via YAML files.
+Control IDs/titles for AIUC-1 and OWASP Agentic Top 10 are sourced from their published framework documents.
+
+- AIUC-1: <https://aiuc-1.com/data-and-privacy> (and linked Security/Safety/Reliability/Accountability/Society sections)
+- OWASP Agentic Top 10: <https://genai.owasp.org/resource/agentic-top-10/>
 
 ## CLI Reference
 
@@ -308,6 +350,9 @@ Compatibility packages for migration:
 - `github.com/Clyra-AI/proof/schema` — `ValidateJSON()` and `ValidateJSONL()` helpers
 - `github.com/Clyra-AI/proof/exitcode` — Exit code constants with legacy aliases
 
+Public API support and deprecation status are documented in [docs/api-contract.md](docs/api-contract.md).
+Python-first integration patterns are documented in [docs/python-integration.md](docs/python-integration.md).
+
 ## Design Principles
 
 1. **The spec is the product.** JSON Schema files are the normative specification. The Go module is the reference implementation. If they disagree, the spec wins.
@@ -325,10 +370,12 @@ core/
   record/            Record creation, validation, hashing
   chain/             Hash chain append and verification
   signing/           Ed25519 + cosign signing
+  bundle/            Bundle manifests and bundle sign/verify
   canon/             Canonicalization (JSON, SQL, URL, text)
   schema/            JSON Schema validation + type registry
   framework/         YAML framework definition loading
   gait/              Gait pack/runpack compatibility verification
+  errors/            Structured library errors (kind/code/path/field)
   exitcode/          Exit code constants
 signing/             Compatibility package (Gait migration)
 canon/               Compatibility package (Gait migration)
@@ -336,7 +383,7 @@ schema/              Compatibility package (Gait migration)
 exitcode/            Compatibility package (Gait migration)
 schemas/v1/          JSON Schema spec files (language-agnostic contract)
   types/             18 record type schemas
-frameworks/          8 compliance framework YAML definitions
+frameworks/          10 compliance framework YAML definitions
 docs/                Supplementary format and interoperability documentation
 testdata/            Golden vectors and test fixtures
 scripts/             Test and validation scripts
@@ -358,22 +405,52 @@ CI pipelines: main, PR, determinism (cross-platform), CodeQL, nightly (hardening
 ## Install
 
 ```bash
-PROOF_VERSION="$(gh release view --repo Clyra-AI/proof --json tagName -q .tagName 2>/dev/null || curl -fsSL https://api.github.com/repos/Clyra-AI/proof/releases/latest | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"tag_name\"])')"
+# Verified one-command install (Linux/macOS)
+curl -fsSL https://raw.githubusercontent.com/Clyra-AI/proof/main/scripts/install.sh | sh
 
-# From module source at latest published release tag
-go install github.com/Clyra-AI/proof/cmd/proof@"${PROOF_VERSION}"
-
-# From release assets
-gh release download "${PROOF_VERSION}" -R Clyra-AI/proof -D /tmp/proof-release
-cd /tmp/proof-release && sha256sum -c checksums.txt
+# Optional: pin a specific tag
+curl -fsSL https://raw.githubusercontent.com/Clyra-AI/proof/main/scripts/install.sh | sh -s -- --version v1.2.3
 ```
 
-Go module:
+Homebrew publication path:
+
+```bash
+brew tap Clyra-AI/homebrew-tap
+brew install proof
+```
+
+Go module and CLI install:
 
 ```bash
 PROOF_VERSION="$(gh release view --repo Clyra-AI/proof --json tagName -q .tagName 2>/dev/null || curl -fsSL https://api.github.com/repos/Clyra-AI/proof/releases/latest | python3 -c 'import json,sys; print(json.load(sys.stdin)[\"tag_name\"])')"
+go install github.com/Clyra-AI/proof/cmd/proof@"${PROOF_VERSION}"
 go get github.com/Clyra-AI/proof@"${PROOF_VERSION}"
 ```
+
+Release checksum/signature verification:
+
+```bash
+PROOF_VERSION="$(gh release view --repo Clyra-AI/proof --json tagName -q .tagName)"
+gh release download "${PROOF_VERSION}" -R Clyra-AI/proof -D /tmp/proof-release
+cd /tmp/proof-release
+sha256sum -c checksums.txt
+
+# Optional if cosign is installed and signature assets are present
+cosign verify-blob \
+  --certificate checksums.txt.pem \
+  --signature checksums.txt.sig \
+  checksums.txt
+```
+
+See [docs/release-distribution.md](docs/release-distribution.md) for full release and Homebrew publication workflow.
+
+## Project Docs
+
+- [docs/api-contract.md](docs/api-contract.md)
+- [docs/python-integration.md](docs/python-integration.md)
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [SECURITY.md](SECURITY.md)
+- [CHANGELOG.md](CHANGELOG.md)
 
 ## License
 

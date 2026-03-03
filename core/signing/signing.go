@@ -7,13 +7,13 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/Clyra-AI/proof/core/canon"
+	coreerr "github.com/Clyra-AI/proof/core/errors"
 	"github.com/Clyra-AI/proof/core/record"
 )
 
@@ -81,10 +81,10 @@ func NormalizeKeyID(id string, pub ed25519.PublicKey) string {
 
 func Sign(r *record.Record, key SigningKey) (*record.Record, error) {
 	if r == nil {
-		return nil, errors.New("record is nil")
+		return nil, coreerr.New(coreerr.KindInvalidInput, "signing.record_nil", "record is nil", coreerr.WithField("record"))
 	}
 	if len(key.Private) == 0 {
-		return nil, errors.New("private key is required")
+		return nil, coreerr.New(coreerr.KindInvalidInput, "signing.private_key_required", "private key is required", coreerr.WithField("private_key"))
 	}
 	if r.Integrity.RecordHash == "" {
 		h, err := record.ComputeHash(r)
@@ -105,10 +105,10 @@ func Sign(r *record.Record, key SigningKey) (*record.Record, error) {
 func SignDigest(digest string, key SigningKey) (Signature, error) {
 	digest = strings.TrimSpace(digest)
 	if digest == "" {
-		return Signature{}, errors.New("digest is required")
+		return Signature{}, coreerr.New(coreerr.KindInvalidInput, "signing.digest_required", "digest is required", coreerr.WithField("digest"))
 	}
 	if len(key.Private) == 0 {
-		return Signature{}, errors.New("private key is required")
+		return Signature{}, coreerr.New(coreerr.KindInvalidInput, "signing.private_key_required", "private key is required", coreerr.WithField("private_key"))
 	}
 	if len(key.Public) == 0 {
 		key.Public = key.Private.Public().(ed25519.PublicKey)
@@ -124,51 +124,76 @@ func SignDigest(digest string, key SigningKey) (Signature, error) {
 
 func VerifyDigest(sig Signature, digest string, pub PublicKey) error {
 	if sig.Alg != "ed25519" {
-		return fmt.Errorf("unsupported signature algorithm: %s", sig.Alg)
+		return coreerr.New(
+			coreerr.KindVerification,
+			"signing.unsupported_signature_algorithm",
+			fmt.Sprintf("unsupported signature algorithm: %s", sig.Alg),
+			coreerr.WithField("alg"),
+		)
 	}
 	digest = strings.TrimSpace(digest)
 	if sig.SignedDigest != digest {
-		return fmt.Errorf("signed digest mismatch: expected %s got %s", digest, sig.SignedDigest)
+		return coreerr.New(
+			coreerr.KindVerification,
+			"signing.signed_digest_mismatch",
+			fmt.Sprintf("signed digest mismatch: expected %s got %s", digest, sig.SignedDigest),
+			coreerr.WithField("signed_digest"),
+		)
 	}
 	kid := NormalizeKeyID(pub.KeyID, pub.Public)
 	if sig.KeyID != kid {
-		return fmt.Errorf("signing key mismatch: expected %s got %s", kid, sig.KeyID)
+		return coreerr.New(
+			coreerr.KindVerification,
+			"signing.key_mismatch",
+			fmt.Sprintf("signing key mismatch: expected %s got %s", kid, sig.KeyID),
+			coreerr.WithField("key_id"),
+		)
 	}
 	decoded, err := base64.StdEncoding.DecodeString(sig.Sig)
 	if err != nil {
-		return fmt.Errorf("decode signature: %w", err)
+		return coreerr.Wrap(coreerr.KindInvalidInput, "signing.decode_signature_failed", "decode signature", err, coreerr.WithField("signature"))
 	}
 	if !ed25519.Verify(pub.Public, []byte(digest), decoded) {
-		return errors.New("signature verification failed")
+		return coreerr.New(coreerr.KindVerification, "signing.signature_verification_failed", "signature verification failed")
 	}
 	return nil
 }
 
 func Verify(r *record.Record, pub PublicKey) error {
 	if r == nil {
-		return errors.New("record is nil")
+		return coreerr.New(coreerr.KindInvalidInput, "signing.record_nil", "record is nil", coreerr.WithField("record"))
 	}
 	if r.Integrity.RecordHash == "" || r.Integrity.Signature == "" || r.Integrity.SigningKeyID == "" {
-		return errors.New("record integrity signature block is incomplete")
+		return coreerr.New(coreerr.KindInvalidInput, "signing.integrity_block_incomplete", "record integrity signature block is incomplete", coreerr.WithField("integrity"))
 	}
 	expectedHash, err := record.ComputeHash(r)
 	if err != nil {
 		return err
 	}
 	if expectedHash != r.Integrity.RecordHash {
-		return fmt.Errorf("record hash mismatch: expected %s got %s", expectedHash, r.Integrity.RecordHash)
+		return coreerr.New(
+			coreerr.KindVerification,
+			"signing.record_hash_mismatch",
+			fmt.Sprintf("record hash mismatch: expected %s got %s", expectedHash, r.Integrity.RecordHash),
+			coreerr.WithField("integrity.record_hash"),
+		)
 	}
 	kid := NormalizeKeyID(pub.KeyID, pub.Public)
 	if kid != r.Integrity.SigningKeyID {
-		return fmt.Errorf("signing key mismatch: expected %s got %s", kid, r.Integrity.SigningKeyID)
+		return coreerr.New(
+			coreerr.KindVerification,
+			"signing.key_mismatch",
+			fmt.Sprintf("signing key mismatch: expected %s got %s", kid, r.Integrity.SigningKeyID),
+			coreerr.WithField("integrity.signing_key_id"),
+		)
 	}
 	enc := strings.TrimPrefix(r.Integrity.Signature, "base64:")
 	sig, err := base64.StdEncoding.DecodeString(enc)
 	if err != nil {
-		return fmt.Errorf("decode signature: %w", err)
+		return coreerr.Wrap(coreerr.KindInvalidInput, "signing.decode_signature_failed", "decode signature", err, coreerr.WithField("integrity.signature"))
 	}
 	if !ed25519.Verify(pub.Public, []byte(r.Integrity.RecordHash), sig) {
-		return errors.New("signature verification failed")
+		return coreerr.New(coreerr.KindVerification, "signing.signature_verification_failed", "signature verification failed")
 	}
 	return nil
 }

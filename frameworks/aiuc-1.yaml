@@ -1,0 +1,265 @@
+framework:
+  id: aiuc-1
+  version: "2026"
+  title: AIUC-1 Standard
+controls:
+  - id: A001
+    title: Establish input data policy
+    required_record_types: &aiuc_data_privacy_types [permission_check, policy_enforcement, tool_invocation, incident]
+    required_fields: &proof_required_fields [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+    minimum_frequency: continuous
+  - id: A002
+    title: Establish output data policy
+    required_record_types: *aiuc_data_privacy_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: A003
+    title: Limit AI agent data collection
+    required_record_types: *aiuc_data_privacy_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: A004
+    title: Protect IP & trade secrets
+    required_record_types: *aiuc_data_privacy_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: A005
+    title: Prevent cross-customer data exposure
+    required_record_types: *aiuc_data_privacy_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: A006
+    title: Prevent PII leakage
+    required_record_types: *aiuc_data_privacy_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: A007
+    title: Prevent IP violations
+    required_record_types: *aiuc_data_privacy_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+
+  - id: B001
+    title: Third-party testing of adversarial robustness
+    required_record_types: &aiuc_security_types [policy_enforcement, permission_check, guardrail_activation, test_result, incident]
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: B002
+    title: Detect adversarial input
+    required_record_types: *aiuc_security_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: B003
+    title: Manage public release of technical details
+    required_record_types: *aiuc_security_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: B004
+    title: Prevent AI endpoint scraping
+    required_record_types: *aiuc_security_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: B005
+    title: Implement real-time input filtering
+    required_record_types: *aiuc_security_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: B006
+    title: Prevent unauthorized AI agent actions
+    required_record_types: *aiuc_security_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: B007
+    title: Enforce user access privileges to AI systems
+    required_record_types: *aiuc_security_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: B008
+    title: Protect model deployment environment
+    required_record_types: *aiuc_security_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: B009
+    title: Limit output over-exposure
+    required_record_types: *aiuc_security_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+
+  - id: C001
+    title: Define AI risk taxonomy
+    required_record_types: &aiuc_safety_types [risk_assessment, guardrail_activation, test_result, human_oversight, incident]
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: C002
+    title: Conduct pre-deployment testing
+    required_record_types: *aiuc_safety_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: C003
+    title: Prevent harmful outputs
+    required_record_types: *aiuc_safety_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: C004
+    title: Prevent out-of-scope outputs
+    required_record_types: *aiuc_safety_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: C005
+    title: Prevent customer-defined high risk outputs
+    required_record_types: *aiuc_safety_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: C006
+    title: Prevent output vulnerabilities
+    required_record_types: *aiuc_safety_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: C007
+    title: Flag high risk outputs
+    required_record_types: *aiuc_safety_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: C008
+    title: Monitor AI risk categories
+    required_record_types: *aiuc_safety_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: C009
+    title: Enable real-time feedback and intervention
+    required_record_types: *aiuc_safety_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: C010
+    title: Third-party testing for harmful outputs
+    required_record_types: *aiuc_safety_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: C011
+    title: Third-party testing for out-of-scope outputs
+    required_record_types: *aiuc_safety_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: C012
+    title: Third-party testing for customer-defined risk
+    required_record_types: *aiuc_safety_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+
+  - id: D001
+    title: Prevent hallucinated outputs
+    required_record_types: &aiuc_reliability_types [test_result, guardrail_activation, tool_invocation, compiled_action]
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: D002
+    title: Third-party testing for hallucinations
+    required_record_types: *aiuc_reliability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: D003
+    title: Restrict unsafe tool calls
+    required_record_types: *aiuc_reliability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: D004
+    title: Third-party testing of tool calls
+    required_record_types: *aiuc_reliability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+
+  - id: E001
+    title: AI failure plan for security breaches
+    required_record_types: &aiuc_accountability_types [approval, human_oversight, policy_enforcement, incident, deployment]
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: E002
+    title: AI failure plan for harmful outputs
+    required_record_types: *aiuc_accountability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: E003
+    title: AI failure plan for hallucinations
+    required_record_types: *aiuc_accountability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: E004
+    title: Assign accountability
+    required_record_types: *aiuc_accountability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: E005
+    title: Assess cloud vs on-prem processing
+    required_record_types: *aiuc_accountability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: E006
+    title: Conduct vendor due diligence
+    required_record_types: *aiuc_accountability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: E007
+    title: Document system change approvals
+    required_record_types: *aiuc_accountability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: E008
+    title: Review internal processes
+    required_record_types: *aiuc_accountability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: E009
+    title: Monitor third-party access
+    required_record_types: *aiuc_accountability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: E010
+    title: Establish AI acceptable use policy
+    required_record_types: *aiuc_accountability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: E011
+    title: Record processing locations
+    required_record_types: *aiuc_accountability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: E012
+    title: Document regulatory compliance
+    required_record_types: *aiuc_accountability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: E013
+    title: Implement quality management system
+    required_record_types: *aiuc_accountability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: E014
+    title: Share transparency reports
+    required_record_types: *aiuc_accountability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: E015
+    title: Log model activity
+    required_record_types: *aiuc_accountability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: E016
+    title: Implement AI disclosure mechanisms
+    required_record_types: *aiuc_accountability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: E017
+    title: Document system transparency policy
+    required_record_types: *aiuc_accountability_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+
+  - id: F001
+    title: Prevent AI cyber misuse
+    required_record_types: &aiuc_society_types [guardrail_activation, policy_enforcement, incident, risk_assessment]
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous
+  - id: F002
+    title: Prevent catastrophic misuse
+    required_record_types: *aiuc_society_types
+    required_fields: *proof_required_fields
+    minimum_frequency: continuous

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	coreerr "github.com/Clyra-AI/proof/core/errors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,6 +30,16 @@ func TestNewAndHash(t *testing.T) {
 func TestValidateRequiredFields(t *testing.T) {
 	err := Validate(&Record{})
 	require.Error(t, err)
+}
+
+func TestValidateTypedError(t *testing.T) {
+	err := Validate(nil)
+	require.Error(t, err)
+	typed, ok := coreerr.As(err)
+	require.True(t, ok)
+	require.Equal(t, coreerr.KindInvalidInput, typed.Kind)
+	require.Equal(t, "record.nil", typed.Code)
+	require.Equal(t, "record", typed.Field)
 }
 
 func TestValidateDetailedErrors(t *testing.T) {
