@@ -26,6 +26,7 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
       - name: Verify release checksums
         run: ./scripts/verify_release_artifacts.sh dist
       - uses: anchore/sbom-action@v0
