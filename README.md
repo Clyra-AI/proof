@@ -397,7 +397,7 @@ make fmt             # Format
 make lint            # Vet + golangci-lint
 make test            # Unit tests
 make prepush-full    # Full gate: lint + test + coverage + contract + integration + e2e + acceptance
-make test-uat-local  # UAT for source, go-install, and local release-archive install paths
+make test-uat-local  # UAT for source/go-install/local-release paths; add --brew for Homebrew install path
 ```
 
 CI pipelines: main, PR, determinism (cross-platform), CodeQL, nightly (hardening + chaos + performance + soak), release (GoReleaser + checksums + SBOM + cosign + SLSA provenance).
