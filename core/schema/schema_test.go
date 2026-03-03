@@ -49,6 +49,15 @@ func TestValidateRecordTypedError(t *testing.T) {
 	require.Equal(t, coreerr.KindValidation, typed.Kind)
 }
 
+func TestValidateRecordMalformedJSONKeepsInvalidInputKind(t *testing.T) {
+	err := ValidateRecord([]byte("{"), "decision")
+	require.Error(t, err)
+
+	typed, ok := coreerr.As(err)
+	require.True(t, ok)
+	require.Equal(t, coreerr.KindInvalidInput, typed.Kind)
+}
+
 func TestValidateCustomSchema(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "custom.schema.json")

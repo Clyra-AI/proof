@@ -63,7 +63,7 @@ func ListRecordTypes() []RecordType {
 func ValidateRecord(data []byte, recordType string) error {
 	if err := validateWithSchema(data, "v1/proof-record-v1.schema.json"); err != nil {
 		return coreerr.Wrap(
-			coreerr.KindValidation,
+			wrappedKind(err, coreerr.KindValidation),
 			"schema.record.base_validation_failed",
 			"record schema validation failed",
 			err,
@@ -85,7 +85,7 @@ func ValidateRecord(data []byte, recordType string) error {
 		}
 		if err := validateWithCompiledSchema(data, customSchema); err != nil {
 			return coreerr.Wrap(
-				coreerr.KindValidation,
+				wrappedKind(err, coreerr.KindValidation),
 				"schema.record.custom_type_validation_failed",
 				"custom record type schema validation failed",
 				err,
@@ -96,7 +96,7 @@ func ValidateRecord(data []byte, recordType string) error {
 	}
 	if err := validateWithSchema(data, path); err != nil {
 		return coreerr.Wrap(
-			coreerr.KindValidation,
+			wrappedKind(err, coreerr.KindValidation),
 			"schema.record.type_validation_failed",
 			"record type schema validation failed",
 			err,
@@ -203,6 +203,13 @@ func compileSchema(name string, raw []byte) (*jsonschema.Schema, error) {
 		return nil, coreerr.Wrap(coreerr.KindValidation, "schema.compile_failed", "compile schema", err)
 	}
 	return compiled, nil
+}
+
+func wrappedKind(err error, fallback coreerr.Kind) coreerr.Kind {
+	if typed, ok := coreerr.As(err); ok {
+		return typed.Kind
+	}
+	return fallback
 }
 
 func schemaPathForType(recordType string) (string, bool) {

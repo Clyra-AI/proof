@@ -17,6 +17,7 @@ func TestCLIErrorExitCode(t *testing.T) {
 }
 
 func TestVerificationErrorCodeFromTypedError(t *testing.T) {
+	require.Equal(t, exitcode.InternalError, verificationErrorCode(coreerr.New(coreerr.KindInternal, "x", "internal")))
 	require.Equal(t, exitcode.InvalidInput, verificationErrorCode(coreerr.New(coreerr.KindInvalidInput, "x", "bad input")))
 	require.Equal(t, exitcode.PolicyOrSchema, verificationErrorCode(coreerr.New(coreerr.KindValidation, "x", "bad schema")))
 	require.Equal(t, exitcode.VerificationErr, verificationErrorCode(coreerr.New(coreerr.KindVerification, "x", "bad signature")))
