@@ -78,7 +78,7 @@ func TestVerifyBundleWithManifestSignature(t *testing.T) {
 
 	key, err := proof.GenerateSigningKey()
 	require.NoError(t, err)
-	_, err = proof.SignBundle(dir, key)
+	_, err = proof.SignBundleFile(dir, key)
 	require.NoError(t, err)
 
 	out, err := runCLIForTest(t, []string{"verify", "--bundle", "--signatures", "--public-key", hex.EncodeToString(key.Public), dir})

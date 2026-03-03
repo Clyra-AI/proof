@@ -6,17 +6,19 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 OUTPUT_DIR="${REPO_ROOT}/.uat_local"
 RELEASE_VERSION="${PROOF_UAT_RELEASE_VERSION:-}"
+RUN_BREW_PATH="${PROOF_UAT_BREW:-0}"
 
 usage() {
   cat <<'EOF'
 Run local end-to-end UAT for Proof.
 
 Usage:
-  test_uat_local.sh [--output-dir <path>] [--release-version <tag>]
+  test_uat_local.sh [--output-dir <path>] [--release-version <tag>] [--brew]
 
 Options:
   --output-dir <path>      UAT artifacts directory (default: .uat_local)
   --release-version <tag>  Optional GitHub release tag to validate release binary path
+  --brew                   Validate Homebrew install path (requires --release-version)
   -h, --help               Show this help
 EOF
 }
@@ -32,6 +34,10 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || { echo "error: --release-version requires a value" >&2; exit 2; }
       RELEASE_VERSION="$2"
       shift 2
+      ;;
+    --brew)
+      RUN_BREW_PATH=1
+      shift
       ;;
     -h|--help)
       usage
@@ -231,10 +237,25 @@ create_local_release_archive() {
 extract_release_binary() {
   local release_dir="$1"
   local extraction_dir="$2"
+  local platform_suffix="${3:-}"
+  rm -rf "${extraction_dir}"
   mkdir -p "${extraction_dir}"
 
   local archive
-  archive="$(find "${release_dir}" -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' \) | head -n1 || true)"
+  if [[ -n "${platform_suffix}" ]]; then
+    archive="$(
+      find "${release_dir}" -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' \) | sort | while IFS= read -r path; do
+        base="$(basename "${path}")"
+        if [[ "${base}" == *"_${platform_suffix}.tar.gz" || "${base}" == *"_${platform_suffix}.zip" ]]; then
+          printf '%s\n' "${path}"
+          break
+        fi
+      done
+    )"
+  fi
+  if [[ -z "${archive:-}" ]]; then
+    archive="$(find "${release_dir}" -maxdepth 1 -type f \( -name '*.tar.gz' -o -name '*.zip' \) | sort | head -n1 || true)"
+  fi
   if [[ -z "${archive}" ]]; then
     return 1
   fi
@@ -253,6 +274,66 @@ extract_release_binary() {
   chmod +x "${candidate}" || true
   printf '%s' "${candidate}"
   return 0
+}
+
+host_release_platform_suffix() {
+  local os
+  local arch
+
+  case "$(uname -s)" in
+    Darwin) os="darwin" ;;
+    Linux) os="linux" ;;
+    MINGW*|MSYS*|CYGWIN*) os="windows" ;;
+    *) return 1 ;;
+  esac
+
+  case "$(uname -m)" in
+    x86_64|amd64) arch="amd64" ;;
+    arm64|aarch64) arch="arm64" ;;
+    *) return 1 ;;
+  esac
+
+  printf '%s_%s' "${os}" "${arch}"
+}
+
+resolve_brew_binary_path() {
+  local linked_prefix
+  local keg_prefix
+
+  linked_prefix="$(brew --prefix 2>/dev/null || true)"
+  if [[ -n "${linked_prefix}" && -x "${linked_prefix}/bin/proof" ]]; then
+    printf '%s' "${linked_prefix}/bin/proof"
+    return 0
+  fi
+
+  keg_prefix="$(brew --prefix proof 2>/dev/null || true)"
+  if [[ -n "${keg_prefix}" && -x "${keg_prefix}/bin/proof" ]]; then
+    printf '%s' "${keg_prefix}/bin/proof"
+    return 0
+  fi
+
+  return 1
+}
+
+run_brew_install_path_suite() {
+  local release_version="$1"
+  local artifacts_dir="$2"
+  local brew_bin
+  local expected_version
+
+  require_cmd brew
+  run_step "brew_tap" brew tap Clyra-AI/homebrew-tap
+  run_step "brew_install" bash -lc "set -euo pipefail; if brew list --versions proof >/dev/null 2>&1; then brew reinstall Clyra-AI/homebrew-tap/proof; else brew install Clyra-AI/homebrew-tap/proof; fi"
+
+  brew_bin="$(resolve_brew_binary_path || true)"
+  if [[ -z "${brew_bin}" ]]; then
+    log "FAIL brew_binary_resolve (proof binary not found after brew install)"
+    exit 1
+  fi
+
+  expected_version="${release_version#v}"
+  run_step "brew_expected_version" bash -lc "\"${brew_bin}\" --version | grep -F \"${expected_version}\""
+  run_binary_contract_suite "brew" "${brew_bin}" "${artifacts_dir}"
 }
 
 require_cmd go
@@ -310,10 +391,11 @@ if [[ -n "${RELEASE_VERSION}" ]]; then
   require_cmd gh
   RELEASE_DIR="${OUTPUT_DIR}/release"
   mkdir -p "${RELEASE_DIR}"
-  run_step "release_download" gh release download "${RELEASE_VERSION}" -R Clyra-AI/proof -D "${RELEASE_DIR}"
+  run_step "release_download" gh release download "${RELEASE_VERSION}" -R Clyra-AI/proof -D "${RELEASE_DIR}" --clobber
 
   RELEASE_EXTRACT_DIR="${OUTPUT_DIR}/release_extract"
-  RELEASE_BIN="$(extract_release_binary "${RELEASE_DIR}" "${RELEASE_EXTRACT_DIR}" || true)"
+  RELEASE_PLATFORM_SUFFIX="$(host_release_platform_suffix || true)"
+  RELEASE_BIN="$(extract_release_binary "${RELEASE_DIR}" "${RELEASE_EXTRACT_DIR}" "${RELEASE_PLATFORM_SUFFIX}" || true)"
   if [[ -z "${RELEASE_BIN}" ]]; then
     log "FAIL release_binary_extract (no proof binary found in downloaded release assets)"
     exit 1
@@ -321,6 +403,16 @@ if [[ -n "${RELEASE_VERSION}" ]]; then
   run_binary_contract_suite "release" "${RELEASE_BIN}" "${ARTIFACTS_DIR}"
 else
   log "SKIP release path checks (set --release-version to enable)"
+fi
+
+if [[ "${RUN_BREW_PATH}" == "1" ]]; then
+  if [[ -z "${RELEASE_VERSION}" ]]; then
+    log "FAIL brew install path checks require --release-version"
+    exit 1
+  fi
+  run_brew_install_path_suite "${RELEASE_VERSION}" "${ARTIFACTS_DIR}"
+else
+  log "SKIP brew install path checks (pass --brew to enable)"
 fi
 
 log "UAT COMPLETE: PASS"
