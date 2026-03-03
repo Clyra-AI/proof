@@ -332,7 +332,16 @@ run_brew_install_path_suite() {
   fi
 
   expected_version="${release_version#v}"
-  run_step "brew_expected_version" bash -lc "\"${brew_bin}\" --version | grep -F \"${expected_version}\""
+  run_step "brew_expected_version" python3 -c 'import re, subprocess, sys
+bin_path, expected = sys.argv[1], sys.argv[2]
+out = subprocess.check_output([bin_path, "--version"], text=True)
+match = re.search(r"\b(\d+\.\d+\.\d+)\b", out)
+actual = match.group(1) if match else ""
+missing = "<none>"
+if actual != expected:
+    print(f"expected brew binary version {expected}, got {actual or missing} from: {out.strip()}", file=sys.stderr)
+    raise SystemExit(1)
+' "${brew_bin}" "${expected_version}"
   run_binary_contract_suite "brew" "${brew_bin}" "${artifacts_dir}"
 }
 
