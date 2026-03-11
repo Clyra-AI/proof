@@ -6,6 +6,10 @@ on:
     branches-ignore:
       - main
 
+concurrency:
+  group: pr-${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   pr-lint:
     runs-on: ubuntu-latest
