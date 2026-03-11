@@ -3,13 +3,16 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/Clyra-AI/proof"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 )
 
@@ -107,22 +110,48 @@ func TestInspectChainAndBundleCommands(t *testing.T) {
 	require.Contains(t, out, "\"files\"")
 }
 
+func TestRunCommandForTestDrainsLargeStdout(t *testing.T) {
+	cmd := &cobra.Command{
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_, err := fmt.Fprint(os.Stdout, strings.Repeat("x", 1024*1024))
+			return err
+		},
+	}
+
+	out, err := runCommandForTest(t, cmd, nil)
+	require.NoError(t, err)
+	require.Len(t, out, 1024*1024)
+}
+
 func runCLIForTest(t *testing.T, args []string) (string, error) {
 	t.Helper()
 	cmd := newRootCmd("test")
+	return runCommandForTest(t, cmd, args)
+}
+
+func runCommandForTest(t *testing.T, cmd *cobra.Command, args []string) (string, error) {
+	t.Helper()
 	cmd.SetArgs(args)
 
 	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
 	os.Stdout = w
-
-	err := cmd.Execute()
-
-	_ = w.Close()
-	os.Stdout = oldStdout
+	defer func() {
+		os.Stdout = oldStdout
+	}()
 
 	var buf bytes.Buffer
-	_, _ = io.Copy(&buf, r)
+	copyDone := make(chan error, 1)
+	go func() {
+		_, copyErr := io.Copy(&buf, r)
+		copyDone <- copyErr
+	}()
+
+	err = cmd.Execute()
+
+	_ = w.Close()
+	require.NoError(t, <-copyDone)
 	_ = r.Close()
 	return buf.String(), err
 }
