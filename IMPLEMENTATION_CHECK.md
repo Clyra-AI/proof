@@ -21,7 +21,7 @@ Status key:
 | FR4 Signing | PASS | Ed25519 + cosign signing/verification paths implemented for records/chains and bundle manifests, including cert/identity/issuer verify options and revocation-list verification. |
 | FR5 Canonicalization | PASS | JSON/SQL/URL/text/prompt canonicalization plus digest metadata (`algo_id`, `salt_id`) and HMAC-SHA-256 helpers in `core/canon`. |
 | FR6 Verification CLI | PASS | `verify`, `inspect`, `chain verify`, `types`, `frameworks`; bundle signature verification, custom type schema mapping, `--explain`, and exit code contract implemented. |
-| FR7 Framework definitions | PASS | 8 frameworks in `frameworks/` and `core/framework/`; list/show implemented. |
+| FR7 Framework definitions | PASS | 10 frameworks in `frameworks/` and `core/framework/`; list/show, schema validation, and deterministic evidence coverage evaluation implemented. |
 | FR8 Go module API | PASS | Primary API surface exported from `proof.go`. |
 | FR9 JSON schemas | PASS | Base + type schemas + chain/bundle/framework schemas in `schemas/v1/`. |
 

@@ -170,6 +170,42 @@ controls:
 	require.Equal(t, "custom-framework", custom.Framework.ID)
 }
 
+func TestEvaluateFrameworkCoverage(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "custom-framework.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(`
+framework:
+  id: custom-framework
+  version: "1"
+  title: Custom Framework
+controls:
+  - id: custom-control
+    title: Custom Control
+    evidence_sets:
+      - id: wrkr-discovery
+        source_products: [wrkr]
+        required_record_types: [scan_finding]
+        required_fields: [record_id, source_product, event.entity_id]
+        minimum_frequency: continuous
+`), 0o644))
+
+	f, err := LoadFramework(path)
+	require.NoError(t, err)
+
+	r, err := NewRecord(RecordOpts{
+		Timestamp:     time.Date(2026, 3, 10, 12, 0, 0, 0, time.UTC),
+		Source:        "wrkr",
+		SourceProduct: "wrkr",
+		Type:          "scan_finding",
+		Event:         map[string]any{"entity_id": "tool:filesystem.write"},
+	})
+	require.NoError(t, err)
+
+	coverage, err := EvaluateFrameworkCoverage(f, []Record{*r})
+	require.NoError(t, err)
+	require.Equal(t, 1, coverage.CoveredControls)
+	require.Equal(t, []string{"wrkr-discovery"}, coverage.Controls[0].MatchedEvidenceSetIDs)
+}
+
 func TestWriteReadAndCustomSchemaValidation(t *testing.T) {
 	ResetCustomTypes()
 	t.Cleanup(ResetCustomTypes)

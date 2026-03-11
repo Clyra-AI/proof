@@ -3,18 +3,93 @@ framework:
   version: "2026"
   title: SOC 2 AI Controls
 controls:
-  - id: cc6
-    title: Logical Access
-    required_record_types: [permission_check, approval]
-    required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
-    minimum_frequency: continuous
-  - id: cc7
-    title: System Operations
-    required_record_types: [incident, guardrail_activation, compiled_action]
-    required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
-    minimum_frequency: continuous
-  - id: cc8
+  - id: cc6.1
+    title: Logical Access Controls
+    evidence_sets:
+      - id: runtime_control
+        title: Gait runtime access enforcement
+        source_products: [gait]
+        required_record_types: [permission_check, policy_enforcement]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+      - id: axym_compliance
+        title: Axym governance evidence
+        source_products: [axym]
+        required_record_types: [risk_assessment, approval]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: quarterly
+      - id: combined
+        title: Discovery and runtime evidence
+        source_products: [wrkr, gait]
+        required_record_types: [scan_finding, permission_check]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+  - id: cc6.3
+    title: Authorization and Approval
+    evidence_sets:
+      - id: runtime_control
+        title: Gait runtime approval gates
+        source_products: [gait]
+        required_record_types: [permission_check, approval]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: per-event
+      - id: axym_compliance
+        title: Axym governance approvals
+        source_products: [axym]
+        required_record_types: [approval, risk_assessment]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: quarterly
+      - id: combined
+        title: Discovery and approval evidence
+        source_products: [wrkr, gait]
+        required_record_types: [scan_finding, permission_check, approval]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: per-event
+  - id: cc7.1
+    title: System Monitoring
+    evidence_sets:
+      - id: wrkr_discovery
+        title: Wrkr discovery monitoring evidence
+        source_products: [wrkr]
+        required_record_types: [scan_finding]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+      - id: runtime_control
+        title: Gait runtime monitoring evidence
+        source_products: [gait]
+        required_record_types: [guardrail_activation, incident]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+      - id: axym_compliance
+        title: Axym operations evidence
+        source_products: [axym]
+        required_record_types: [incident, risk_assessment]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: quarterly
+      - id: combined
+        title: Discovery and runtime monitoring evidence
+        source_products: [wrkr, gait]
+        required_record_types: [scan_finding, guardrail_activation]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+  - id: cc8.1
     title: Change Management
-    required_record_types: [approval, compiled_action]
-    required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
-    minimum_frequency: continuous
+    evidence_sets:
+      - id: runtime_control
+        title: Gait change gating evidence
+        source_products: [gait]
+        required_record_types: [compiled_action, approval]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: per-event
+      - id: axym_compliance
+        title: Axym deployment governance evidence
+        source_products: [axym]
+        required_record_types: [deployment, approval]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: per-event
+      - id: combined
+        title: Discovery and change control evidence
+        source_products: [wrkr, gait]
+        required_record_types: [scan_finding, compiled_action, approval]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: per-event

@@ -3,8 +3,66 @@ framework:
   version: "4.0"
   title: PCI-DSS
 controls:
-  - id: req-10
-    title: Logging and Monitoring
-    required_record_types: [tool_invocation, permission_check, incident, compiled_action]
-    required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
-    minimum_frequency: continuous
+  - id: req-6.5
+    title: Secure Systems and Software
+    evidence_sets:
+      - id: wrkr_discovery
+        title: Wrkr discovery evidence
+        source_products: [wrkr]
+        required_record_types: [scan_finding]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+      - id: runtime_control
+        title: Gait runtime hardening evidence
+        source_products: [gait]
+        required_record_types: [guardrail_activation, test_result]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+      - id: axym_compliance
+        title: Axym governance evidence
+        source_products: [axym]
+        required_record_types: [risk_assessment, approval]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: quarterly
+      - id: combined
+        title: Discovery and validation evidence
+        source_products: [wrkr, gait]
+        required_record_types: [scan_finding, test_result]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+  - id: req-7.2
+    title: Access Control by Need to Know
+    evidence_sets:
+      - id: runtime_control
+        title: Gait access control evidence
+        source_products: [gait]
+        required_record_types: [permission_check, policy_enforcement]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+      - id: axym_compliance
+        title: Axym approval evidence
+        source_products: [axym]
+        required_record_types: [approval, risk_assessment]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: quarterly
+      - id: combined
+        title: Discovery and runtime access evidence
+        source_products: [wrkr, gait]
+        required_record_types: [scan_finding, permission_check]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+  - id: req-12.8
+    title: Service Provider Governance
+    evidence_sets:
+      - id: axym_compliance
+        title: Axym provider governance evidence
+        source_products: [axym]
+        required_record_types: [risk_assessment, approval, deployment]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: quarterly
+      - id: combined
+        title: Discovery and governance evidence
+        source_products: [wrkr, axym]
+        required_record_types: [scan_finding, risk_assessment, approval]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: quarterly

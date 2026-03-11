@@ -349,3 +349,47 @@ func TestValidateRelationshipEnvelopeSchema(t *testing.T) {
 	}`)
 	require.NoError(t, ValidateAgainstSchema(valid, "v1/relationship_envelope.schema.json"))
 }
+
+func TestValidateFrameworkDefinitionSchema(t *testing.T) {
+	valid := []byte(`{
+	  "framework":{"id":"starter","version":"1","title":"Starter"},
+	  "controls":[
+	    {
+	      "id":"cc7.1",
+	      "title":"Monitoring",
+	      "evidence_sets":[
+	        {
+	          "id":"wrkr-discovery",
+	          "source_products":["wrkr"],
+	          "required_record_types":["scan_finding"],
+	          "required_fields":["record_id","source_product"],
+	          "minimum_frequency":"continuous"
+	        }
+	      ]
+	    }
+	  ]
+	}`)
+	require.NoError(t, ValidateAgainstSchema(valid, "v1/framework-definition.schema.json"))
+
+	invalid := []byte(`{
+	  "framework":{"id":"starter","version":"1","title":"Starter"},
+	  "controls":[
+	    {
+	      "id":"cc7.1",
+	      "title":"Monitoring",
+	      "required_record_types":["scan_finding"],
+	      "required_fields":["record_id"],
+	      "minimum_frequency":"continuous",
+	      "evidence_sets":[
+	        {
+	          "id":"wrkr-discovery",
+	          "required_record_types":["scan_finding"],
+	          "required_fields":["record_id"],
+	          "minimum_frequency":"continuous"
+	        }
+	      ]
+	    }
+	  ]
+	}`)
+	require.Error(t, ValidateAgainstSchema(invalid, "v1/framework-definition.schema.json"))
+}

@@ -41,7 +41,7 @@ PROOF_VERSION="$(gh release view --repo Clyra-AI/proof --json tagName -q .tagNam
 go install github.com/Clyra-AI/proof/cmd/proof@"${PROOF_VERSION}"
 
 proof types list          # 18 built-in record types
-proof frameworks list     # 10 built-in starter frameworks (73 controls)
+proof frameworks list     # 10 built-in starter frameworks (79 controls)
 proof verify ./artifact   # Verify any proof artifact offline
 ```
 
@@ -250,25 +250,33 @@ All digests carry `algo_id` (sha256 or hmac-sha256) and optional `salt_id` metad
 
 ## Compliance Framework Definitions
 
-YAML files that declare what regulatory controls require — which record types, required fields, and evidence frequency. Zero evaluation logic. Configuration data consumed by downstream compliance tools.
+YAML files declare what regulatory controls require and which evidence paths can satisfy them. Proof evaluates deterministic evidence coverage only. It does not decide regulatory applicability, scope gating, or compliance status.
 
 ```yaml
 controls:
   - id: article-12
     title: Record-Keeping
-    required_record_types: [tool_invocation, decision, guardrail_activation, permission_check, compiled_action]
-    required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
-    minimum_frequency: continuous
+    evidence_sets:
+      - id: runtime_control
+        source_products: [gait]
+        required_record_types: [tool_invocation, permission_check, compiled_action]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+      - id: combined
+        source_products: [wrkr, gait]
+        required_record_types: [scan_finding, tool_invocation, compiled_action]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
 ```
 
-10 built-in starter frameworks ship with v1 (73 controls total). Add custom frameworks via YAML.
+10 built-in starter frameworks ship with v1 (79 controls total). Add custom frameworks via YAML.
 
 | Framework | Scope |
 |---|---|
-| EU AI Act | Articles 9, 12, 14 (starter mapping) |
-| SOC 2 | CC6, CC7, CC8 (starter mapping) |
+| EU AI Act | Articles 9, 12, 13, 14, 15, 26 (starter mapping) |
+| SOC 2 | CC6.1, CC6.3, CC7.1, CC8.1 (starter mapping) |
 | SOX | Change management (starter mapping) |
-| PCI-DSS | Requirement 10 (logging and monitoring) |
+| PCI-DSS | Requirements 6.5, 7.2, 12.8 (starter mapping) |
 | Texas TRAIGA | State AI regulation |
 | Colorado AI Act | State AI regulation |
 | ISO 42001 | AI Management System |

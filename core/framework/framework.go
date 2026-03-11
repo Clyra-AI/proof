@@ -1,16 +1,20 @@
 package framework
 
 import (
+	"bytes"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
+	coreschema "github.com/Clyra-AI/proof/core/schema"
 	"gopkg.in/yaml.v3"
 )
 
+//go:generate go run ../../internal/tools/syncframeworks
 //go:embed *.yaml
 var frameworkFS embed.FS
 
@@ -24,12 +28,22 @@ type Framework struct {
 }
 
 type Control struct {
-	ID                  string    `yaml:"id" json:"id"`
-	Title               string    `yaml:"title" json:"title"`
-	RequiredRecordTypes []string  `yaml:"required_record_types,omitempty" json:"required_record_types,omitempty"`
-	MinimumFrequency    string    `yaml:"minimum_frequency,omitempty" json:"minimum_frequency,omitempty"`
-	RequiredFields      []string  `yaml:"required_fields,omitempty" json:"required_fields,omitempty"`
-	Children            []Control `yaml:"children,omitempty" json:"children,omitempty"`
+	ID                  string        `yaml:"id" json:"id"`
+	Title               string        `yaml:"title" json:"title"`
+	RequiredRecordTypes []string      `yaml:"required_record_types,omitempty" json:"required_record_types,omitempty"`
+	MinimumFrequency    string        `yaml:"minimum_frequency,omitempty" json:"minimum_frequency,omitempty"`
+	RequiredFields      []string      `yaml:"required_fields,omitempty" json:"required_fields,omitempty"`
+	EvidenceSets        []EvidenceSet `yaml:"evidence_sets,omitempty" json:"evidence_sets,omitempty"`
+	Children            []Control     `yaml:"children,omitempty" json:"children,omitempty"`
+}
+
+type EvidenceSet struct {
+	ID                  string   `yaml:"id" json:"id"`
+	Title               string   `yaml:"title,omitempty" json:"title,omitempty"`
+	SourceProducts      []string `yaml:"source_products,omitempty" json:"source_products,omitempty"`
+	RequiredRecordTypes []string `yaml:"required_record_types,omitempty" json:"required_record_types,omitempty"`
+	MinimumFrequency    string   `yaml:"minimum_frequency,omitempty" json:"minimum_frequency,omitempty"`
+	RequiredFields      []string `yaml:"required_fields,omitempty" json:"required_fields,omitempty"`
 }
 
 type Info struct {
@@ -132,7 +146,8 @@ func isLikelyPath(value string) bool {
 
 func parseFramework(idOrFile string, raw []byte) (*Framework, error) {
 	var f Framework
-	if err := yaml.Unmarshal(raw, &f); err != nil {
+	decoder := yaml.NewDecoder(bytes.NewReader(raw))
+	if err := decoder.Decode(&f); err != nil {
 		return nil, err
 	}
 	if f.Framework.ID == "" {
@@ -143,6 +158,9 @@ func parseFramework(idOrFile string, raw []byte) (*Framework, error) {
 	}
 	if err := validateControls(f.Controls, "controls"); err != nil {
 		return nil, fmt.Errorf("framework %s invalid: %w", idOrFile, err)
+	}
+	if err := validateFrameworkSchema(&f); err != nil {
+		return nil, fmt.Errorf("framework %s schema invalid: %w", idOrFile, err)
 	}
 	return &f, nil
 }
@@ -156,23 +174,63 @@ func validateControls(controls []Control, path string) error {
 		if strings.TrimSpace(c.Title) == "" {
 			return fmt.Errorf("%s (%s) missing title", controlPath, c.ID)
 		}
-		if len(c.RequiredRecordTypes) == 0 {
-			return fmt.Errorf("%s (%s) missing required_record_types", controlPath, c.ID)
+		hasLegacy := len(c.RequiredRecordTypes) > 0 || strings.TrimSpace(c.MinimumFrequency) != "" || len(c.RequiredFields) > 0
+		hasEvidenceSets := len(c.EvidenceSets) > 0
+		if hasLegacy && hasEvidenceSets {
+			return fmt.Errorf("%s (%s) mixes legacy required_record_types with evidence_sets", controlPath, c.ID)
 		}
-		if strings.TrimSpace(c.MinimumFrequency) == "" {
-			return fmt.Errorf("%s (%s) missing minimum_frequency", controlPath, c.ID)
+		if !hasLegacy && !hasEvidenceSets {
+			return fmt.Errorf("%s (%s) missing evidence definition", controlPath, c.ID)
 		}
-		if len(c.RequiredFields) == 0 {
-			return fmt.Errorf("%s (%s) missing required_fields", controlPath, c.ID)
-		}
-		for _, t := range c.RequiredRecordTypes {
-			if strings.TrimSpace(t) == "" {
-				return fmt.Errorf("%s (%s) has blank required_record_types entry", controlPath, c.ID)
+		if hasLegacy {
+			if len(c.RequiredRecordTypes) == 0 {
+				return fmt.Errorf("%s (%s) missing required_record_types", controlPath, c.ID)
+			}
+			if strings.TrimSpace(c.MinimumFrequency) == "" {
+				return fmt.Errorf("%s (%s) missing minimum_frequency", controlPath, c.ID)
+			}
+			if len(c.RequiredFields) == 0 {
+				return fmt.Errorf("%s (%s) missing required_fields", controlPath, c.ID)
+			}
+			for _, t := range c.RequiredRecordTypes {
+				if strings.TrimSpace(t) == "" {
+					return fmt.Errorf("%s (%s) has blank required_record_types entry", controlPath, c.ID)
+				}
+			}
+			for _, field := range c.RequiredFields {
+				if strings.TrimSpace(field) == "" {
+					return fmt.Errorf("%s (%s) has blank required_fields entry", controlPath, c.ID)
+				}
 			}
 		}
-		for _, field := range c.RequiredFields {
-			if strings.TrimSpace(field) == "" {
-				return fmt.Errorf("%s (%s) has blank required_fields entry", controlPath, c.ID)
+		for j, set := range c.EvidenceSets {
+			setPath := fmt.Sprintf("%s.evidence_sets[%d]", controlPath, j)
+			if strings.TrimSpace(set.ID) == "" {
+				return fmt.Errorf("%s missing id", setPath)
+			}
+			if len(set.RequiredRecordTypes) == 0 {
+				return fmt.Errorf("%s (%s) missing required_record_types", setPath, set.ID)
+			}
+			if strings.TrimSpace(set.MinimumFrequency) == "" {
+				return fmt.Errorf("%s (%s) missing minimum_frequency", setPath, set.ID)
+			}
+			if len(set.RequiredFields) == 0 {
+				return fmt.Errorf("%s (%s) missing required_fields", setPath, set.ID)
+			}
+			for _, t := range set.RequiredRecordTypes {
+				if strings.TrimSpace(t) == "" {
+					return fmt.Errorf("%s (%s) has blank required_record_types entry", setPath, set.ID)
+				}
+			}
+			for _, field := range set.RequiredFields {
+				if strings.TrimSpace(field) == "" {
+					return fmt.Errorf("%s (%s) has blank required_fields entry", setPath, set.ID)
+				}
+			}
+			for _, product := range set.SourceProducts {
+				if strings.TrimSpace(product) == "" {
+					return fmt.Errorf("%s (%s) has blank source_products entry", setPath, set.ID)
+				}
 			}
 		}
 		if err := validateControls(c.Children, controlPath+".children"); err != nil {
@@ -189,4 +247,12 @@ func countControls(in []Control) int {
 		total += countControls(c.Children)
 	}
 	return total
+}
+
+func validateFrameworkSchema(f *Framework) error {
+	raw, err := json.Marshal(f)
+	if err != nil {
+		return err
+	}
+	return coreschema.ValidateAgainstSchema(raw, "v1/framework-definition.schema.json")
 }
