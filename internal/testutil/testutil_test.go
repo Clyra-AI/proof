@@ -37,3 +37,20 @@ func TestBuildBinaryAndExitCode(t *testing.T) {
 	require.Equal(t, 7, CommandExitCode(t, err))
 	require.Equal(t, 0, CommandExitCode(t, nil))
 }
+
+func TestBuildBinaryRebuildsAfterStaleCache(t *testing.T) {
+	root := RepoRoot(t)
+
+	buildMu.Lock()
+	binaryCache[root] = filepath.Join(t.TempDir(), "missing-binary")
+	buildMu.Unlock()
+
+	bin := BuildBinary(t, root)
+	_, err := os.Stat(bin)
+	require.NoError(t, err)
+
+	buildMu.Lock()
+	cached := binaryCache[root]
+	buildMu.Unlock()
+	require.Equal(t, bin, cached)
+}
