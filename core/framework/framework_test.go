@@ -1,6 +1,7 @@
 package framework
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -40,9 +41,12 @@ framework:
 controls:
   - id: custom-control
     title: Custom Control
-    required_record_types: [decision]
-    required_fields: [record_id]
-    minimum_frequency: continuous
+    evidence_sets:
+      - id: wrkr-discovery
+        source_products: [wrkr]
+        required_record_types: [scan_finding]
+        required_fields: [record_id, source_product]
+        minimum_frequency: continuous
 `), 0o644))
 
 	f, err := Load(path)
@@ -73,7 +77,7 @@ func TestLoadPrefersEmbeddedOverLocalCollision(t *testing.T) {
 	for _, info := range list {
 		if info.ID == "eu-ai-act" {
 			found = true
-			require.Equal(t, 3, info.ControlCount)
+			require.Equal(t, 6, info.ControlCount)
 		}
 	}
 	require.True(t, found)
@@ -111,6 +115,21 @@ func TestValidateControls(t *testing.T) {
 		},
 	}
 	require.NoError(t, validateControls(valid, "controls"))
+
+	validEvidenceSets := []Control{
+		{
+			ID:    "c3",
+			Title: "Control 3",
+			EvidenceSets: []EvidenceSet{{
+				ID:                  "wrkr-discovery",
+				SourceProducts:      []string{"wrkr"},
+				RequiredRecordTypes: []string{"scan_finding"},
+				MinimumFrequency:    "continuous",
+				RequiredFields:      []string{"record_id", "source_product"},
+			}},
+		},
+	}
+	require.NoError(t, validateControls(validEvidenceSets, "controls"))
 
 	missingFields := []Control{
 		{
@@ -168,6 +187,23 @@ framework:
 controls: []
 `))
 	require.ErrorContains(t, err, "has no controls")
+
+	_, err = parseFramework("empty-source-products", []byte(`
+framework:
+  id: test
+  version: "1"
+  title: Empty Source Products
+controls:
+  - id: c1
+    title: Control
+    evidence_sets:
+      - id: set-1
+        source_products: []
+        required_record_types: [scan_finding]
+        required_fields: [record_id]
+        minimum_frequency: continuous
+`))
+	require.ErrorContains(t, err, "schema invalid")
 }
 
 func TestValidateControlsErrors(t *testing.T) {
@@ -255,6 +291,51 @@ func TestValidateControlsErrors(t *testing.T) {
 			}},
 			needle: "missing required_record_types",
 		},
+		{
+			name: "mixed legacy and evidence sets",
+			in: []Control{{
+				ID:                  "c1",
+				Title:               "Control",
+				RequiredRecordTypes: []string{"decision"},
+				MinimumFrequency:    "continuous",
+				RequiredFields:      []string{"record_id"},
+				EvidenceSets: []EvidenceSet{{
+					ID:                  "set-1",
+					RequiredRecordTypes: []string{"scan_finding"},
+					MinimumFrequency:    "continuous",
+					RequiredFields:      []string{"record_id"},
+				}},
+			}},
+			needle: "mixes legacy required_record_types with evidence_sets",
+		},
+		{
+			name: "missing evidence set id",
+			in: []Control{{
+				ID:    "c1",
+				Title: "Control",
+				EvidenceSets: []EvidenceSet{{
+					RequiredRecordTypes: []string{"scan_finding"},
+					MinimumFrequency:    "continuous",
+					RequiredFields:      []string{"record_id"},
+				}},
+			}},
+			needle: "missing id",
+		},
+		{
+			name: "blank evidence set source product",
+			in: []Control{{
+				ID:    "c1",
+				Title: "Control",
+				EvidenceSets: []EvidenceSet{{
+					ID:                  "set-1",
+					SourceProducts:      []string{"wrkr", " "},
+					RequiredRecordTypes: []string{"scan_finding"},
+					MinimumFrequency:    "continuous",
+					RequiredFields:      []string{"record_id"},
+				}},
+			}},
+			needle: "blank source_products entry",
+		},
 	}
 
 	for _, tc := range cases {
@@ -264,5 +345,40 @@ func TestValidateControlsErrors(t *testing.T) {
 			require.Error(t, err)
 			require.ErrorContains(t, err, tc.needle)
 		})
+	}
+}
+
+func TestLoadFrameworkDeterministic(t *testing.T) {
+	first, err := Load("eu-ai-act")
+	require.NoError(t, err)
+	second, err := Load("eu-ai-act")
+	require.NoError(t, err)
+
+	firstRaw, err := json.Marshal(first)
+	require.NoError(t, err)
+	secondRaw, err := json.Marshal(second)
+	require.NoError(t, err)
+	require.Equal(t, string(firstRaw), string(secondRaw))
+}
+
+func TestBuiltInControlPresence(t *testing.T) {
+	cases := map[string][]string{
+		"eu-ai-act": {"article-9", "article-12", "article-13", "article-14", "article-15", "article-26"},
+		"pci-dss":   {"req-6.5", "req-7.2", "req-12.8"},
+		"soc2":      {"cc6.1", "cc6.3", "cc7.1", "cc8.1"},
+	}
+
+	for frameworkID, wantControls := range cases {
+		f, err := Load(frameworkID)
+		require.NoError(t, err)
+
+		got := make(map[string]struct{}, len(wantControls))
+		for _, control := range f.Controls {
+			got[control.ID] = struct{}{}
+		}
+		for _, want := range wantControls {
+			_, ok := got[want]
+			require.Truef(t, ok, "framework %s missing control %s", frameworkID, want)
+		}
 	}
 }

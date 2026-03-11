@@ -34,6 +34,9 @@ type RevocationList = signing.RevocationList
 type RevocationEntry = signing.RevocationEntry
 type CosignVerifyOpts = signing.CosignVerifyOpts
 type Framework = framework.Framework
+type FrameworkCoverage = framework.Coverage
+type FrameworkControlCoverage = framework.ControlCoverage
+type FrameworkEvidenceSetCoverage = framework.EvidenceSetCoverage
 type RecordType = schema.RecordType
 type CanonDomain = canon.Domain
 type Digest = canon.Digest
@@ -90,6 +93,10 @@ func DigestHMACValue(input []byte, domain CanonDomain, secret []byte, saltID str
 
 func LoadFramework(pathOrID string) (*Framework, error) {
 	return framework.Load(pathOrID)
+}
+
+func EvaluateFrameworkCoverage(f *Framework, records []Record) (*FrameworkCoverage, error) {
+	return framework.EvaluateCoverage(f, records)
 }
 
 func ListRecordTypes() []RecordType {

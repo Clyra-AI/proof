@@ -4,9 +4,41 @@
   "type": "object",
   "required": ["framework", "controls"],
   "definitions": {
+    "evidence_set": {
+      "type": "object",
+      "required": ["id", "required_record_types", "required_fields", "minimum_frequency"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "title": { "type": "string", "minLength": 1 },
+        "source_products": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "required_record_types": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "minimum_frequency": { "type": "string", "minLength": 1 },
+        "required_fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "control": {
       "type": "object",
-      "required": ["id", "title", "required_record_types", "required_fields", "minimum_frequency"],
+      "required": ["id", "title"],
+      "oneOf": [
+        {
+          "required": ["required_record_types", "required_fields", "minimum_frequency"]
+        },
+        {
+          "required": ["evidence_sets"]
+        }
+      ],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "title": { "type": "string", "minLength": 1 },
@@ -20,6 +52,11 @@
           "type": "array",
           "minItems": 1,
           "items": { "type": "string", "minLength": 1 }
+        },
+        "evidence_sets": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/evidence_set" }
         },
         "children": {
           "type": "array",

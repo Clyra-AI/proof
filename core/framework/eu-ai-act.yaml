@@ -5,16 +5,139 @@ framework:
 controls:
   - id: article-9
     title: Risk Management
-    required_record_types: [risk_assessment]
-    required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
-    minimum_frequency: quarterly
+    evidence_sets:
+      - id: wrkr_discovery
+        title: Wrkr discovery risk evidence
+        source_products: [wrkr]
+        required_record_types: [scan_finding]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+      - id: axym_compliance
+        title: Axym risk assessment evidence
+        source_products: [axym]
+        required_record_types: [risk_assessment]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: quarterly
+      - id: combined
+        title: Discovery and assessment evidence
+        source_products: [wrkr, axym]
+        required_record_types: [scan_finding, risk_assessment]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: quarterly
   - id: article-12
     title: Record-Keeping
-    required_record_types: [tool_invocation, decision, guardrail_activation, permission_check, compiled_action]
-    required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
-    minimum_frequency: continuous
+    evidence_sets:
+      - id: wrkr_discovery
+        title: Wrkr discovery record evidence
+        source_products: [wrkr]
+        required_record_types: [scan_finding]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+      - id: runtime_control
+        title: Gait runtime record evidence
+        source_products: [gait]
+        required_record_types: [tool_invocation, permission_check, compiled_action]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+      - id: axym_compliance
+        title: Axym governance record evidence
+        source_products: [axym]
+        required_record_types: [decision, approval]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: quarterly
+      - id: combined
+        title: Discovery and runtime record evidence
+        source_products: [wrkr, gait]
+        required_record_types: [scan_finding, tool_invocation, compiled_action]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+  - id: article-13
+    title: Transparency and Information to Deployers
+    evidence_sets:
+      - id: runtime_control
+        title: Gait runtime decision evidence
+        source_products: [gait]
+        required_record_types: [decision, compiled_action]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: per-event
+      - id: axym_compliance
+        title: Axym transparency evidence
+        source_products: [axym]
+        required_record_types: [decision, approval]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: per-event
+      - id: combined
+        title: Discovery and decision evidence
+        source_products: [wrkr, gait]
+        required_record_types: [scan_finding, decision]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: per-event
   - id: article-14
     title: Human Oversight
-    required_record_types: [human_oversight, approval, compiled_action]
-    required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
-    minimum_frequency: per-event
+    evidence_sets:
+      - id: runtime_control
+        title: Gait human oversight evidence
+        source_products: [gait]
+        required_record_types: [human_oversight, approval]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: per-event
+      - id: axym_compliance
+        title: Axym oversight evidence
+        source_products: [axym]
+        required_record_types: [approval, decision]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: per-event
+      - id: combined
+        title: Discovery and oversight evidence
+        source_products: [wrkr, gait]
+        required_record_types: [scan_finding, human_oversight, approval]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: per-event
+  - id: article-15
+    title: Accuracy, Robustness, and Cybersecurity
+    evidence_sets:
+      - id: wrkr_discovery
+        title: Wrkr discovery security evidence
+        source_products: [wrkr]
+        required_record_types: [scan_finding]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+      - id: runtime_control
+        title: Gait runtime safety evidence
+        source_products: [gait]
+        required_record_types: [guardrail_activation, incident, test_result]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+      - id: axym_compliance
+        title: Axym resilience evidence
+        source_products: [axym]
+        required_record_types: [risk_assessment, incident]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: quarterly
+      - id: combined
+        title: Discovery and runtime safety evidence
+        source_products: [wrkr, gait]
+        required_record_types: [scan_finding, guardrail_activation, test_result]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: continuous
+  - id: article-26
+    title: Deployer Obligations
+    evidence_sets:
+      - id: runtime_control
+        title: Gait deployer control evidence
+        source_products: [gait]
+        required_record_types: [compiled_action, approval]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: per-event
+      - id: axym_compliance
+        title: Axym deployer governance evidence
+        source_products: [axym]
+        required_record_types: [deployment, risk_assessment, approval]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: quarterly
+      - id: combined
+        title: Discovery and deployer evidence
+        source_products: [wrkr, axym]
+        required_record_types: [scan_finding, deployment, approval]
+        required_fields: [record_id, timestamp, source, source_product, record_type, event, integrity.record_hash]
+        minimum_frequency: quarterly

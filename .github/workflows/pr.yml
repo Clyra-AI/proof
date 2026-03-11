@@ -6,6 +6,10 @@ on:
     branches-ignore:
       - main
 
+concurrency:
+  group: pr-${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   pr-lint:
     runs-on: ubuntu-latest
@@ -36,4 +40,4 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - run: go test ./...
+      - run: go test -v ./...
