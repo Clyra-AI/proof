@@ -123,6 +123,43 @@ func TestEvaluateCoverageDeterministic(t *testing.T) {
 	require.Equal(t, string(firstRaw), string(secondRaw))
 }
 
+func TestEvaluateCoverageDeterministicAcrossRecordOrder(t *testing.T) {
+	f := &Framework{}
+	f.Framework.ID = "deterministic-order"
+	f.Framework.Version = "1"
+	f.Controls = []Control{{
+		ID:    "control-1",
+		Title: "Control 1",
+		EvidenceSets: []EvidenceSet{{
+			ID:                  "set-1",
+			SourceProducts:      []string{"wrkr"},
+			RequiredRecordTypes: []string{"scan_finding"},
+			RequiredFields:      []string{"record_id", "event.entity_id"},
+			MinimumFrequency:    "continuous",
+		}},
+	}}
+
+	recA := mustRecordAt(t, "wrkr", "scan_finding", time.Date(2026, 3, 10, 12, 0, 0, 0, time.UTC), map[string]any{"entity_id": "tool:b"})
+	recB := mustRecordAt(t, "wrkr", "scan_finding", time.Date(2026, 3, 10, 12, 1, 0, 0, time.UTC), map[string]any{"entity_id": "tool:a"})
+
+	first, err := EvaluateCoverage(f, []record.Record{*recA, *recB})
+	require.NoError(t, err)
+	second, err := EvaluateCoverage(f, []record.Record{*recB, *recA})
+	require.NoError(t, err)
+
+	firstRaw, err := json.Marshal(first)
+	require.NoError(t, err)
+	secondRaw, err := json.Marshal(second)
+	require.NoError(t, err)
+	require.Equal(t, string(firstRaw), string(secondRaw))
+
+	expected := recA.RecordID
+	if recB.RecordID < expected {
+		expected = recB.RecordID
+	}
+	require.Equal(t, []string{expected}, first.Controls[0].EvidenceSets[0].MatchingRecordIDs)
+}
+
 func TestEvaluateCoverageRejectsInvalidControls(t *testing.T) {
 	f := &Framework{}
 	f.Framework.ID = "invalid"
@@ -139,8 +176,13 @@ func TestEvaluateCoverageRejectsInvalidControls(t *testing.T) {
 
 func mustRecord(t *testing.T, sourceProduct, recordType string, event map[string]any) *record.Record {
 	t.Helper()
+	return mustRecordAt(t, sourceProduct, recordType, time.Date(2026, 3, 10, 12, 0, 0, 0, time.UTC), event)
+}
+
+func mustRecordAt(t *testing.T, sourceProduct, recordType string, ts time.Time, event map[string]any) *record.Record {
+	t.Helper()
 	r, err := record.New(record.RecordOpts{
-		Timestamp:     time.Date(2026, 3, 10, 12, 0, 0, 0, time.UTC),
+		Timestamp:     ts,
 		Source:        sourceProduct,
 		SourceProduct: sourceProduct,
 		Type:          recordType,

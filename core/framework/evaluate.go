@@ -129,6 +129,7 @@ func evaluateEvidenceSet(set EvidenceSet, indexed []indexedRecord) EvidenceSetCo
 
 func matchRecord(requiredType string, set EvidenceSet, indexed []indexedRecord) (string, bool) {
 	requiredType = strings.TrimSpace(requiredType)
+	bestRecordID := ""
 	for _, candidate := range indexed {
 		if candidate.record.RecordType != requiredType {
 			continue
@@ -139,9 +140,14 @@ func matchRecord(requiredType string, set EvidenceSet, indexed []indexedRecord) 
 		if !hasRequiredFields(candidate.raw, set.RequiredFields) {
 			continue
 		}
-		return candidate.record.RecordID, true
+		if bestRecordID == "" || candidate.record.RecordID < bestRecordID {
+			bestRecordID = candidate.record.RecordID
+		}
 	}
-	return "", false
+	if bestRecordID == "" {
+		return "", false
+	}
+	return bestRecordID, true
 }
 
 func matchesSourceProduct(sourceProduct string, allowed []string) bool {
