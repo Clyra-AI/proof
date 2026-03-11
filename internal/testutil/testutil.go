@@ -5,7 +5,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
+)
+
+var (
+	buildMu     sync.Mutex
+	binaryCache = map[string]string{}
 )
 
 func RepoRoot(t *testing.T) string {
@@ -19,10 +25,26 @@ func RepoRoot(t *testing.T) string {
 
 func BuildBinary(t *testing.T, root string) string {
 	t.Helper()
-	bin := filepath.Join(t.TempDir(), "proof")
+
+	buildMu.Lock()
+	if cached, ok := binaryCache[root]; ok {
+		if _, err := os.Stat(cached); err == nil {
+			buildMu.Unlock()
+			return cached
+		}
+		delete(binaryCache, root)
+	}
+	buildMu.Unlock()
+
+	dir, err := os.MkdirTemp("", "proof-test-bin-*")
+	if err != nil {
+		t.Fatalf("create temp dir for test binary: %v", err)
+	}
+	bin := filepath.Join(dir, "proof")
 	if runtime.GOOS == "windows" {
 		bin += ".exe"
 	}
+
 	// #nosec G204 -- test helper executes a fixed go build command.
 	cmd := exec.Command("go", "build", "-o", bin, "./cmd/proof")
 	cmd.Dir = root
@@ -33,6 +55,17 @@ func BuildBinary(t *testing.T, root string) string {
 	if _, err := os.Stat(bin); err != nil {
 		t.Fatalf("build binary output not found at %s: %v", bin, err)
 	}
+
+	buildMu.Lock()
+	if cached, ok := binaryCache[root]; ok {
+		if _, err := os.Stat(cached); err == nil {
+			buildMu.Unlock()
+			return cached
+		}
+	}
+	binaryCache[root] = bin
+	buildMu.Unlock()
+
 	return bin
 }
 

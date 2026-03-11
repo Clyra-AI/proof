@@ -27,8 +27,10 @@ func TestWriteFile(t *testing.T) {
 func TestBuildBinaryAndExitCode(t *testing.T) {
 	root := RepoRoot(t)
 	bin := BuildBinary(t, root)
+	binAgain := BuildBinary(t, root)
 	_, err := os.Stat(bin)
 	require.NoError(t, err)
+	require.Equal(t, bin, binAgain)
 
 	cmd := exec.Command("sh", "-c", "exit 7")
 	err = cmd.Run()
