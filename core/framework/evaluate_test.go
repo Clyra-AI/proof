@@ -123,6 +123,20 @@ func TestEvaluateCoverageDeterministic(t *testing.T) {
 	require.Equal(t, string(firstRaw), string(secondRaw))
 }
 
+func TestEvaluateCoverageRejectsInvalidControls(t *testing.T) {
+	f := &Framework{}
+	f.Framework.ID = "invalid"
+	f.Framework.Version = "1"
+	f.Controls = []Control{{
+		ID:    "control-1",
+		Title: "Control 1",
+	}}
+
+	_, err := EvaluateCoverage(f, nil)
+	require.Error(t, err)
+	require.ErrorContains(t, err, "missing evidence definition")
+}
+
 func mustRecord(t *testing.T, sourceProduct, recordType string, event map[string]any) *record.Record {
 	t.Helper()
 	r, err := record.New(record.RecordOpts{

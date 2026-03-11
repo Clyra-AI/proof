@@ -47,6 +47,9 @@ func EvaluateCoverage(f *Framework, records []record.Record) (*Coverage, error) 
 	if f == nil {
 		return nil, fmt.Errorf("framework is nil")
 	}
+	if err := validateControls(f.Controls, "controls"); err != nil {
+		return nil, fmt.Errorf("framework invalid: %w", err)
+	}
 
 	indexed := make([]indexedRecord, 0, len(records))
 	for i := range records {
