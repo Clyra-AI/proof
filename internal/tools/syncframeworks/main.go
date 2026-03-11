@@ -10,16 +10,28 @@ import (
 	"strings"
 )
 
+var (
+	repoRootFunc                 = repoRoot
+	syncFrameworksFunc           = syncFrameworks
+	runFunc                      = run
+	exitFunc                     = os.Exit
+	stderrWriter       io.Writer = os.Stderr
+)
+
 func main() {
-	root, err := repoRoot()
-	if err != nil {
+	if err := runFunc(); err != nil {
 		fail(err)
+	}
+}
+
+func run() error {
+	root, err := repoRootFunc()
+	if err != nil {
+		return err
 	}
 	srcDir := filepath.Join(root, "core", "framework")
 	dstDir := filepath.Join(root, "frameworks")
-	if err := syncFrameworks(srcDir, dstDir); err != nil {
-		fail(err)
-	}
+	return syncFrameworksFunc(srcDir, dstDir)
 }
 
 func repoRoot() (string, error) {
@@ -35,7 +47,7 @@ func syncFrameworks(srcDir, dstDir string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+	if err := os.MkdirAll(dstDir, 0o750); err != nil {
 		return err
 	}
 
@@ -51,9 +63,7 @@ func syncFrameworks(srcDir, dstDir string) error {
 	sort.Strings(names)
 
 	for _, name := range names {
-		srcPath := filepath.Join(srcDir, name)
-		dstPath := filepath.Join(dstDir, name)
-		if err := copyFile(srcPath, dstPath); err != nil {
+		if err := copyFile(srcDir, dstDir, name); err != nil {
 			return err
 		}
 	}
@@ -76,8 +86,24 @@ func syncFrameworks(srcDir, dstDir string) error {
 	return nil
 }
 
-func copyFile(srcPath, dstPath string) error {
-	src, err := os.Open(srcPath)
+func copyFile(srcDir, dstDir, name string) error {
+	srcRoot, err := os.OpenRoot(srcDir)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = srcRoot.Close()
+	}()
+
+	dstRoot, err := os.OpenRoot(dstDir)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = dstRoot.Close()
+	}()
+
+	src, err := srcRoot.Open(name)
 	if err != nil {
 		return err
 	}
@@ -85,7 +111,7 @@ func copyFile(srcPath, dstPath string) error {
 		_ = src.Close()
 	}()
 
-	dst, err := os.Create(dstPath)
+	dst, err := dstRoot.OpenFile(name, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}
@@ -93,13 +119,10 @@ func copyFile(srcPath, dstPath string) error {
 		_ = dst.Close()
 		return err
 	}
-	if err := dst.Close(); err != nil {
-		return err
-	}
-	return os.Chmod(dstPath, 0o644)
+	return dst.Close()
 }
 
 func fail(err error) {
-	_, _ = fmt.Fprintf(os.Stderr, "sync frameworks: %s\n", strings.TrimSpace(err.Error()))
-	os.Exit(1)
+	_, _ = fmt.Fprintf(stderrWriter, "sync frameworks: %s\n", strings.TrimSpace(err.Error()))
+	exitFunc(1)
 }
