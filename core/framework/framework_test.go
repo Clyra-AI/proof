@@ -187,6 +187,23 @@ framework:
 controls: []
 `))
 	require.ErrorContains(t, err, "has no controls")
+
+	_, err = parseFramework("empty-source-products", []byte(`
+framework:
+  id: test
+  version: "1"
+  title: Empty Source Products
+controls:
+  - id: c1
+    title: Control
+    evidence_sets:
+      - id: set-1
+        source_products: []
+        required_record_types: [scan_finding]
+        required_fields: [record_id]
+        minimum_frequency: continuous
+`))
+	require.ErrorContains(t, err, "schema invalid")
 }
 
 func TestValidateControlsErrors(t *testing.T) {

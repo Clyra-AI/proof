@@ -159,7 +159,7 @@ func parseFramework(idOrFile string, raw []byte) (*Framework, error) {
 	if err := validateControls(f.Controls, "controls"); err != nil {
 		return nil, fmt.Errorf("framework %s invalid: %w", idOrFile, err)
 	}
-	if err := validateFrameworkSchema(&f); err != nil {
+	if err := validateFrameworkSchema(raw); err != nil {
 		return nil, fmt.Errorf("framework %s schema invalid: %w", idOrFile, err)
 	}
 	return &f, nil
@@ -249,10 +249,14 @@ func countControls(in []Control) int {
 	return total
 }
 
-func validateFrameworkSchema(f *Framework) error {
-	raw, err := json.Marshal(f)
+func validateFrameworkSchema(raw []byte) error {
+	var document any
+	if err := yaml.Unmarshal(raw, &document); err != nil {
+		return err
+	}
+	normalized, err := json.Marshal(document)
 	if err != nil {
 		return err
 	}
-	return coreschema.ValidateAgainstSchema(raw, "v1/framework-definition.schema.json")
+	return coreschema.ValidateAgainstSchema(normalized, "v1/framework-definition.schema.json")
 }
