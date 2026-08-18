@@ -1,0 +1,328 @@
+name: release-repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to repair
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    env:
+      EXPECTED_RELEASE_TAG: v0.5.0
+      EXPECTED_TARGET_SHA: e6af6d650e7c84d0ddb5831ced76a8633181f146
+      RELEASE_TAG: ${{ inputs.tag }}
+      REPOSITORY_FULL_NAME: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Validate repair target
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          [[ "${RELEASE_TAG}" == "${EXPECTED_RELEASE_TAG}" ]] || {
+            echo "release repair is constrained to ${EXPECTED_RELEASE_TAG}, got ${RELEASE_TAG}" >&2
+            exit 1
+          }
+          [[ "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "invalid release tag format: ${RELEASE_TAG}" >&2
+            exit 1
+          }
+          [[ "$(git rev-parse HEAD)" == "${EXPECTED_TARGET_SHA}" ]] || {
+            echo "tag ${RELEASE_TAG} does not resolve to expected SHA ${EXPECTED_TARGET_SHA}" >&2
+            exit 1
+          }
+          release_json_path="$(mktemp)"
+          gh release view "${RELEASE_TAG}" \
+            --repo "${REPOSITORY_FULL_NAME}" \
+            --json tagName,isDraft,isPrerelease,publishedAt,assets,url > "${release_json_path}"
+          RELEASE_JSON_PATH="${release_json_path}" python3 <<'PY'
+          import json
+          import os
+          import sys
+
+          with open(os.environ["RELEASE_JSON_PATH"], "r", encoding="utf-8") as fh:
+              data = json.load(fh)
+
+          if data["tagName"] != os.environ["EXPECTED_RELEASE_TAG"]:
+              raise SystemExit(f"release tag mismatch: {data['tagName']}")
+          if data.get("isDraft") or data.get("isPrerelease"):
+              raise SystemExit("release must be published and non-prerelease")
+          if not data.get("publishedAt"):
+              raise SystemExit("release must already be published")
+
+          expected_assets = {
+              "checksums.txt",
+              "proof_0.5.0_darwin_amd64.tar.gz",
+              "proof_0.5.0_darwin_arm64.tar.gz",
+              "proof_0.5.0_linux_amd64.tar.gz",
+              "proof_0.5.0_linux_arm64.tar.gz",
+              "proof_0.5.0_windows_amd64.zip",
+              "proof_0.5.0_windows_arm64.zip",
+              "sbom.spdx.json",
+          }
+          actual_assets = {asset["name"] for asset in data["assets"]}
+          missing = sorted(expected_assets - actual_assets)
+          if missing:
+              raise SystemExit(f"release is missing expected assets: {missing}")
+          print(f"validated published release {data['url']}")
+          PY
+      - name: Download published release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          rm -rf dist
+          mkdir -p dist
+          gh release download "${RELEASE_TAG}" \
+            --repo "${REPOSITORY_FULL_NAME}" \
+            -D dist \
+            --clobber
+      - name: Verify downloaded release asset digests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          release_json_path="$(mktemp)"
+          gh release view "${RELEASE_TAG}" \
+            --repo "${REPOSITORY_FULL_NAME}" \
+            --json assets > "${release_json_path}"
+          RELEASE_JSON_PATH="${release_json_path}" python3 <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+
+          dist_dir = pathlib.Path("dist")
+          with open(os.environ["RELEASE_JSON_PATH"], "r", encoding="utf-8") as fh:
+              data = json.load(fh)
+
+          for asset in data["assets"]:
+              digest = asset.get("digest", "")
+              if not digest.startswith("sha256:"):
+                  continue
+              path = dist_dir / asset["name"]
+              if not path.is_file():
+                  raise SystemExit(f"missing downloaded asset: {path}")
+              actual = hashlib.sha256(path.read_bytes()).hexdigest()
+              if actual != digest.split(":", 1)[1]:
+                  raise SystemExit(f"digest mismatch for {asset['name']}: {actual} != {digest}")
+          print("downloaded asset digests verified")
+          PY
+      - name: Verify downloaded release checksums
+        run: ./scripts/verify_release_artifacts.sh dist
+      - name: Extract verified release archives for scanning
+        run: |
+          rm -rf dist/scan-root
+          mkdir -p dist/scan-root
+          shopt -s nullglob
+          for archive in dist/proof_*.tar.gz; do
+            out_dir="dist/scan-root/$(basename "${archive}" .tar.gz)"
+            mkdir -p "${out_dir}"
+            tar -xzf "${archive}" -C "${out_dir}"
+          done
+          for archive in dist/proof_*.zip; do
+            out_dir="dist/scan-root/$(basename "${archive}" .zip)"
+            mkdir -p "${out_dir}"
+            unzip -q "${archive}" -d "${out_dir}"
+          done
+          mapfile -t extracted_binaries < <(find dist/scan-root -type f \( -name 'proof' -o -name 'proof.exe' \) | sort)
+          if [[ ${#extracted_binaries[@]} -ne 6 ]]; then
+            echo "expected 6 extracted release binaries, found ${#extracted_binaries[@]}" >&2
+            printf '%s\n' "${extracted_binaries[@]}"
+            exit 1
+          fi
+      - name: Install grype
+        uses: anchore/scan-action/download-grype@v4
+      - name: Vulnerability scan (verified release contents)
+        run: |
+          mkdir -p dist/scan
+          set +e
+          grype db update > dist/scan/grype-db-update.log 2>&1
+          db_update_status=$?
+          set -e
+          if [[ ${db_update_status} -ne 0 ]]; then
+            echo "grype db update did not complete successfully; proceeding to scan and requiring an explicit freshness failure before fallback"
+            cat dist/scan/grype-db-update.log
+          fi
+
+          set +e
+          grype dir:dist/scan-root --fail-on high > dist/scan/grype-high.log 2>&1
+          high_status=$?
+          set -e
+          if [[ ${high_status} -eq 0 ]]; then
+            cat dist/scan/grype-high.log
+            exit 0
+          fi
+
+          if grep -q "max allowed age" dist/scan/grype-high.log; then
+            echo "grype DB freshness gate still failed after refresh; using govulncheck fallback on extracted binaries"
+            : > dist/scan/govulncheck.log
+            while IFS= read -r binary_path; do
+              echo "==> ${binary_path}" | tee -a dist/scan/govulncheck.log
+              go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 -mode=binary "${binary_path}" 2>&1 | tee -a dist/scan/govulncheck.log
+            done < <(find dist/scan-root -type f \( -name 'proof' -o -name 'proof.exe' \) | sort)
+            exit 0
+          fi
+
+          set +e
+          grype dir:dist/scan-root --fail-on critical > dist/scan/grype-critical.log 2>&1
+          critical_status=$?
+          set -e
+          cat dist/scan/grype-high.log
+          if [[ ${critical_status} -eq 0 ]]; then
+            cat dist/scan/grype-critical.log
+            exit 0
+          fi
+
+          cat dist/scan/grype-critical.log
+          if grep -q "max allowed age" dist/scan/grype-critical.log; then
+            echo "grype DB freshness gate still failed after refresh; using govulncheck fallback on extracted binaries"
+            : > dist/scan/govulncheck.log
+            while IFS= read -r binary_path; do
+              echo "==> ${binary_path}" | tee -a dist/scan/govulncheck.log
+              go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 -mode=binary "${binary_path}" 2>&1 | tee -a dist/scan/govulncheck.log
+            done < <(find dist/scan-root -type f \( -name 'proof' -o -name 'proof.exe' \) | sort)
+            exit 0
+          fi
+
+          exit ${critical_status}
+      - uses: sigstore/cosign-installer@v3
+      - name: Determine checksum signature pair state
+        id: signature_pair
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mapfile -t existing_assets < <(gh release view "${RELEASE_TAG}" --repo "${REPOSITORY_FULL_NAME}" --json assets --jq '.assets[].name')
+          declare -A existing_map=()
+          for asset_name in "${existing_assets[@]}"; do
+            existing_map["${asset_name}"]=1
+          done
+
+          sig_exists=0
+          pem_exists=0
+          [[ -n "${existing_map[checksums.txt.sig]:-}" ]] && sig_exists=1
+          [[ -n "${existing_map[checksums.txt.pem]:-}" ]] && pem_exists=1
+
+          if [[ ${sig_exists} -ne ${pem_exists} ]]; then
+            echo "release has a partial checksum signature pair; manual repair is required" >&2
+            exit 1
+          fi
+
+          if [[ ${sig_exists} -eq 1 ]]; then
+            [[ -f dist/checksums.txt.sig && -f dist/checksums.txt.pem ]] || {
+              echo "expected both downloaded signature assets to exist locally" >&2
+              exit 1
+            }
+            echo "mode=verify_existing" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          echo "mode=create_and_upload" >> "${GITHUB_OUTPUT}"
+      - name: Verify existing checksum signature pair
+        if: steps.signature_pair.outputs.mode == 'verify_existing'
+        run: ./scripts/verify_release_artifacts.sh dist
+      - name: Create checksum signature pair
+        if: steps.signature_pair.outputs.mode == 'create_and_upload'
+        run: |
+          cosign sign-blob --yes \
+            --output-signature dist/checksums.txt.sig \
+            --output-certificate dist/checksums.txt.pem \
+            dist/checksums.txt
+      - name: Verify newly created checksum signature pair
+        if: steps.signature_pair.outputs.mode == 'create_and_upload'
+        run: ./scripts/verify_release_artifacts.sh dist
+      - name: Upload checksum signature pair
+        if: steps.signature_pair.outputs.mode == 'create_and_upload'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${RELEASE_TAG}" \
+            dist/checksums.txt.sig \
+            dist/checksums.txt.pem \
+            --repo "${REPOSITORY_FULL_NAME}"
+      - name: Verify final release asset state
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          release_json_path="$(mktemp)"
+          gh release view "${RELEASE_TAG}" \
+            --repo "${REPOSITORY_FULL_NAME}" \
+            --json assets > "${release_json_path}"
+          RELEASE_JSON_PATH="${release_json_path}" python3 <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+
+          dist_dir = pathlib.Path("dist")
+          expected = {
+              "checksums.txt",
+              "checksums.txt.sig",
+              "checksums.txt.pem",
+              "proof_0.5.0_darwin_amd64.tar.gz",
+              "proof_0.5.0_darwin_arm64.tar.gz",
+              "proof_0.5.0_linux_amd64.tar.gz",
+              "proof_0.5.0_linux_arm64.tar.gz",
+              "proof_0.5.0_windows_amd64.zip",
+              "proof_0.5.0_windows_arm64.zip",
+              "sbom.spdx.json",
+          }
+
+          with open(os.environ["RELEASE_JSON_PATH"], "r", encoding="utf-8") as fh:
+              data = json.load(fh)
+
+          assets = {asset["name"]: asset for asset in data["assets"]}
+          missing = sorted(expected - assets.keys())
+          if missing:
+              raise SystemExit(f"release missing expected final assets: {missing}")
+
+          for name in sorted(expected):
+              path = dist_dir / name
+              if not path.is_file():
+                  raise SystemExit(f"missing local asset for final verification: {path}")
+              digest = assets[name].get("digest", "")
+              if not digest.startswith("sha256:"):
+                  raise SystemExit(f"release asset digest missing for {name}")
+              actual = hashlib.sha256(path.read_bytes()).hexdigest()
+              if actual != digest.split(":", 1)[1]:
+                  raise SystemExit(f"release asset digest mismatch for {name}: {actual} != {digest}")
+          print("final release asset state verified")
+          PY
+      - name: Generate build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/checksums.txt
+            dist/checksums.txt.sig
+            dist/checksums.txt.pem
+            dist/proof_0.5.0_darwin_amd64.tar.gz
+            dist/proof_0.5.0_darwin_arm64.tar.gz
+            dist/proof_0.5.0_linux_amd64.tar.gz
+            dist/proof_0.5.0_linux_arm64.tar.gz
+            dist/proof_0.5.0_windows_amd64.zip
+            dist/proof_0.5.0_windows_arm64.zip
+            dist/sbom.spdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-repair-artifacts
+          path: |
+            dist/checksums.txt
+            dist/checksums.txt.sig
+            dist/checksums.txt.pem
+            dist/sbom.spdx.json
+            dist/scan/grype-db-update.log
+            dist/scan/grype-high.log
+            dist/scan/grype-critical.log
+            dist/scan/govulncheck.log

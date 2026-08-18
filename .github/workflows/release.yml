@@ -35,6 +35,8 @@ jobs:
           output-file: sbom.spdx.json
       - name: Install grype
         uses: anchore/scan-action/download-grype@v4
+      - name: Refresh grype database
+        run: grype db update
       - name: Vulnerability scan (dist)
         run: grype dir:dist --fail-on high || grype dir:dist --fail-on critical
       - uses: sigstore/cosign-installer@v3
