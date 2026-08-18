@@ -2,32 +2,68 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://github.com/Clyra-AI/proof/schemas/v1/relationship_envelope.schema.json",
   "type": "object",
-  "properties": {
+  "$defs": {
+    "parent_kind": {
+      "anyOf": [
+        { "enum": ["trace", "run", "session", "intent", "policy", "agent", "evidence"] },
+        { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*(?:\\.[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*)+$" }
+      ]
+    },
+    "entity_kind": {
+      "anyOf": [
+        { "enum": ["agent", "tool", "resource", "policy", "run", "trace", "delegation", "evidence"] },
+        { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*(?:\\.[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*)+$" }
+      ]
+    },
+    "edge_kind": {
+      "anyOf": [
+        { "enum": ["delegates_to", "calls", "governed_by", "targets", "derived_from", "emits_evidence"] },
+        { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*(?:\\.[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*)+$" }
+      ]
+    },
     "parent_ref": {
       "type": "object",
       "required": ["kind", "id"],
       "properties": {
-        "kind": {
-          "type": "string",
-          "enum": ["trace", "run", "session", "intent", "policy", "agent", "evidence"]
-        },
-        "id": { "type": "string", "minLength": 1 }
+        "kind": { "$ref": "#/$defs/parent_kind" },
+        "id": { "type": "string", "minLength": 1 },
+        "digest": { "description": "SHA-256 digest; legacy additive values remain accepted for hash compatibility" },
+        "schema_id": { "description": "Producing schema identifier; legacy additive values remain accepted" },
+        "schema_version": { "description": "Producing schema version; legacy additive values remain accepted" },
+        "source_product": { "description": "Producing product; legacy additive values remain accepted" }
       }
     },
+    "entity_ref": {
+      "type": "object",
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/entity_kind" },
+        "id": { "type": "string", "minLength": 1 },
+        "digest": { "description": "SHA-256 digest; legacy additive values remain accepted for hash compatibility" },
+        "schema_id": { "description": "Producing schema identifier; legacy additive values remain accepted" },
+        "schema_version": { "description": "Producing schema version; legacy additive values remain accepted" },
+        "source_product": { "description": "Producing product; legacy additive values remain accepted" }
+      }
+    },
+    "endpoint_ref": {
+      "type": "object",
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1 },
+        "digest": { "description": "SHA-256 digest; legacy additive values remain accepted for hash compatibility" },
+        "schema_id": { "description": "Producing schema identifier; legacy additive values remain accepted" },
+        "schema_version": { "description": "Producing schema version; legacy additive values remain accepted" },
+        "source_product": { "description": "Producing product; legacy additive values remain accepted" }
+      }
+    }
+  },
+  "properties": {
+    "parent_ref": { "$ref": "#/$defs/parent_ref" },
     "entity_refs": {
       "type": "array",
       "uniqueItems": true,
-      "items": {
-        "type": "object",
-        "required": ["kind", "id"],
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": ["agent", "tool", "resource", "policy", "run", "trace", "delegation", "evidence"]
-          },
-          "id": { "type": "string", "minLength": 1 }
-        }
-      }
+      "items": { "$ref": "#/$defs/entity_ref" }
     },
     "policy_ref": {
       "type": "object",
@@ -60,26 +96,9 @@
         "type": "object",
         "required": ["kind", "from", "to"],
         "properties": {
-          "kind": {
-            "type": "string",
-            "enum": ["delegates_to", "calls", "governed_by", "targets", "derived_from", "emits_evidence"]
-          },
-          "from": {
-            "type": "object",
-            "required": ["kind", "id"],
-            "properties": {
-              "kind": { "type": "string", "minLength": 1 },
-              "id": { "type": "string", "minLength": 1 }
-            }
-          },
-          "to": {
-            "type": "object",
-            "required": ["kind", "id"],
-            "properties": {
-              "kind": { "type": "string", "minLength": 1 },
-              "id": { "type": "string", "minLength": 1 }
-            }
-          }
+          "kind": { "$ref": "#/$defs/edge_kind" },
+          "from": { "$ref": "#/$defs/endpoint_ref" },
+          "to": { "$ref": "#/$defs/endpoint_ref" }
         }
       }
     },

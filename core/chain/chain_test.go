@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	coreerr "github.com/Clyra-AI/proof/core/errors"
 	"github.com/Clyra-AI/proof/core/record"
 	"github.com/Clyra-AI/proof/core/signing"
 	"github.com/stretchr/testify/require"
@@ -192,4 +193,47 @@ func TestVerifyRangeScenarios(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, v.Intact)
 	require.Equal(t, 0, v.Count)
+}
+
+func TestVerifyStrictRejectsInconsistentMetadata(t *testing.T) {
+	c := New("chain-strict", time.Now().UTC())
+	r, err := record.New(record.RecordOpts{
+		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
+		Source:        "proof",
+		SourceProduct: "proof",
+		Type:          "decision",
+		Event:         map[string]any{"action": "allow"},
+	})
+	require.NoError(t, err)
+	require.NoError(t, Append(c, r))
+
+	c.RecordCount = 2
+	legacy, err := Verify(c)
+	require.NoError(t, err)
+	require.True(t, legacy.Intact)
+
+	_, err = VerifyWithOptions(c, VerifyOpts{Strict: true})
+	require.Error(t, err)
+	typed, ok := coreerr.As(err)
+	require.True(t, ok)
+	require.Equal(t, ErrorCodeRecordCountMismatch, typed.Code)
+
+	c.RecordCount = 1
+	c.HeadHash = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	legacy, err = Verify(c)
+	require.NoError(t, err)
+	require.False(t, legacy.Intact)
+
+	_, err = VerifyWithOptions(c, VerifyOpts{Strict: true})
+	require.Error(t, err)
+	typed, ok = coreerr.As(err)
+	require.True(t, ok)
+	require.Equal(t, ErrorCodeHeadHashMismatch, typed.Code)
+}
+
+func TestVerifyRangeWithOptionsUsesStrictMetadataChecks(t *testing.T) {
+	c := New("chain-range-strict", time.Now().UTC())
+	c.RecordCount = 1
+	_, err := VerifyRangeWithOptions(c, time.Time{}, time.Time{}, VerifyOpts{Strict: true})
+	require.Error(t, err)
 }

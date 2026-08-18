@@ -252,6 +252,244 @@ func TestNormalizeDigestRefAndHexValidation(t *testing.T) {
 	require.Equal(t, "policy-ref-v2", normalizeDigestRef("policy-ref-v2"))
 	require.False(t, isLowerHexLen("nothex", 64))
 	require.False(t, isLowerHexLen("abc", 64))
+	require.True(t, isValidDigestRef("SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"))
+	require.True(t, isValidDigestRef("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
+	require.False(t, isValidDigestRef(" sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"))
+}
+
+func TestNewNormalizesDigestBoundRelationshipRefs(t *testing.T) {
+	r, err := New(RecordOpts{
+		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
+		Source:        "gait",
+		SourceProduct: "gait",
+		Type:          "policy_enforcement",
+		Event:         map[string]any{"verdict": "allow"},
+		Relationship: &Relationship{
+			EntityRefs: []RelationshipRef{
+				{
+					Kind:          " Vendor.Model-Card ",
+					ID:            " model:alpha ",
+					Digest:        " SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA ",
+					SchemaID:      " vendor.model-card ",
+					SchemaVersion: " 2.1 ",
+					SourceProduct: " vendor ",
+				},
+			},
+			Edges: []RelationshipEdge{
+				{
+					Kind: " Vendor.Derived-From ",
+					From: RelationshipRef{Kind: "Vendor.Model-Card", ID: "model:alpha"},
+					To:   RelationshipRef{Kind: "evidence", ID: "evidence:one"},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	ref := r.Relationship.EntityRefs[0]
+	require.Equal(t, "vendor.model-card", ref.Kind)
+	require.Equal(t, "model:alpha", ref.ID)
+	require.Equal(t, "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ref.Digest)
+	require.Equal(t, "vendor.model-card", ref.SchemaID)
+	require.Equal(t, "2.1", ref.SchemaVersion)
+	require.Equal(t, "vendor", ref.SourceProduct)
+	require.Equal(t, "vendor.derived-from", r.Relationship.Edges[0].Kind)
+}
+
+func TestNormalizedRefsKeepsSameReferenceWithDifferentDigests(t *testing.T) {
+	refs := []RelationshipRef{
+		{Kind: "evidence", ID: "evidence:one", Digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+		{Kind: "evidence", ID: "evidence:one", Digest: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"},
+		{Kind: "evidence", ID: "evidence:one", Digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+	}
+
+	normalized := normalizedRefs(refs)
+	require.Len(t, normalized, 2)
+	require.Equal(t, "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", normalized[0].Digest)
+	require.Equal(t, "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", normalized[1].Digest)
+}
+
+func TestRelationshipRefStableKeyCannotCollideOnFieldDelimiters(t *testing.T) {
+	base := RecordOpts{
+		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
+		Source:        "proof",
+		SourceProduct: "proof",
+		Type:          "decision",
+		Event:         map[string]any{"action": "allow"},
+	}
+	left := RelationshipRef{Kind: "vendor.entity", ID: "entity:one", SchemaID: "a\x00b", SchemaVersion: "c"}
+	right := RelationshipRef{Kind: "vendor.entity", ID: "entity:one", SchemaID: "a", SchemaVersion: "b\x00c"}
+	require.NotEqual(t, relationshipRefStableKey(left), relationshipRefStableKey(right))
+
+	first := base
+	first.Relationship = &Relationship{EntityRefs: []RelationshipRef{left, right}}
+	second := base
+	second.Relationship = &Relationship{EntityRefs: []RelationshipRef{right, left}}
+
+	r1, err := New(first)
+	require.NoError(t, err)
+	r2, err := New(second)
+	require.NoError(t, err)
+	require.Len(t, r1.Relationship.EntityRefs, 2)
+	require.Equal(t, r1.Integrity.RecordHash, r2.Integrity.RecordHash)
+}
+
+func TestValidateRelationshipKindsAndDigestsReturnsStableCodes(t *testing.T) {
+	base := Record{
+		RecordVersion: SchemaVersion,
+		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
+		Source:        "proof",
+		SourceProduct: "proof",
+		RecordType:    "decision",
+		Event:         map[string]any{"action": "allow"},
+	}
+
+	tests := []struct {
+		name string
+		rel  *Relationship
+		code string
+		path string
+	}{
+		{
+			name: "invalid entity kind",
+			rel:  &Relationship{EntityRefs: []RelationshipRef{{Kind: "custom_kind", ID: "x"}}},
+			code: ErrorCodeRelationshipRefKindInvalid,
+			path: "relationship.entity_refs[0].kind",
+		},
+		{
+			name: "invalid edge kind",
+			rel: &Relationship{Edges: []RelationshipEdge{{
+				Kind: "custom_edge",
+				From: RelationshipRef{Kind: "agent", ID: "a"},
+				To:   RelationshipRef{Kind: "tool", ID: "b"},
+			}}},
+			code: ErrorCodeRelationshipEdgeKindInvalid,
+			path: "relationship.edges[0].kind",
+		},
+		{
+			name: "invalid digest",
+			rel:  &Relationship{EntityRefs: []RelationshipRef{{Kind: "evidence", ID: "x", Digest: "sha256:bad"}}},
+			code: ErrorCodeRelationshipRefDigestInvalid,
+			path: "relationship.entity_refs[0].digest",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := base
+			r.Relationship = tt.rel
+			err := Validate(&r)
+			require.Error(t, err)
+			typed, ok := coreerr.As(err)
+			require.True(t, ok)
+			require.Equal(t, coreerr.KindValidation, typed.Kind)
+			require.Equal(t, tt.code, typed.Code)
+			require.Equal(t, tt.path, typed.Path)
+		})
+	}
+}
+
+func TestValidatePreservesLegacyArbitraryEdgeEndpointKinds(t *testing.T) {
+	r := &Record{
+		RecordVersion: SchemaVersion,
+		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
+		Source:        "proof",
+		SourceProduct: "proof",
+		RecordType:    "decision",
+		Event:         map[string]any{"action": "allow"},
+		Relationship: &Relationship{Edges: []RelationshipEdge{{
+			Kind: "calls",
+			From: RelationshipRef{Kind: "principal", ID: "principal:one"},
+			To:   RelationshipRef{Kind: "endpoint", ID: "endpoint:one"},
+		}}},
+	}
+	require.NoError(t, Validate(r))
+}
+
+func TestLegacyRelationshipHashRemainsStable(t *testing.T) {
+	r, err := New(RecordOpts{
+		Timestamp:     time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC),
+		Source:        "gait",
+		SourceProduct: "gait",
+		Type:          "policy_enforcement",
+		Event:         map[string]any{"verdict": "allow"},
+		Relationship: &Relationship{
+			ParentRef:  &RelationshipRef{Kind: "trace", ID: "trace-1"},
+			EntityRefs: []RelationshipRef{{Kind: "agent", ID: "agent:a"}, {Kind: "tool", ID: "tool:b"}},
+			Edges: []RelationshipEdge{{
+				Kind: "calls",
+				From: RelationshipRef{Kind: "agent", ID: "agent:a"},
+				To:   RelationshipRef{Kind: "tool", ID: "tool:b"},
+			}},
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "sha256:26e7e8116a1fbed3b0fdef3a45c049478ca40d43c9b29a2d3f40b40376f96800", r.Integrity.RecordHash)
+}
+
+func TestUnmarshalDoesNotNormalizeAlreadyHashedRelationshipRef(t *testing.T) {
+	raw := []byte(`{
+	  "record_id":"prf-legacy-digest",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-17T12:00:00Z",
+	  "source":"gait",
+	  "source_product":"gait",
+	  "record_type":"policy_enforcement",
+	  "event":{"verdict":"allow"},
+	  "controls":{},
+	  "relationship":{
+	    "entity_refs":[
+	      {
+	        "kind":"evidence",
+	        "id":"evidence:legacy",
+	        "digest":"SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+	        "schema_id":"legacy.evidence",
+	        "future":"preserved"
+	      },
+	      {
+	        "kind":"evidence",
+	        "id":"evidence:additive-collision",
+	        "digest":null,
+	        "schema_id":"",
+	        "schema_version":2,
+	        "source_product":{"name":"legacy"}
+	      }
+	    ]
+	  },
+	  "integrity":{"record_hash":"sha256:ae794c4d5fde13a7789228b97f5fdf6d049935bb416de62d409f298e5572a7c4"}
+	}`)
+
+	var r Record
+	require.NoError(t, json.Unmarshal(raw, &r))
+	require.Equal(t, "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", r.Relationship.EntityRefs[0].Digest)
+	require.Equal(t, `"preserved"`, string(r.Relationship.EntityRefs[0].Extra["future"]))
+	legacyCollision := r.Relationship.EntityRefs[1]
+	require.Empty(t, legacyCollision.Digest)
+	require.Empty(t, legacyCollision.SchemaID)
+	require.Empty(t, legacyCollision.SchemaVersion)
+	require.Empty(t, legacyCollision.SourceProduct)
+	require.Equal(t, "null", string(legacyCollision.Extra["digest"]))
+	require.Equal(t, `""`, string(legacyCollision.Extra["schema_id"]))
+	require.Equal(t, "2", string(legacyCollision.Extra["schema_version"]))
+	require.Equal(t, `{"name":"legacy"}`, string(legacyCollision.Extra["source_product"]))
+
+	hash, err := ComputeHash(&r)
+	require.NoError(t, err)
+	require.Equal(t, r.Integrity.RecordHash, hash)
+
+	encoded, err := json.Marshal(&r)
+	require.NoError(t, err)
+	var roundTripped Record
+	require.NoError(t, json.Unmarshal(encoded, &roundTripped))
+	require.Equal(t, r.Relationship.EntityRefs[0], roundTripped.Relationship.EntityRefs[0])
+	require.Equal(t, hash, mustComputeHash(t, &roundTripped))
+}
+
+func mustComputeHash(t *testing.T, r *Record) string {
+	t.Helper()
+	hash, err := ComputeHash(r)
+	require.NoError(t, err)
+	return hash
 }
 
 func TestNormalizedEdgesStableSortAndDedup(t *testing.T) {

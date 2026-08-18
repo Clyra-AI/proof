@@ -8,21 +8,32 @@ import (
 )
 
 func TestRelationshipRefJSONRoundTripPreservesExtras(t *testing.T) {
-	raw := []byte(`{"kind":"agent","id":"agent:a","future":"x"}`)
+	raw := []byte(`{"kind":"vendor.model","id":"model:a","digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","schema_id":"vendor.model-card","schema_version":"2.1","source_product":"vendor","future":"x"}`)
 	var ref RelationshipRef
 	require.NoError(t, json.Unmarshal(raw, &ref))
-	require.Equal(t, "agent", ref.Kind)
-	require.Equal(t, "agent:a", ref.ID)
+	require.Equal(t, "vendor.model", ref.Kind)
+	require.Equal(t, "model:a", ref.ID)
+	require.Equal(t, "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", ref.Digest)
+	require.Equal(t, "vendor.model-card", ref.SchemaID)
+	require.Equal(t, "2.1", ref.SchemaVersion)
+	require.Equal(t, "vendor", ref.SourceProduct)
 	require.Equal(t, `"x"`, string(ref.Extra["future"]))
+	require.NotContains(t, ref.Extra, "digest")
+	require.NotContains(t, ref.Extra, "schema_id")
 
 	ref.Extra["kind"] = json.RawMessage(`"ignored"`)
+	ref.Extra["digest"] = json.RawMessage(`"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"`)
 	out, err := json.Marshal(ref)
 	require.NoError(t, err)
 
 	var obj map[string]any
 	require.NoError(t, json.Unmarshal(out, &obj))
-	require.Equal(t, "agent", obj["kind"])
-	require.Equal(t, "agent:a", obj["id"])
+	require.Equal(t, "vendor.model", obj["kind"])
+	require.Equal(t, "model:a", obj["id"])
+	require.Equal(t, ref.Digest, obj["digest"])
+	require.Equal(t, "vendor.model-card", obj["schema_id"])
+	require.Equal(t, "2.1", obj["schema_version"])
+	require.Equal(t, "vendor", obj["source_product"])
 	require.Equal(t, "x", obj["future"])
 }
 

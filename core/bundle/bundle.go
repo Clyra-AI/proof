@@ -13,6 +13,7 @@ import (
 	coreerr "github.com/Clyra-AI/proof/core/errors"
 	"github.com/Clyra-AI/proof/core/schema"
 	"github.com/Clyra-AI/proof/core/signing"
+	"github.com/Clyra-AI/proof/core/structure"
 )
 
 type ManifestEntry struct {
@@ -31,6 +32,7 @@ type VerifyOpts struct {
 	VerifySignatures bool
 	PublicKey        signing.PublicKey
 	Cosign           signing.CosignVerifyOpts
+	Strict           bool
 }
 
 const manifestFilename = "manifest.json"
@@ -49,6 +51,11 @@ func Verify(path string, opts VerifyOpts) (*Manifest, error) {
 	}
 	if err := schema.ValidateAgainstSchema(manifestRaw, "v1/bundle-manifest-v1.schema.json"); err != nil {
 		return nil, coreerr.Wrap(coreerr.KindValidation, "bundle.schema_validation_failed", "bundle manifest schema validation failed", err, coreerr.WithPath("v1/bundle-manifest-v1.schema.json"))
+	}
+	if opts.Strict {
+		if err := validateStrictStructure(path, manifest); err != nil {
+			return nil, err
+		}
 	}
 	for _, file := range manifest.Files {
 		// #nosec G304 -- manifest drives local bundle verification.
@@ -90,6 +97,56 @@ func Verify(path string, opts VerifyOpts) (*Manifest, error) {
 		}
 	}
 	return &manifest, nil
+}
+
+func validateStrictStructure(root string, manifest Manifest) error {
+	rootInfo, err := os.Lstat(root)
+	if err != nil {
+		return err
+	}
+	if rootInfo.Mode()&os.ModeSymlink != 0 {
+		return structure.SymlinkAmbiguityError(root)
+	}
+
+	paths := make([]string, 0, len(manifest.Files))
+	for i := range manifest.Files {
+		paths = append(paths, manifest.Files[i].Path)
+	}
+	listed, err := structure.ValidateListedPaths(paths)
+	if err != nil {
+		return err
+	}
+
+	return filepath.WalkDir(root, func(filePath string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		rel, err := filepath.Rel(root, filePath)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+		if rel == "." {
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 {
+			return structure.SymlinkAmbiguityError(rel)
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if rel == manifestFilename {
+			return nil
+		}
+		key, err := structure.ValidatePath(rel)
+		if err != nil {
+			return err
+		}
+		if _, ok := listed[key]; !ok {
+			return structure.UnlistedFileError(rel)
+		}
+		return nil
+	})
 }
 
 func ReadManifest(path string) (Manifest, error) {

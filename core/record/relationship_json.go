@@ -84,6 +84,18 @@ func (r RelationshipRef) MarshalJSON() ([]byte, error) {
 		"kind": r.Kind,
 		"id":   r.ID,
 	}
+	if r.Digest != "" {
+		out["digest"] = r.Digest
+	}
+	if r.SchemaID != "" {
+		out["schema_id"] = r.SchemaID
+	}
+	if r.SchemaVersion != "" {
+		out["schema_version"] = r.SchemaVersion
+	}
+	if r.SourceProduct != "" {
+		out["source_product"] = r.SourceProduct
+	}
 	mergeExtraRaw(out, r.Extra)
 	return json.Marshal(out)
 }
@@ -99,12 +111,36 @@ func (r *RelationshipRef) UnmarshalJSON(data []byte) error {
 	}
 	r.Kind = v.Kind
 	r.ID = v.ID
+	r.Digest = ""
+	r.SchemaID = ""
+	r.SchemaVersion = ""
+	r.SourceProduct = ""
 	extra, err := extractExtraRaw(data, "kind", "id")
 	if err != nil {
 		return err
 	}
+	promoteRelationshipRefString(extra, "digest", &r.Digest, isValidDigestRef)
+	promoteRelationshipRefString(extra, "schema_id", &r.SchemaID, nil)
+	promoteRelationshipRefString(extra, "schema_version", &r.SchemaVersion, nil)
+	promoteRelationshipRefString(extra, "source_product", &r.SourceProduct, nil)
+	if len(extra) == 0 {
+		extra = nil
+	}
 	r.Extra = extra
 	return nil
+}
+
+func promoteRelationshipRefString(extra map[string]json.RawMessage, key string, dst *string, valid func(string) bool) {
+	raw, ok := extra[key]
+	if !ok {
+		return
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil || value == "" || (valid != nil && !valid(value)) {
+		return
+	}
+	*dst = value
+	delete(extra, key)
 }
 
 func (e RelationshipEdge) MarshalJSON() ([]byte, error) {

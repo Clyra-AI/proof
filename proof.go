@@ -13,6 +13,7 @@ import (
 	"github.com/Clyra-AI/proof/core/record"
 	"github.com/Clyra-AI/proof/core/schema"
 	"github.com/Clyra-AI/proof/core/signing"
+	"github.com/Clyra-AI/proof/core/structure"
 )
 
 type Record = record.Record
@@ -27,6 +28,7 @@ type PolicyRef = record.PolicyRef
 type AgentLineageHop = record.AgentLineageHop
 type Chain = chain.Chain
 type ChainVerification = chain.Verification
+type ChainVerifyOpts = chain.VerifyOpts
 type SigningKey = signing.SigningKey
 type PublicKey = signing.PublicKey
 type Signature = signing.Signature
@@ -50,6 +52,20 @@ const (
 	DomainURL    = canon.DomainURL
 	DomainText   = canon.DomainText
 	DomainPrompt = canon.DomainPrompt
+)
+
+const (
+	ErrorCodeRelationshipRefIDRequired    = record.ErrorCodeRelationshipRefIDRequired
+	ErrorCodeRelationshipRefKindInvalid   = record.ErrorCodeRelationshipRefKindInvalid
+	ErrorCodeRelationshipRefDigestInvalid = record.ErrorCodeRelationshipRefDigestInvalid
+	ErrorCodeRelationshipEdgeKindInvalid  = record.ErrorCodeRelationshipEdgeKindInvalid
+	ErrorCodeChainRecordCountMismatch     = chain.ErrorCodeRecordCountMismatch
+	ErrorCodeChainHeadHashMismatch        = chain.ErrorCodeHeadHashMismatch
+	ErrorCodeStructurePathInvalid         = structure.ErrorCodePathInvalid
+	ErrorCodeStructurePathAmbiguous       = structure.ErrorCodePathAmbiguous
+	ErrorCodeStructurePathDuplicate       = structure.ErrorCodePathDuplicate
+	ErrorCodeStructureUnlistedFile        = structure.ErrorCodeUnlistedFile
+	ErrorCodeStructureSymlinkAmbiguous    = structure.ErrorCodeSymlinkAmbiguous
 )
 
 func NewRecord(opts RecordOpts) (*Record, error) {
@@ -77,6 +93,10 @@ func AppendToChain(c *Chain, r *Record) error {
 
 func VerifyChain(c *Chain) (*ChainVerification, error) {
 	return chain.Verify(c)
+}
+
+func VerifyChainWithOptions(c *Chain, opts ChainVerifyOpts) (*ChainVerification, error) {
+	return chain.VerifyWithOptions(c, opts)
 }
 
 func Canonicalize(input []byte, domain CanonDomain) ([]byte, error) {
@@ -124,6 +144,10 @@ func NewChain(id string) *Chain {
 
 func VerifyChainRange(c *Chain, from, to time.Time) (*ChainVerification, error) {
 	return chain.VerifyRange(c, from, to)
+}
+
+func VerifyChainRangeWithOptions(c *Chain, from, to time.Time, opts ChainVerifyOpts) (*ChainVerification, error) {
+	return chain.VerifyRangeWithOptions(c, from, to, opts)
 }
 
 func GenerateSigningKey() (SigningKey, error) {
