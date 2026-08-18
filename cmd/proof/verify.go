@@ -24,6 +24,7 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 	var cosignCertIssuer string
 	var revocationListPath string
 	var revocationKeyHex string
+	var strict bool
 
 	cmd := &cobra.Command{
 		Use:   "verify <path>",
@@ -116,9 +117,9 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 				if err != nil {
 					return newCLIError(exitcode.InvalidInput, err.Error())
 				}
-				v, err := proof.VerifyChain(c)
+				v, err := proof.VerifyChainWithOptions(c, proof.ChainVerifyOpts{Strict: strict})
 				if err != nil {
-					return newCLIError(exitcode.InternalError, err.Error())
+					return newCLIError(verificationErrorCode(err), err.Error())
 				}
 				if !v.Intact {
 					return newCLIError(exitcode.VerificationErr, fmt.Sprintf("chain verification failed at index %d record %s", v.BreakIndex, v.BreakPoint))
@@ -164,12 +165,12 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 			case artifactBundle:
 				explainf(opts, "bundle verify: manifest hash checks")
 				if verifyBundleFlag || !verifyChain {
-					if err := verifyBundle(path, verifySignatures, publicKeyHex, proof.CosignVerifyOpts{
+					if err := verifyBundleWithStrict(path, verifySignatures, publicKeyHex, proof.CosignVerifyOpts{
 						KeyPath:             cosignKeyPath,
 						CertificatePath:     cosignCertPath,
 						CertificateIdentity: cosignCertIdentity,
 						CertificateIssuer:   cosignCertIssuer,
-					}); err != nil {
+					}, strict); err != nil {
 						return newCLIError(verificationErrorCode(err), err.Error())
 					}
 				}
@@ -177,7 +178,7 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 					chainPath := filepath.Join(path, "chain.json")
 					c, err := loadChain(chainPath)
 					if err == nil {
-						v, verr := proof.VerifyChain(c)
+						v, verr := proof.VerifyChainWithOptions(c, proof.ChainVerifyOpts{Strict: strict})
 						if verr != nil || !v.Intact {
 							return newCLIError(exitcode.VerificationErr, "bundle chain verification failed")
 						}
@@ -187,12 +188,12 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 				return nil
 			case artifactGaitPack:
 				explainf(opts, "gait pack verify: manifest + embedded artifacts")
-				res, err := verifyGaitPack(path, verifySignatures, publicKeyHex, proof.CosignVerifyOpts{
+				res, err := verifyGaitPackWithStrict(path, verifySignatures, publicKeyHex, proof.CosignVerifyOpts{
 					KeyPath:             cosignKeyPath,
 					CertificatePath:     cosignCertPath,
 					CertificateIdentity: cosignCertIdentity,
 					CertificateIssuer:   cosignCertIssuer,
-				})
+				}, strict)
 				if err != nil {
 					return newCLIError(verificationErrorCode(err), err.Error())
 				}
@@ -208,12 +209,7 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 				return nil
 			case artifactGaitRunpack:
 				explainf(opts, "gait runpack verify: manifest + file integrity")
-				res, err := verifyGaitRunpack(path, verifySignatures, publicKeyHex, proof.CosignVerifyOpts{
-					KeyPath:             cosignKeyPath,
-					CertificatePath:     cosignCertPath,
-					CertificateIdentity: cosignCertIdentity,
-					CertificateIssuer:   cosignCertIssuer,
-				})
+				res, err := verifyGaitRunpackWithStrict(path, verifySignatures, publicKeyHex, strict)
 				if err != nil {
 					return newCLIError(verificationErrorCode(err), err.Error())
 				}
@@ -245,6 +241,7 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 	cmd.Flags().StringVar(&cosignCertIssuer, "cosign-cert-issuer", "", "Expected cosign certificate OIDC issuer")
 	cmd.Flags().StringVar(&revocationListPath, "revocation-list", "", "Path to signed revocation list JSON")
 	cmd.Flags().StringVar(&revocationKeyHex, "revocation-key", "", "Revocation list signer Ed25519 public key as hex")
+	cmd.Flags().BoolVar(&strict, "strict", false, "Reject structurally ambiguous artifacts and inconsistent chain metadata")
 	return cmd
 }
 

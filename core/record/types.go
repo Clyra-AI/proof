@@ -42,8 +42,12 @@ type Relationship struct {
 type Relations = Relationship
 
 type RelationshipRef struct {
-	Kind string `json:"kind"`
-	ID   string `json:"id"`
+	Kind          string `json:"kind"`
+	ID            string `json:"id"`
+	Digest        string `json:"digest,omitempty"`
+	SchemaID      string `json:"schema_id,omitempty"`
+	SchemaVersion string `json:"schema_version,omitempty"`
+	SourceProduct string `json:"source_product,omitempty"`
 
 	Extra map[string]json.RawMessage `json:"-"`
 }

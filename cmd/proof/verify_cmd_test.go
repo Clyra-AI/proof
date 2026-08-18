@@ -86,6 +86,19 @@ func TestVerifyBundleWithManifestSignature(t *testing.T) {
 	require.Contains(t, out, "Bundle verified")
 }
 
+func TestVerifyStrictRejectsUnlistedBundleFile(t *testing.T) {
+	dir := t.TempDir()
+	testutil.WriteFile(t, filepath.Join(dir, "records.jsonl"), []byte("{}\n"))
+	testutil.WriteFile(t, filepath.Join(dir, "extra.json"), []byte("{}"))
+	testutil.WriteFile(t, filepath.Join(dir, "manifest.json"), []byte(`{"files":[{"path":"records.jsonl","sha256":"sha256:ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"}]}`))
+
+	_, err := runCLIForTest(t, []string{"verify", dir})
+	require.NoError(t, err)
+	_, err = runCLIForTest(t, []string{"verify", "--strict", dir})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "unlisted file")
+}
+
 func TestVerifyCustomTypeSchemaMapping(t *testing.T) {
 	proof.ResetCustomTypes()
 	t.Cleanup(proof.ResetCustomTypes)

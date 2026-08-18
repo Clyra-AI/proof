@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	coreerr "github.com/Clyra-AI/proof/core/errors"
 	"github.com/Clyra-AI/proof/core/record"
 	"github.com/Clyra-AI/proof/core/signing"
 )
@@ -25,6 +26,15 @@ type Verification struct {
 	BreakIndex int    `json:"break_index,omitempty"`
 	HeadHash   string `json:"head_hash,omitempty"`
 }
+
+type VerifyOpts struct {
+	Strict bool
+}
+
+const (
+	ErrorCodeRecordCountMismatch = "chain.record_count_mismatch"
+	ErrorCodeHeadHashMismatch    = "chain.head_hash_mismatch"
+)
 
 func New(chainID string, createdAt time.Time) *Chain {
 	if createdAt.IsZero() {
@@ -65,8 +75,20 @@ func Append(c *Chain, r *record.Record) error {
 }
 
 func Verify(c *Chain) (*Verification, error) {
+	return VerifyWithOptions(c, VerifyOpts{})
+}
+
+func VerifyWithOptions(c *Chain, opts VerifyOpts) (*Verification, error) {
 	if c == nil {
 		return nil, errors.New("chain is nil")
+	}
+	if opts.Strict && c.RecordCount != len(c.Records) {
+		return nil, coreerr.New(
+			coreerr.KindVerification,
+			ErrorCodeRecordCountMismatch,
+			fmt.Sprintf("chain record_count mismatch: expected %d got %d", len(c.Records), c.RecordCount),
+			coreerr.WithField("record_count"),
+		)
 	}
 	verification := &Verification{Intact: true, Count: len(c.Records), HeadHash: c.HeadHash}
 	prev := ""
@@ -91,6 +113,14 @@ func Verify(c *Chain) (*Verification, error) {
 		prev = r.Integrity.RecordHash
 	}
 	if c.HeadHash != prev {
+		if opts.Strict {
+			return nil, coreerr.New(
+				coreerr.KindVerification,
+				ErrorCodeHeadHashMismatch,
+				fmt.Sprintf("chain head_hash mismatch: expected %s got %s", prev, c.HeadHash),
+				coreerr.WithField("head_hash"),
+			)
+		}
 		verification.Intact = false
 		verification.BreakIndex = len(c.Records) - 1
 		verification.BreakPoint = fmt.Sprintf("head_hash mismatch: expected %s got %s", prev, c.HeadHash)
@@ -100,13 +130,17 @@ func Verify(c *Chain) (*Verification, error) {
 }
 
 func VerifyRange(c *Chain, from, to time.Time) (*Verification, error) {
+	return VerifyRangeWithOptions(c, from, to, VerifyOpts{})
+}
+
+func VerifyRangeWithOptions(c *Chain, from, to time.Time, opts VerifyOpts) (*Verification, error) {
 	if from.IsZero() && to.IsZero() {
-		return Verify(c)
+		return VerifyWithOptions(c, opts)
 	}
 	if c == nil {
 		return nil, errors.New("chain is nil")
 	}
-	v, err := Verify(c)
+	v, err := VerifyWithOptions(c, opts)
 	if err != nil {
 		return nil, err
 	}

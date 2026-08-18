@@ -123,6 +123,7 @@ if err != nil {
 verified, err := proof.VerifyBundle("./bundle", proof.BundleVerifyOpts{
 	VerifySignatures: true,
 	PublicKey:        proof.PublicKey{Public: key.Public},
+	Strict:           true,
 })
 if err != nil {
 	return err
@@ -130,6 +131,11 @@ if err != nil {
 _ = signedManifest
 _ = verified
 ```
+
+`Strict` verification is additive and opt-in. For bundles it rejects ambiguous or duplicate normalized manifest paths,
+unlisted files, and symbolic links. `proof.VerifyChainWithOptions` applies the same opt-in model to chain metadata,
+rejecting inconsistent `record_count` and `head_hash` values. Gait pack/runpack callers can enable the equivalent
+checks through `core/gait.VerifyOpts.Strict`. Existing verification entry points retain their legacy behavior.
 
 ## Record Format
 
@@ -164,7 +170,14 @@ The atomic unit is the proof record — a structured, signed artifact that captu
     "entity_refs": [
       {"kind": "agent", "id": "agent:billing-assistant"},
       {"kind": "tool", "id": "tool:postgres_query"},
-      {"kind": "resource", "id": "resource:payments.transactions"}
+      {
+        "kind": "vendor.dataset",
+        "id": "resource:payments.transactions",
+        "digest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "schema_id": "vendor.dataset-manifest",
+        "schema_version": "2.0",
+        "source_product": "vendor"
+      }
     ],
     "policy_ref": {
       "policy_id": "prod.tool-access",
@@ -183,6 +196,11 @@ The atomic unit is the proof record — a structured, signed artifact that captu
 
 Records are immutable, deterministic, and JSON-native — readable by any language, any tool, any text editor.
 Relationship fields are optional and schema-defined, so products can build graph queries later without changing the proof format.
+Relationship references can bind an ID to immutable bytes with `digest` and identify the producing contract with
+`schema_id`, `schema_version`, and `source_product`. New records normalize valid SHA-256 digests to lowercase while
+preserving whether the caller supplied the `sha256:` prefix. Existing built-in reference and edge kinds remain valid;
+extensions use lowercase dot-separated names such as `vendor.dataset` or `vendor.derived-from`. Unknown additive
+relationship fields are preserved and remain covered by record hashes and signatures.
 
 ## Built-in Record Types
 

@@ -59,6 +59,24 @@ func TestNewRecordRelationshipDoesNotChangeDeterministicID(t *testing.T) {
 	require.NotEqual(t, r1.Integrity.RecordHash, r2.Integrity.RecordHash)
 }
 
+func TestNewRecordRejectsInvalidRelationshipKindWithPublicReasonCode(t *testing.T) {
+	_, err := NewRecord(RecordOpts{
+		Timestamp:     time.Date(2026, 2, 17, 12, 30, 0, 0, time.UTC),
+		Source:        "axym",
+		SourceProduct: "axym",
+		Type:          "decision",
+		Event:         map[string]any{"action": "allow"},
+		Relationship: &Relationship{
+			EntityRefs: []RelationshipRef{{Kind: "unregistered_kind", ID: "entity:one"}},
+		},
+	})
+	require.Error(t, err)
+	typed, ok := AsLibraryError(err)
+	require.True(t, ok)
+	require.Equal(t, ErrorKindValidation, typed.Kind)
+	require.Equal(t, ErrorCodeRelationshipRefKindInvalid, typed.Code)
+}
+
 func TestNewRecordLegacyRelationsAliasAccepted(t *testing.T) {
 	ts := time.Date(2026, 2, 17, 12, 30, 0, 0, time.UTC)
 	r, err := NewRecord(RecordOpts{

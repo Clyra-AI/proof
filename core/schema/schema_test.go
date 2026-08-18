@@ -350,6 +350,90 @@ func TestValidateRelationshipEnvelopeSchema(t *testing.T) {
 	require.NoError(t, ValidateAgainstSchema(valid, "v1/relationship_envelope.schema.json"))
 }
 
+func TestValidateRelationshipEnvelopeDigestBoundNamespacedRefs(t *testing.T) {
+	valid := []byte(`{
+	  "parent_ref":{
+	    "kind":"vendor.workflow",
+	    "id":"workflow:one",
+	    "digest":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+	    "schema_id":"vendor.workflow",
+	    "schema_version":"2.0",
+	    "source_product":"vendor",
+	    "future":{"preserved":true}
+	  },
+	  "entity_refs":[
+	    {"kind":"vendor.model-card","id":"model:one","digest":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},
+	    {"kind":"vendor.model-card","id":"model:one","digest":"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}
+	  ],
+	  "edges":[{
+	    "kind":"vendor.derived-from",
+	    "from":{"kind":"vendor.model-card","id":"model:one","schema_id":"vendor.model-card","schema_version":"1"},
+	    "to":{"kind":"evidence","id":"evidence:one","source_product":"proof"}
+	  }]
+	}`)
+	require.NoError(t, ValidateAgainstSchema(valid, "v1/relationship_envelope.schema.json"))
+}
+
+func TestValidateRecordDigestBoundNamespacedRefs(t *testing.T) {
+	valid := []byte(`{
+	  "record_id":"prf-test",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-22T12:00:00Z",
+	  "source":"wrkr",
+	  "source_product":"wrkr",
+	  "record_type":"scan_finding",
+	  "event":{"entity_id":"model:one"},
+	  "controls":{},
+	  "relationship":{
+	    "entity_refs":[{"kind":"vendor.model-card","id":"model:one","digest":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","schema_id":"vendor.model-card","schema_version":"1","source_product":"vendor"}],
+	    "edges":[{"kind":"vendor.describes","from":{"kind":"vendor.model-card","id":"model:one"},"to":{"kind":"evidence","id":"evidence:one"}}]
+	  },
+	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	}`)
+	require.NoError(t, ValidateRecord(valid, "scan_finding"))
+}
+
+func TestValidateRelationshipEnvelopeRejectsInvalidNamespacedKinds(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+	}{
+		{name: "unregistered simple entity", raw: `{"entity_refs":[{"kind":"model_card","id":"model:one"}]}`},
+		{name: "empty namespace segment", raw: `{"entity_refs":[{"kind":"vendor..model","id":"model:one"}]}`},
+		{name: "uppercase namespace", raw: `{"entity_refs":[{"kind":"Vendor.model","id":"model:one"}]}`},
+		{name: "unregistered simple edge", raw: `{"edges":[{"kind":"describes","from":{"kind":"agent","id":"a"},"to":{"kind":"evidence","id":"b"}}]}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Error(t, ValidateAgainstSchema([]byte(tt.raw), "v1/relationship_envelope.schema.json"))
+		})
+	}
+}
+
+func TestValidateLegacyRelationshipRecordCompatibility(t *testing.T) {
+	legacy := []byte(`{
+	  "record_id":"prf-legacy",
+	  "record_version":"1.0",
+	  "timestamp":"2026-02-22T12:00:00Z",
+	  "source":"wrkr",
+	  "source_product":"wrkr",
+	  "record_type":"scan_finding",
+	  "event":{"entity_id":"tool:filesystem.write"},
+	  "controls":{},
+	  "relationship":{
+	    "parent_ref":{"kind":"trace","id":"trace-1"},
+	    "entity_refs":[
+	      {"kind":"agent","id":"agent:scanner","digest":"SHA256:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"},
+	      {"kind":"evidence","id":"evidence:legacy","digest":null,"schema_id":"","schema_version":2,"source_product":{"name":"legacy"}}
+	    ],
+	    "edges":[{"kind":"calls","from":{"kind":"principal","id":"agent:scanner"},"to":{"kind":"endpoint","id":"tool:filesystem.write"}}]
+	  },
+	  "integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+	}`)
+	require.NoError(t, ValidateRecord(legacy, "scan_finding"))
+}
+
 func TestValidateFrameworkDefinitionSchema(t *testing.T) {
 	valid := []byte(`{
 	  "framework":{"id":"starter","version":"1","title":"Starter"},

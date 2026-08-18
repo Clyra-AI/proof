@@ -13,8 +13,10 @@ import (
 	"testing"
 	"time"
 
+	coreerr "github.com/Clyra-AI/proof/core/errors"
 	"github.com/Clyra-AI/proof/core/record"
 	"github.com/Clyra-AI/proof/core/signing"
+	"github.com/Clyra-AI/proof/core/structure"
 	"github.com/stretchr/testify/require"
 )
 
@@ -299,6 +301,105 @@ func TestVerifyRunpackErrorBranches(t *testing.T) {
 	require.ErrorContains(t, verifyRunpackSignature(digestHex(t, "other"), manifest.Signatures[0], pub), "manifest signed_digest mismatch")
 }
 
+func TestVerifyPackStrictStructure(t *testing.T) {
+	content := []byte(`{}`)
+	baseManifest := PackManifest{
+		PackID:   "pack-strict",
+		PackType: "run",
+		Contents: []PackEntry{{Path: "trace.json", SHA256: sha256Hex(content), Type: "gait.gate.trace"}},
+	}
+
+	tests := []struct {
+		name     string
+		manifest PackManifest
+		files    map[string][]byte
+		code     string
+	}{
+		{
+			name:     "unlisted file",
+			manifest: baseManifest,
+			files:    map[string][]byte{"trace.json": content, "extra.json": content},
+			code:     structure.ErrorCodeUnlistedFile,
+		},
+		{
+			name: "ambiguous path",
+			manifest: PackManifest{
+				PackID:   "pack-strict",
+				PackType: "run",
+				Contents: []PackEntry{{Path: "./trace.json", SHA256: sha256Hex(content), Type: "gait.gate.trace"}},
+			},
+			files: map[string][]byte{"trace.json": content},
+			code:  structure.ErrorCodePathAmbiguous,
+		},
+		{
+			name: "duplicate normalized path",
+			manifest: PackManifest{
+				PackID:   "pack-strict",
+				PackType: "run",
+				Contents: []PackEntry{
+					{Path: "trace.json", SHA256: sha256Hex(content), Type: "gait.gate.trace"},
+					{Path: "./trace.json", SHA256: sha256Hex(content), Type: "gait.gate.trace"},
+				},
+			},
+			files: map[string][]byte{"trace.json": content},
+			code:  structure.ErrorCodePathDuplicate,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			manifestRaw, err := json.Marshal(tt.manifest)
+			require.NoError(t, err)
+			files := cloneFileMap(tt.files)
+			files["pack_manifest.json"] = manifestRaw
+			zipPath := filepath.Join(t.TempDir(), "pack.zip")
+			writeZip(t, zipPath, files)
+
+			_, err = VerifyPackWithOptions(zipPath, VerifyOpts{})
+			require.NoError(t, err)
+			_, err = VerifyPackWithOptions(zipPath, VerifyOpts{Strict: true})
+			require.Error(t, err)
+			typed, ok := coreerr.As(err)
+			require.True(t, ok)
+			require.Equal(t, tt.code, typed.Code)
+		})
+	}
+}
+
+func TestVerifyPackStrictRejectsZipSymlink(t *testing.T) {
+	manifest := PackManifest{
+		PackID:   "pack-symlink",
+		PackType: "run",
+		Contents: []PackEntry{{Path: "trace-link.json", SHA256: sha256Hex([]byte("trace.json")), Type: "gait.gate.trace"}},
+	}
+	manifestRaw, err := json.Marshal(manifest)
+	require.NoError(t, err)
+	zipPath := filepath.Join(t.TempDir(), "symlink-pack.zip")
+	writeZipWithSymlink(t, zipPath, manifestRaw)
+
+	_, err = VerifyPackWithOptions(zipPath, VerifyOpts{})
+	require.NoError(t, err)
+	_, err = VerifyPackWithOptions(zipPath, VerifyOpts{Strict: true})
+	require.Error(t, err)
+	typed, ok := coreerr.As(err)
+	require.True(t, ok)
+	require.Equal(t, structure.ErrorCodeSymlinkAmbiguous, typed.Code)
+}
+
+func TestVerifyRunpackStrictRejectsUnlistedFile(t *testing.T) {
+	_, manifest, files := newSignedRunpackFixture(t)
+	files["extra.json"] = []byte(`{}`)
+	zipPath := writeRunpackZip(t, manifest, files)
+
+	_, err := VerifyRunpackWithOptions(zipPath, VerifyOpts{})
+	require.NoError(t, err)
+	_, err = VerifyRunpackWithOptions(zipPath, VerifyOpts{Strict: true})
+	require.Error(t, err)
+	typed, ok := coreerr.As(err)
+	require.True(t, ok)
+	require.Equal(t, structure.ErrorCodeUnlistedFile, typed.Code)
+}
+
 func TestVerifyPackWithProofRecordsJSONL(t *testing.T) {
 	pub, priv, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
@@ -581,6 +682,25 @@ func writeZip(t *testing.T, path string, files map[string][]byte) {
 		require.NoError(t, err)
 	}
 	require.NoError(t, w.Close())
+}
+
+func writeZipWithSymlink(t *testing.T, zipPath string, manifest []byte) {
+	t.Helper()
+	file, err := os.Create(zipPath)
+	require.NoError(t, err)
+	defer func() { _ = file.Close() }()
+	writer := zip.NewWriter(file)
+	manifestWriter, err := writer.Create("pack_manifest.json")
+	require.NoError(t, err)
+	_, err = manifestWriter.Write(manifest)
+	require.NoError(t, err)
+	header := &zip.FileHeader{Name: "trace-link.json", Method: zip.Store}
+	header.SetMode(os.ModeSymlink | 0o777)
+	symlinkWriter, err := writer.CreateHeader(header)
+	require.NoError(t, err)
+	_, err = symlinkWriter.Write([]byte("trace.json"))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
 }
 
 func sha256Hex(in []byte) string {

@@ -7,7 +7,9 @@ import (
 	"runtime"
 	"testing"
 
+	coreerr "github.com/Clyra-AI/proof/core/errors"
 	"github.com/Clyra-AI/proof/core/signing"
+	"github.com/Clyra-AI/proof/core/structure"
 	"github.com/stretchr/testify/require"
 )
 
@@ -244,6 +246,95 @@ func TestVerifyCosignSignaturePath(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+}
+
+func TestVerifyStrictStructure(t *testing.T) {
+	tests := []struct {
+		name       string
+		manifest   Manifest
+		setup      func(t *testing.T, dir string)
+		code       string
+		legacyPass bool
+	}{
+		{
+			name: "unlisted file",
+			manifest: Manifest{Files: []ManifestEntry{{
+				Path: "records.jsonl", SHA256: "sha256:ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+			}}},
+			setup: func(t *testing.T, dir string) {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "records.jsonl"), []byte("{}\n"), 0o644))
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "extra.json"), []byte("{}"), 0o644))
+			},
+			code:       structure.ErrorCodeUnlistedFile,
+			legacyPass: true,
+		},
+		{
+			name: "ambiguous path",
+			manifest: Manifest{Files: []ManifestEntry{{
+				Path: "./records.jsonl", SHA256: "sha256:ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+			}}},
+			setup: func(t *testing.T, dir string) {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "records.jsonl"), []byte("{}\n"), 0o644))
+			},
+			code:       structure.ErrorCodePathAmbiguous,
+			legacyPass: true,
+		},
+		{
+			name: "duplicate normalized path",
+			manifest: Manifest{Files: []ManifestEntry{
+				{Path: "records.jsonl", SHA256: "sha256:ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"},
+				{Path: "./records.jsonl", SHA256: "sha256:ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"},
+			}},
+			setup: func(t *testing.T, dir string) {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "records.jsonl"), []byte("{}\n"), 0o644))
+			},
+			code:       structure.ErrorCodePathDuplicate,
+			legacyPass: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			tt.setup(t, dir)
+			raw, err := json.Marshal(tt.manifest)
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filepath.Join(dir, manifestFilename), raw, 0o644))
+			if tt.legacyPass {
+				_, err = Verify(dir, VerifyOpts{})
+				require.NoError(t, err)
+			}
+			_, err = Verify(dir, VerifyOpts{Strict: true})
+			require.Error(t, err)
+			typed, ok := coreerr.As(err)
+			require.True(t, ok)
+			require.Equal(t, tt.code, typed.Code)
+		})
+	}
+}
+
+func TestVerifyStrictRejectsSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires platform-specific privileges")
+	}
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "target.jsonl"), []byte("{}\n"), 0o644))
+	require.NoError(t, os.Symlink("target.jsonl", filepath.Join(dir, "records.jsonl")))
+	manifest := Manifest{Files: []ManifestEntry{
+		{Path: "records.jsonl", SHA256: "sha256:ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"},
+		{Path: "target.jsonl", SHA256: "sha256:ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"},
+	}}
+	raw, err := json.Marshal(manifest)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, manifestFilename), raw, 0o644))
+
+	_, err = Verify(dir, VerifyOpts{})
+	require.NoError(t, err)
+	_, err = Verify(dir, VerifyOpts{Strict: true})
+	require.Error(t, err)
+	typed, ok := coreerr.As(err)
+	require.True(t, ok)
+	require.Equal(t, structure.ErrorCodeSymlinkAmbiguous, typed.Code)
 }
 
 func writeFakeCosign(t *testing.T) string {

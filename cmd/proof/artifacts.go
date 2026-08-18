@@ -140,6 +140,10 @@ func loadChain(path string) (*proof.Chain, error) {
 }
 
 func verifyBundle(path string, verifySignatures bool, publicKey string, cosignOpts proof.CosignVerifyOpts) error {
+	return verifyBundleWithStrict(path, verifySignatures, publicKey, cosignOpts, false)
+}
+
+func verifyBundleWithStrict(path string, verifySignatures bool, publicKey string, cosignOpts proof.CosignVerifyOpts, strict bool) error {
 	var pub proof.PublicKey
 	if strings.TrimSpace(publicKey) != "" {
 		decoded, err := decodePublicKey(publicKey)
@@ -152,6 +156,7 @@ func verifyBundle(path string, verifySignatures bool, publicKey string, cosignOp
 		VerifySignatures: verifySignatures,
 		PublicKey:        pub,
 		Cosign:           cosignOpts,
+		Strict:           strict,
 	})
 	return err
 }
@@ -182,6 +187,10 @@ func appendJSONLRecords(c *proof.Chain, path string) error {
 }
 
 func verifyGaitPack(path string, verifySignatures bool, publicKey string, cosignOpts proof.CosignVerifyOpts) (*gait.Result, error) {
+	return verifyGaitPackWithStrict(path, verifySignatures, publicKey, cosignOpts, false)
+}
+
+func verifyGaitPackWithStrict(path string, verifySignatures bool, publicKey string, cosignOpts proof.CosignVerifyOpts, strict bool) (*gait.Result, error) {
 	var pubKey []byte
 	if verifySignatures {
 		if strings.TrimSpace(publicKey) != "" {
@@ -199,10 +208,15 @@ func verifyGaitPack(path string, verifySignatures bool, publicKey string, cosign
 		VerifySignatures: verifySignatures,
 		PublicKey:        pubKey,
 		Cosign:           cosignOpts,
+		Strict:           strict,
 	})
 }
 
 func verifyGaitRunpack(path string, verifySignatures bool, publicKey string, _ proof.CosignVerifyOpts) (*gait.RunpackResult, error) {
+	return verifyGaitRunpackWithStrict(path, verifySignatures, publicKey, false)
+}
+
+func verifyGaitRunpackWithStrict(path string, verifySignatures bool, publicKey string, strict bool) (*gait.RunpackResult, error) {
 	var pubKey []byte
 	if verifySignatures {
 		if strings.TrimSpace(publicKey) == "" {
@@ -217,6 +231,7 @@ func verifyGaitRunpack(path string, verifySignatures bool, publicKey string, _ p
 	return gait.VerifyRunpackWithOptions(path, gait.VerifyOpts{
 		VerifySignatures: verifySignatures,
 		PublicKey:        pubKey,
+		Strict:           strict,
 	})
 }
 

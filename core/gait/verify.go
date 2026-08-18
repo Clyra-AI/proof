@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -19,6 +20,7 @@ import (
 	"github.com/Clyra-AI/proof/core/record"
 	"github.com/Clyra-AI/proof/core/schema"
 	"github.com/Clyra-AI/proof/core/signing"
+	"github.com/Clyra-AI/proof/core/structure"
 )
 
 type Signature struct {
@@ -77,6 +79,7 @@ type VerifyOpts struct {
 	VerifySignatures bool
 	PublicKey        ed25519.PublicKey
 	Cosign           signing.CosignVerifyOpts
+	Strict           bool
 }
 
 func VerifyPack(path string, verifySignatures bool, pub ed25519.PublicKey) (*Result, error) {
@@ -100,6 +103,15 @@ func VerifyPackWithOptions(path string, opts VerifyOpts) (*Result, error) {
 	var manifest PackManifest
 	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
 		return nil, fmt.Errorf("unmarshal pack_manifest.json: %w", err)
+	}
+	if opts.Strict {
+		paths := make([]string, 0, len(manifest.Contents))
+		for i := range manifest.Contents {
+			paths = append(paths, manifest.Contents[i].Path)
+		}
+		if err := validateStrictZipStructure(zr.File, "pack_manifest.json", paths); err != nil {
+			return nil, err
+		}
 	}
 
 	var proofRecordsVerified int
@@ -221,6 +233,15 @@ func VerifyRunpackWithOptions(path string, opts VerifyOpts) (*RunpackResult, err
 	}
 	if manifest.SchemaVersion != "1.0.0" {
 		return nil, fmt.Errorf("manifest schema_version must be 1.0.0")
+	}
+	if opts.Strict {
+		paths := make([]string, 0, len(manifest.Files))
+		for i := range manifest.Files {
+			paths = append(paths, manifest.Files[i].Path)
+		}
+		if err := validateStrictZipStructure(zr.File, "manifest.json", paths); err != nil {
+			return nil, err
+		}
 	}
 
 	for _, entry := range manifest.Files {
@@ -359,6 +380,36 @@ func readZipFile(files []*zip.File, path string) ([]byte, error) {
 		return io.ReadAll(rc)
 	}
 	return nil, fmt.Errorf("%s not found", path)
+}
+
+func validateStrictZipStructure(files []*zip.File, manifestPath string, listedPaths []string) error {
+	listed, err := structure.ValidateListedPaths(listedPaths)
+	if err != nil {
+		return err
+	}
+	archivePaths := make([]string, 0, len(files))
+	for _, file := range files {
+		if file.Mode()&os.ModeSymlink != 0 {
+			return structure.SymlinkAmbiguityError(file.Name)
+		}
+		if file.FileInfo().IsDir() {
+			continue
+		}
+		archivePaths = append(archivePaths, file.Name)
+	}
+	if _, err := structure.ValidateArchivePaths(archivePaths); err != nil {
+		return err
+	}
+	sort.Strings(archivePaths)
+	for _, filePath := range archivePaths {
+		if filePath == manifestPath {
+			continue
+		}
+		if _, ok := listed[filePath]; !ok {
+			return structure.UnlistedFileError(filePath)
+		}
+	}
+	return nil
 }
 
 func isLikelySignedJSON(t, p string) bool {
