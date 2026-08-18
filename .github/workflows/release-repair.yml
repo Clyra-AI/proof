@@ -1,9 +1,12 @@
-name: release
+name: release-repair
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to repair
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -11,8 +14,12 @@ permissions:
   attestations: write
 
 jobs:
-  release:
+  repair:
+    if: startsWith(inputs.tag, 'v')
     runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      REPOSITORY_FULL_NAME: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,19 +27,23 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - uses: goreleaser/goreleaser-action@v6
-        with:
-          version: v2.13.3
-          args: release --clean
+      - name: Download published release assets
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
-      - name: Verify release checksums
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          rm -rf dist
+          mkdir -p dist
+          gh release download "${RELEASE_TAG}" \
+            --repo "${REPOSITORY_FULL_NAME}" \
+            -D dist \
+            --clobber
+      - name: Verify downloaded release checksums
         run: ./scripts/verify_release_artifacts.sh dist
       - uses: anchore/sbom-action@v0
         with:
-          artifact-name: sbom.spdx.json
-          output-file: sbom.spdx.json
+          artifact-name: release-repair-sbom
+          output-file: dist/sbom.spdx.json
+          upload-release-assets: false
       - name: Install grype
         uses: anchore/scan-action/download-grype@v4
       - name: Refresh grype database
@@ -42,18 +53,22 @@ jobs:
       - uses: sigstore/cosign-installer@v3
       - name: Sign checksums
         run: |
-          cosign sign-blob --yes --output-signature dist/checksums.txt.sig --output-certificate dist/checksums.txt.pem dist/checksums.txt
+          cosign sign-blob --yes \
+            --output-signature dist/checksums.txt.sig \
+            --output-certificate dist/checksums.txt.pem \
+            dist/checksums.txt
       - name: Verify signed checksums
         run: ./scripts/verify_release_artifacts.sh dist
-      - name: Upload checksum signature assets to release
+      - name: Upload missing release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ github.ref_name }}" \
+          ./scripts/upload_missing_release_assets.sh \
+            "${RELEASE_TAG}" \
+            "${REPOSITORY_FULL_NAME}" \
+            dist/sbom.spdx.json \
             dist/checksums.txt.sig \
-            dist/checksums.txt.pem \
-            --repo "${{ github.repository }}" \
-            --clobber
+            dist/checksums.txt.pem
       - name: Generate build provenance
         uses: actions/attest-build-provenance@v2
         with:
@@ -61,9 +76,9 @@ jobs:
             dist/*
       - uses: actions/upload-artifact@v4
         with:
-          name: release-security-artifacts
+          name: release-repair-artifacts
           path: |
             dist/checksums.txt
             dist/checksums.txt.sig
             dist/checksums.txt.pem
-            sbom.spdx.json
+            dist/sbom.spdx.json
