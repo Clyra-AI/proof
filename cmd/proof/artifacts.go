@@ -83,18 +83,26 @@ func loadChain(path string) (*proof.Chain, error) {
 		return nil, err
 	}
 	if !info.IsDir() {
-		// #nosec G304 -- CLI accepts explicit local artifact paths.
-		raw, err := os.ReadFile(path)
-		if err != nil {
-			return nil, err
-		}
-		var c proof.Chain
-		if err := json.Unmarshal(raw, &c); err != nil {
-			return nil, err
-		}
-		return &c, nil
+		return loadChainFile(path)
 	}
 
+	return loadChainDir(path)
+}
+
+func loadChainFile(path string) (*proof.Chain, error) {
+	// #nosec G304 -- CLI accepts explicit local artifact paths.
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var c proof.Chain
+	if err := json.Unmarshal(raw, &c); err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+func loadChainDir(path string) (*proof.Chain, error) {
 	files, err := filepath.Glob(filepath.Join(path, "*.json"))
 	if err != nil {
 		return nil, err
@@ -127,16 +135,35 @@ func loadChain(path string) (*proof.Chain, error) {
 	}
 	if len(c.Records) == 0 {
 		chainPath := filepath.Join(path, "chain.json")
-		// #nosec G304 -- CLI accepts explicit local artifact paths.
-		raw, err := os.ReadFile(chainPath)
+		declared, err := loadChainFile(chainPath)
 		if err != nil {
 			return c, nil
 		}
-		if err := json.Unmarshal(raw, c); err != nil {
-			return nil, err
-		}
+		*c = *declared
 	}
 	return c, nil
+}
+
+func verifyDeclaredChainMetadata(path string, reconstructed *proof.Chain) error {
+	info, err := os.Stat(path)
+	if err != nil || !info.IsDir() || len(reconstructed.Records) == 0 {
+		return err
+	}
+	chainPath := filepath.Join(path, "chain.json")
+	declared, err := loadChainFile(chainPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if declared.RecordCount == 0 && strings.TrimSpace(declared.HeadHash) == "" {
+		return nil
+	}
+	comparison := *declared
+	comparison.Records = append([]proof.Record(nil), reconstructed.Records...)
+	_, err = proof.VerifyChainWithOptions(&comparison, proof.ChainVerifyOpts{Strict: true})
+	return err
 }
 
 func verifyBundle(path string, verifySignatures bool, publicKey string, cosignOpts proof.CosignVerifyOpts) error {

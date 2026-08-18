@@ -117,6 +117,11 @@ func newVerifyCmd(opts *globalOpts) *cobra.Command {
 				if err != nil {
 					return newCLIError(exitcode.InvalidInput, err.Error())
 				}
+				if strict {
+					if err := verifyDeclaredChainMetadata(path, c); err != nil {
+						return newCLIError(verificationErrorCode(err), err.Error())
+					}
+				}
 				v, err := proof.VerifyChainWithOptions(c, proof.ChainVerifyOpts{Strict: strict})
 				if err != nil {
 					return newCLIError(verificationErrorCode(err), err.Error())

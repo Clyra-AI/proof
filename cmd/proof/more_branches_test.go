@@ -115,6 +115,27 @@ func TestVerifyCommandBundleChainAndTypeFrameworkErrors(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestVerifyStrictRejectsTamperedChainMetadataInDirectory(t *testing.T) {
+	dir := t.TempDir()
+	r, err := proof.NewRecord(proof.RecordOpts{
+		Timestamp:     time.Date(2026, 2, 17, 18, 2, 0, 0, time.UTC),
+		Source:        "axym",
+		SourceProduct: "axym",
+		Type:          "decision",
+		Event:         map[string]any{"action": "allow"},
+	})
+	require.NoError(t, err)
+	require.NoError(t, proof.WriteRecord(filepath.Join(dir, "record.json"), r))
+	testutil.WriteFile(t, filepath.Join(dir, "chain.json"), []byte(`{"record_count":2}`))
+
+	_, err = runCLIForTest(t, []string{"verify", dir})
+	require.NoError(t, err)
+
+	_, err = runCLIForTest(t, []string{"verify", "--strict", dir})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "record_count mismatch")
+}
+
 func TestInspectCommandBranchErrors(t *testing.T) {
 	c := proof.NewChain("inspect-branches")
 	r, err := proof.NewRecord(proof.RecordOpts{

@@ -400,6 +400,28 @@ func TestVerifyRunpackStrictRejectsUnlistedFile(t *testing.T) {
 	require.Equal(t, structure.ErrorCodeUnlistedFile, typed.Code)
 }
 
+func TestVerifyPackStrictRejectsDirectoryAliasCollision(t *testing.T) {
+	content := []byte(`{}`)
+	manifest := PackManifest{
+		PackID:   "pack-dir-collision",
+		PackType: "run",
+		Contents: []PackEntry{{Path: "payload", SHA256: sha256Hex(content), Type: "gait.gate.trace"}},
+	}
+	manifestRaw, err := json.Marshal(manifest)
+	require.NoError(t, err)
+
+	zipPath := filepath.Join(t.TempDir(), "pack-dir-collision.zip")
+	writeZipWithDirectoryEntry(t, zipPath, manifestRaw, "payload", content, "payload/")
+
+	_, err = VerifyPackWithOptions(zipPath, VerifyOpts{})
+	require.NoError(t, err)
+	_, err = VerifyPackWithOptions(zipPath, VerifyOpts{Strict: true})
+	require.Error(t, err)
+	typed, ok := coreerr.As(err)
+	require.True(t, ok)
+	require.Equal(t, structure.ErrorCodePathDuplicate, typed.Code)
+}
+
 func TestVerifyPackWithProofRecordsJSONL(t *testing.T) {
 	pub, priv, err := ed25519.GenerateKey(nil)
 	require.NoError(t, err)
@@ -699,6 +721,27 @@ func writeZipWithSymlink(t *testing.T, zipPath string, manifest []byte) {
 	symlinkWriter, err := writer.CreateHeader(header)
 	require.NoError(t, err)
 	_, err = symlinkWriter.Write([]byte("trace.json"))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+}
+
+func writeZipWithDirectoryEntry(t *testing.T, zipPath string, manifest []byte, fileName string, fileContent []byte, dirName string) {
+	t.Helper()
+	file, err := os.Create(zipPath)
+	require.NoError(t, err)
+	defer func() { _ = file.Close() }()
+	writer := zip.NewWriter(file)
+	manifestWriter, err := writer.Create("pack_manifest.json")
+	require.NoError(t, err)
+	_, err = manifestWriter.Write(manifest)
+	require.NoError(t, err)
+	fileWriter, err := writer.Create(fileName)
+	require.NoError(t, err)
+	_, err = fileWriter.Write(fileContent)
+	require.NoError(t, err)
+	dirWriter, err := writer.Create(dirName)
+	require.NoError(t, err)
+	_, err = dirWriter.Write(nil)
 	require.NoError(t, err)
 	require.NoError(t, writer.Close())
 }

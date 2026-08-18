@@ -138,7 +138,11 @@ func validateStrictStructure(root string, manifest Manifest) error {
 		if rel == manifestFilename {
 			return nil
 		}
-		if _, ok := listed[rel]; !ok {
+		key, err := structure.ValidatePath(rel)
+		if err != nil {
+			return err
+		}
+		if _, ok := listed[key]; !ok {
 			return structure.UnlistedFileError(rel)
 		}
 		return nil

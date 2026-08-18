@@ -388,25 +388,39 @@ func validateStrictZipStructure(files []*zip.File, manifestPath string, listedPa
 		return err
 	}
 	archivePaths := make([]string, 0, len(files))
+	fileKeys := make([]struct {
+		path string
+		key  string
+	}, 0, len(files))
 	for _, file := range files {
 		if file.Mode()&os.ModeSymlink != 0 {
 			return structure.SymlinkAmbiguityError(file.Name)
 		}
+		archivePaths = append(archivePaths, file.Name)
+		key, err := structure.ValidateArchivePath(file.Name, file.FileInfo().IsDir())
+		if err != nil {
+			return err
+		}
 		if file.FileInfo().IsDir() {
 			continue
 		}
-		archivePaths = append(archivePaths, file.Name)
+		fileKeys = append(fileKeys, struct {
+			path string
+			key  string
+		}{path: file.Name, key: key})
 	}
 	if _, err := structure.ValidateArchivePaths(archivePaths); err != nil {
 		return err
 	}
-	sort.Strings(archivePaths)
-	for _, filePath := range archivePaths {
-		if filePath == manifestPath {
+	sort.Slice(fileKeys, func(i, j int) bool {
+		return fileKeys[i].path < fileKeys[j].path
+	})
+	for _, file := range fileKeys {
+		if file.path == manifestPath {
 			continue
 		}
-		if _, ok := listed[filePath]; !ok {
-			return structure.UnlistedFileError(filePath)
+		if _, ok := listed[file.key]; !ok {
+			return structure.UnlistedFileError(file.path)
 		}
 	}
 	return nil

@@ -26,8 +26,12 @@ func TestValidateListedPathsRejectsAmbiguityAndDuplicates(t *testing.T) {
 		{name: "escape", paths: []string{"../file"}, code: ErrorCodePathInvalid},
 		{name: "dot segment", paths: []string{"./file"}, code: ErrorCodePathAmbiguous},
 		{name: "backslash", paths: []string{`dir\file`}, code: ErrorCodePathAmbiguous},
+		{name: "uppercase alias", paths: []string{"File.json"}, code: ErrorCodePathAmbiguous},
+		{name: "trailing dot alias", paths: []string{"file."}, code: ErrorCodePathAmbiguous},
+		{name: "trailing space alias", paths: []string{"file "}, code: ErrorCodePathAmbiguous},
 		{name: "duplicate", paths: []string{"file", "file"}, code: ErrorCodePathDuplicate},
 		{name: "duplicate normalized", paths: []string{"file", "./file"}, code: ErrorCodePathDuplicate},
+		{name: "duplicate portable alias", paths: []string{"file", "FILE"}, code: ErrorCodePathDuplicate},
 	}
 
 	for _, tt := range tests {
@@ -39,6 +43,19 @@ func TestValidateListedPathsRejectsAmbiguityAndDuplicates(t *testing.T) {
 			require.Equal(t, tt.code, typed.Code)
 		})
 	}
+}
+
+func TestValidateArchivePathsAcceptsCanonicalDirectoriesAndRejectsCollisions(t *testing.T) {
+	paths, err := ValidateArchivePaths([]string{"payload/", "payload/file.json"})
+	require.NoError(t, err)
+	require.Contains(t, paths, "payload")
+	require.Contains(t, paths, "payload/file.json")
+
+	_, err = ValidateArchivePaths([]string{"payload/", "payload"})
+	require.Error(t, err)
+	typed, ok := coreerr.As(err)
+	require.True(t, ok)
+	require.Equal(t, ErrorCodePathDuplicate, typed.Code)
 }
 
 func TestStructuralErrorsAreTyped(t *testing.T) {
