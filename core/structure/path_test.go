@@ -72,3 +72,16 @@ func TestStructuralErrorsAreTyped(t *testing.T) {
 		require.Equal(t, test.code, typed.Code)
 	}
 }
+
+func TestValidateObservedPaths(t *testing.T) {
+	key, err := ValidatePath("records/one.json")
+	require.NoError(t, err)
+	require.Equal(t, "records/one.json", key)
+	key, err = ValidateArchivePath("payload/", true)
+	require.NoError(t, err)
+	require.Equal(t, "payload", key)
+	_, err = ValidatePath("./records/one.json")
+	require.Error(t, err)
+	_, err = ValidateArchivePath("payload", false)
+	require.NoError(t, err)
+}

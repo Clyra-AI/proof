@@ -1,6 +1,8 @@
 package proof
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -400,6 +402,45 @@ func TestRegisterCustomTypeInline(t *testing.T) {
 	  "properties":{"record_type":{"const":"vendor.inline_event"}}
 	}`)))
 	require.Error(t, RegisterCustomType("", []byte(`{}`)))
+}
+
+func TestScopedRegistryAndCorrelationProfileAPIs(t *testing.T) {
+	customSchema := []byte(`{"type":"object","required":["record_type"],"properties":{"record_type":{"const":"vendor.root"}}}`)
+	sum := sha256.Sum256(customSchema)
+	def := RecordTypeDefinition{RecordType: "vendor.root", SchemaID: "urn:test:root", SchemaVersion: "1", SchemaPath: "schemas/vendor-root.json", SHA256: hex.EncodeToString(sum[:])}
+	registry := NewSchemaRegistry()
+	require.NotNil(t, NewRegistry())
+	require.NoError(t, registry.Register(def, customSchema))
+	record := &Record{RecordID: "prf-root", RecordVersion: "1.0", Timestamp: time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC), Source: "test", SourceProduct: "test", RecordType: "vendor.root", Event: map[string]any{}, Controls: Controls{}, Integrity: Integrity{RecordHash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}
+	require.NoError(t, ValidateRecordWithRegistry(registry, record))
+	manifest, err := json.Marshal(RecordTypeManifest{Version: RecordTypeManifestVersion, RecordTypes: []RecordTypeDefinition{def}})
+	require.NoError(t, err)
+	parsed, err := ParseRecordTypeManifest(manifest)
+	require.NoError(t, err)
+	require.Len(t, parsed.RecordTypes, 1)
+	loaded, err := LoadRecordTypeManifest(manifest, map[string][]byte{def.SchemaPath: customSchema})
+	require.NoError(t, err)
+	require.Len(t, loaded.Definitions(), 1)
+
+	profile := &ControlContainmentTelemetryProfile{
+		ProfileVersion: ControlContainmentTelemetryProfileVersion,
+		EventRef:       &RelationshipRef{Kind: "event", ID: "event:1"},
+		BindingMode:    BindingModeIdentifierOnly,
+	}
+	require.NoError(t, ValidateControlContainmentTelemetryProfile(profile))
+	require.NoError(t, ValidateControlContainmentTelemetry(profile))
+	canonical, err := CanonicalizeControlContainmentTelemetry(profile)
+	require.NoError(t, err)
+	require.Contains(t, string(canonical), "identifier_only")
+	chain := NewChain("coverage")
+	builtin, err := NewRecord(RecordOpts{Timestamp: time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC), Source: "test", SourceProduct: "test", Type: "decision", Event: map[string]any{"action": "allow"}})
+	require.NoError(t, err)
+	require.NoError(t, AppendToChain(chain, builtin))
+	_, err = VerifyChainWithOptions(chain, ChainVerifyOpts{Strict: true})
+	require.NoError(t, err)
+	_, err = VerifyChainRangeWithOptions(chain, time.Time{}, time.Time{}, ChainVerifyOpts{Strict: true})
+	require.NoError(t, err)
+	require.False(t, IsDependencyMissing(nil))
 }
 
 func TestVerifyBundleErrorBranches(t *testing.T) {

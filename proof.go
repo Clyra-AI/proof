@@ -19,10 +19,16 @@ import (
 type Record = record.Record
 type RecordOpts = record.RecordOpts
 type Controls = record.Controls
+type Integrity = record.Integrity
 type Relationship = record.Relationship
 type Relations = record.Relations
 type RelationshipRef = record.RelationshipRef
 type RelationshipEdge = record.RelationshipEdge
+type ControlContainmentTelemetryProfile = record.ControlContainmentTelemetryProfile
+type ControlContainmentTelemetry = record.ControlContainmentTelemetry
+type ControlContainmentTelemetryRef = record.ControlContainmentTelemetryRef
+type CorrelationRef = record.CorrelationRef
+type RedactionMetadata = record.RedactionMetadata
 type AgentChainHop = record.AgentChainHop
 type PolicyRef = record.PolicyRef
 type AgentLineageHop = record.AgentLineageHop
@@ -40,6 +46,10 @@ type FrameworkCoverage = framework.Coverage
 type FrameworkControlCoverage = framework.ControlCoverage
 type FrameworkEvidenceSetCoverage = framework.EvidenceSetCoverage
 type RecordType = schema.RecordType
+type RecordTypeDefinition = schema.RecordTypeDefinition
+type RecordTypeManifest = schema.RecordTypeManifest
+type SchemaRegistry = schema.Registry
+type Registry = schema.Registry
 type CanonDomain = canon.Domain
 type Digest = canon.Digest
 type BundleManifestEntry = bundle.ManifestEntry
@@ -47,11 +57,20 @@ type BundleManifest = bundle.Manifest
 type BundleVerifyOpts = bundle.VerifyOpts
 
 const (
+	RecordTypeManifestVersion = schema.RecordTypeManifestVersion
+	RecordTypeManifestPath    = schema.RecordTypeManifestPath
+
 	DomainJSON   = canon.DomainJSON
 	DomainSQL    = canon.DomainSQL
 	DomainURL    = canon.DomainURL
 	DomainText   = canon.DomainText
 	DomainPrompt = canon.DomainPrompt
+)
+
+const (
+	ControlContainmentTelemetryProfileVersion = record.ControlContainmentTelemetryProfileVersion
+	BindingModeIdentifierOnly                 = record.BindingModeIdentifierOnly
+	BindingModeDigestBound                    = record.BindingModeDigestBound
 )
 
 const (
@@ -115,6 +134,10 @@ func LoadFramework(pathOrID string) (*Framework, error) {
 	return framework.Load(pathOrID)
 }
 
+// EvaluateFrameworkCoverage reports deterministic evidence-path coverage only.
+// Deprecated: callers must not treat this helper as a compliance decision or
+// regulatory applicability engine; use product-owned compliance evaluation for
+// those semantics while this compatibility API remains available.
 func EvaluateFrameworkCoverage(f *Framework, records []Record) (*FrameworkCoverage, error) {
 	return framework.EvaluateCoverage(f, records)
 }
@@ -124,6 +147,12 @@ func ListRecordTypes() []RecordType {
 }
 
 func ValidateRecord(r *Record) error {
+	return ValidateRecordWithRegistry(nil, r)
+}
+
+// ValidateRecordWithRegistry validates using a caller-owned scoped registry.
+// A nil registry preserves the legacy process-global custom type behavior.
+func ValidateRecordWithRegistry(registry *SchemaRegistry, r *Record) error {
 	if err := record.Validate(r); err != nil {
 		return err
 	}
@@ -131,7 +160,31 @@ func ValidateRecord(r *Record) error {
 	if err != nil {
 		return err
 	}
-	return schema.ValidateRecord(raw, r.RecordType)
+	return schema.ValidateRecordWithRegistry(registry, raw, r.RecordType)
+}
+
+func NewSchemaRegistry() *SchemaRegistry { return schema.NewRegistry() }
+
+func NewRegistry() *Registry { return schema.NewRegistry() }
+
+func ParseRecordTypeManifest(raw []byte) (RecordTypeManifest, error) {
+	return schema.ParseRecordTypeManifest(raw)
+}
+
+func LoadRecordTypeManifest(raw []byte, schemaFiles map[string][]byte) (*SchemaRegistry, error) {
+	return schema.LoadRecordTypeManifest(raw, schemaFiles)
+}
+
+func ValidateControlContainmentTelemetryProfile(p *ControlContainmentTelemetryProfile) error {
+	return record.ValidateControlContainmentTelemetryProfile(p)
+}
+
+func ValidateControlContainmentTelemetry(p *ControlContainmentTelemetryProfile) error {
+	return record.ValidateControlContainmentTelemetry(p)
+}
+
+func CanonicalizeControlContainmentTelemetry(p *ControlContainmentTelemetryProfile) ([]byte, error) {
+	return record.CanonicalizeControlContainmentTelemetry(p)
 }
 
 func ComputeRecordHash(r *Record) (string, error) {

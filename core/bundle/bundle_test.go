@@ -1,6 +1,8 @@
 package bundle
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -8,6 +10,7 @@ import (
 	"testing"
 
 	coreerr "github.com/Clyra-AI/proof/core/errors"
+	"github.com/Clyra-AI/proof/core/schema"
 	"github.com/Clyra-AI/proof/core/signing"
 	"github.com/Clyra-AI/proof/core/structure"
 	"github.com/stretchr/testify/require"
@@ -335,6 +338,64 @@ func TestVerifyStrictRejectsSymlink(t *testing.T) {
 	typed, ok := coreerr.As(err)
 	require.True(t, ok)
 	require.Equal(t, structure.ErrorCodeSymlinkAmbiguous, typed.Code)
+}
+
+func TestVerifyStrictLoadsPortableRecordTypesWithoutGlobalLeak(t *testing.T) {
+	schema.ResetCustomTypes()
+	t.Cleanup(schema.ResetCustomTypes)
+	dir := t.TempDir()
+	customSchema := []byte(`{"type":"object","required":["record_type"],"properties":{"record_type":{"const":"vendor.bundle"}}}`)
+	schemaSum := sha256.Sum256(customSchema)
+	typesManifest := schema.RecordTypeManifest{
+		Version: schema.RecordTypeManifestVersion,
+		RecordTypes: []schema.RecordTypeDefinition{{
+			RecordType: "vendor.bundle", SchemaID: "urn:test:bundle", SchemaVersion: "1.0",
+			SchemaPath: "schemas/vendor-bundle.json", SHA256: hex.EncodeToString(schemaSum[:]),
+		}},
+	}
+	typesRaw, err := json.Marshal(typesManifest)
+	require.NoError(t, err)
+	recordsRaw := []byte(`{"record_id":"prf-bundle","record_version":"1.0","timestamp":"2026-02-17T12:00:00Z","source":"test","source_product":"test","record_type":"vendor.bundle","event":{},"controls":{},"integrity":{"record_hash":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}` + "\n")
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "schemas"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "record-types.json"), typesRaw, 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "schemas", "vendor-bundle.json"), customSchema, 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "records.jsonl"), recordsRaw, 0o644))
+	hash := func(raw []byte) string {
+		sum := sha256.Sum256(raw)
+		return hex.EncodeToString(sum[:])
+	}
+	manifest := Manifest{Files: []ManifestEntry{
+		{Path: "record-types.json", SHA256: hash(typesRaw)},
+		{Path: "schemas/vendor-bundle.json", SHA256: hash(customSchema)},
+		{Path: "records.jsonl", SHA256: hash(recordsRaw)},
+	}}
+	manifestRaw, err := json.Marshal(manifest)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, manifestFilename), manifestRaw, 0o644))
+	_, err = Verify(dir, VerifyOpts{Strict: true})
+	require.NoError(t, err)
+	for _, rt := range schema.ListRecordTypes() {
+		require.NotEqual(t, "vendor.bundle", rt.Name)
+	}
+}
+
+func TestVerifyStrictRejectsPortableSchemaNotCoveredByManifest(t *testing.T) {
+	dir := t.TempDir()
+	customSchema := []byte(`{"type":"object"}`)
+	sum := sha256.Sum256(customSchema)
+	typesRaw, err := json.Marshal(schema.RecordTypeManifest{Version: schema.RecordTypeManifestVersion, RecordTypes: []schema.RecordTypeDefinition{{
+		RecordType: "vendor.unlisted", SchemaID: "urn:test:unlisted", SchemaVersion: "1", SchemaPath: "schemas/unlisted.json", SHA256: hex.EncodeToString(sum[:]),
+	}}})
+	require.NoError(t, err)
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "schemas"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "record-types.json"), typesRaw, 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "schemas", "unlisted.json"), customSchema, 0o644))
+	hash := func(raw []byte) string { sum := sha256.Sum256(raw); return hex.EncodeToString(sum[:]) }
+	manifestRaw, err := json.Marshal(Manifest{Files: []ManifestEntry{{Path: "record-types.json", SHA256: hash(typesRaw)}}})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, manifestFilename), manifestRaw, 0o644))
+	_, err = Verify(dir, VerifyOpts{Strict: true})
+	require.ErrorContains(t, err, "unlisted file")
 }
 
 func writeFakeCosign(t *testing.T) string {

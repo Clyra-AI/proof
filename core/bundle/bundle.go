@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/Clyra-AI/proof/core/canon"
+	"github.com/Clyra-AI/proof/core/chain"
 	coreerr "github.com/Clyra-AI/proof/core/errors"
 	"github.com/Clyra-AI/proof/core/schema"
 	"github.com/Clyra-AI/proof/core/signing"
@@ -36,6 +37,7 @@ type VerifyOpts struct {
 }
 
 const manifestFilename = "manifest.json"
+const manifestRecordTypesPath = "record-types.json"
 
 func Verify(path string, opts VerifyOpts) (*Manifest, error) {
 	manifest, err := ReadManifest(path)
@@ -70,6 +72,21 @@ func Verify(path string, opts VerifyOpts) (*Manifest, error) {
 			return nil, coreerr.New(coreerr.KindVerification, "bundle.hash_mismatch", fmt.Sprintf("bundle hash mismatch for %s", file.Path), coreerr.WithPath(file.Path))
 		}
 	}
+	if opts.Strict {
+		// Strict verification loads custom schemas into a registry owned by this
+		// call. It is intentionally not installed in schema's legacy global
+		// registry, so concurrent bundle verifications cannot influence one
+		// another.
+		registry, err := loadStrictRecordTypeRegistry(path, manifest)
+		if err != nil {
+			return nil, err
+		}
+		if registry != nil {
+			if err := validateStrictRecordFiles(path, manifest, registry); err != nil {
+				return nil, err
+			}
+		}
+	}
 	if opts.VerifySignatures {
 		if len(manifest.Signatures) == 0 {
 			return nil, coreerr.New(coreerr.KindVerification, "bundle.signature_missing", "bundle manifest has no signatures")
@@ -97,6 +114,104 @@ func Verify(path string, opts VerifyOpts) (*Manifest, error) {
 		}
 	}
 	return &manifest, nil
+}
+
+func validateStrictRecordFiles(root string, manifest Manifest, registry *schema.Registry) error {
+	for _, file := range manifest.Files {
+		base := strings.ToLower(filepath.Base(file.Path))
+		switch {
+		case base == "chain.json":
+			// #nosec G304 -- path has passed strict bundle membership and path checks.
+			raw, err := os.ReadFile(filepath.Join(root, file.Path))
+			if err != nil {
+				return err
+			}
+			var c chain.Chain
+			if err := json.Unmarshal(raw, &c); err != nil {
+				return coreerr.Wrap(coreerr.KindValidation, "schema.record.chain_invalid", "parse strict bundle chain", err, coreerr.WithPath(file.Path))
+			}
+			for i := range c.Records {
+				recordRaw, err := json.Marshal(c.Records[i])
+				if err != nil {
+					return err
+				}
+				if err := registry.ValidateRecord(recordRaw, c.Records[i].RecordType); err != nil {
+					return coreerr.Wrap(coreerr.KindValidation, "schema.record.bundle_validation_failed", "strict bundle record validation failed", err, coreerr.WithPath(fmt.Sprintf("%s.records[%d]", file.Path, i)))
+				}
+			}
+		case strings.HasSuffix(base, ".jsonl"):
+			// JSONL files may be non-Proof data. Validate only lines that clearly
+			// identify themselves as records, preserving existing bundle use cases.
+			// #nosec G304 -- path has passed strict bundle membership and path checks.
+			raw, err := os.ReadFile(filepath.Join(root, file.Path))
+			if err != nil {
+				return err
+			}
+			for lineNo, line := range strings.Split(string(raw), "\n") {
+				line = strings.TrimSpace(line)
+				if line == "" {
+					continue
+				}
+				var header struct {
+					RecordType string `json:"record_type"`
+				}
+				if err := json.Unmarshal([]byte(line), &header); err != nil || header.RecordType == "" {
+					continue
+				}
+				if err := registry.ValidateRecord([]byte(line), header.RecordType); err != nil {
+					return coreerr.Wrap(coreerr.KindValidation, "schema.record.bundle_validation_failed", "strict bundle record validation failed", err, coreerr.WithPath(fmt.Sprintf("%s[%d]", file.Path, lineNo+1)))
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func loadStrictRecordTypeRegistry(root string, manifest Manifest) (*schema.Registry, error) {
+	entries := make(map[string]ManifestEntry, len(manifest.Files))
+	for _, file := range manifest.Files {
+		key, err := structure.ValidatePath(file.Path)
+		if err != nil {
+			return nil, err
+		}
+		entries[key] = file
+	}
+	manifestEntry, ok := entries[manifestRecordTypesPath]
+	if !ok {
+		return nil, nil
+	}
+	// #nosec G304 -- path has passed strict bundle membership and path checks.
+	raw, err := os.ReadFile(filepath.Join(root, manifestEntry.Path))
+	if err != nil {
+		return nil, coreerr.Wrap(coreerr.KindVerification, "schema.custom.manifest_missing", "read record type manifest", err, coreerr.WithPath(manifestRecordTypesPath))
+	}
+	typesManifest, err := schema.ParseRecordTypeManifest(raw)
+	if err != nil {
+		return nil, err
+	}
+	schemaFiles := make(map[string][]byte, len(typesManifest.RecordTypes))
+	for _, def := range typesManifest.RecordTypes {
+		key, err := structure.ValidatePath(def.SchemaPath)
+		if err != nil {
+			return nil, err
+		}
+		entry, listed := entries[key]
+		if !listed {
+			return nil, coreerr.New(coreerr.KindVerification, "schema.custom.schema_unlisted", fmt.Sprintf("custom schema is not covered by bundle manifest: %s", def.SchemaPath), coreerr.WithPath(def.SchemaPath))
+		}
+		// #nosec G304 -- path has passed strict bundle membership and path checks.
+		data, err := os.ReadFile(filepath.Join(root, entry.Path))
+		if err != nil {
+			return nil, coreerr.Wrap(coreerr.KindVerification, "schema.custom.schema_missing", "read custom schema", err, coreerr.WithPath(def.SchemaPath))
+		}
+		schemaFiles[key] = data
+		got := sha256.Sum256(data)
+		want := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(def.SHA256)), "sha256:")
+		if hex.EncodeToString(got[:]) != want {
+			return nil, coreerr.New(coreerr.KindVerification, "schema.custom.digest_mismatch", fmt.Sprintf("schema digest mismatch for %s", def.SchemaPath), coreerr.WithPath(def.SchemaPath))
+		}
+	}
+	return schema.LoadRecordTypeManifest(raw, schemaFiles)
 }
 
 func validateStrictStructure(root string, manifest Manifest) error {

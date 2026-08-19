@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Clyra-AI/proof/schemas/v1/control-containment-telemetry-profile-v1.schema.json",
+  "title": "Proof canonical control, containment, and telemetry correlation profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile_version", "binding_mode"],
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^(sha256:)?[a-f0-9]{64}$"},
+    "reference": {
+      "type": "object", "required": ["kind", "id"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1}, "id": {"type": "string", "minLength": 1},
+        "digest": {"$ref": "#/$defs/digest"}, "schema_id": {"type": "string", "minLength": 1},
+        "schema_version": {"type": "string", "minLength": 1}, "source_product": {"type": "string", "minLength": 1}
+      }
+    },
+    "redaction": {
+      "type": "object", "additionalProperties": false, "required": ["applied"],
+      "properties": {
+        "applied": {"type": "boolean"},
+        "fields": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "reason": {"type": "string", "minLength": 1}, "method": {"type": "string", "minLength": 1}
+      }
+    }
+  },
+  "properties": {
+    "profile_version": {"type": "string", "enum": ["1", "1.0"]},
+    "event_ref": {"$ref": "#/$defs/reference"}, "action_ref": {"$ref": "#/$defs/reference"},
+    "contract_ref": {"$ref": "#/$defs/reference"}, "run_ref": {"$ref": "#/$defs/reference"},
+    "session_ref": {"$ref": "#/$defs/reference"}, "policy_ref": {"$ref": "#/$defs/reference"},
+    "decision_ref": {"$ref": "#/$defs/reference"}, "proof_ref": {"$ref": "#/$defs/reference"},
+    "causal_ref": {"$ref": "#/$defs/reference"}, "containment_ref": {"$ref": "#/$defs/reference"},
+    "boundary_ref": {"$ref": "#/$defs/reference"}, "revocation_ref": {"$ref": "#/$defs/reference"},
+    "acknowledgement_ref": {"$ref": "#/$defs/reference"},
+    "trace_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "span_id": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+    "parent_span_id": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+    "content_digest": {"$ref": "#/$defs/digest"}, "redaction": {"$ref": "#/$defs/redaction"},
+    "binding_mode": {"type": "string", "enum": ["identifier_only", "digest_bound"]}
+  }
+}
