@@ -14,17 +14,20 @@ set -eu
 mode="${FAKE_GRYPE_MODE:?}"
 if [[ "$1" == "db" && "$2" == "update" ]]; then
   case "$mode" in
-    success|vulnerability) echo "database refresh complete"; exit 0 ;;
-    stale|stale-success) echo "database max allowed age exceeded"; exit 1 ;;
+    success|vulnerability|scan-collision) echo "database refresh complete"; exit 0 ;;
+    stale|stale-success) echo "[0000]  WARN current database is invalid error=the vulnerability database was built 22 weeks ago (max allowed age is 5 days)"; exit 1 ;;
     generic) echo "network unavailable"; exit 42 ;;
+    collision) echo "fatal: max allowed age parser configuration is invalid"; exit 41 ;;
   esac
 fi
 if [[ "$1" == dir:* ]]; then
   case "$mode" in
     success|stale-success) echo "no vulnerabilities"; exit 0 ;;
+    scan-collision) echo "fatal: max allowed age parser configuration is invalid"; exit 41 ;;
     vulnerability) echo "1 vulnerability found: CVE-2099-0001"; exit 1 ;;
-    stale) echo "database max allowed age exceeded"; exit 1 ;;
+    stale) echo "[0000] ERROR failed to load vulnerability db: the vulnerability database was built 22 weeks ago (max allowed age is 5 days)"; exit 1 ;;
     generic) echo "should not scan after generic update failure"; exit 99 ;;
+    collision) echo "fatal: max allowed age parser configuration is invalid"; exit 41 ;;
   esac
 fi
 echo "unexpected fake grype invocation: $*" >&2
@@ -129,10 +132,36 @@ run_generic_update_case() {
   fi
 }
 
+run_stale_marker_collision_case() {
+  local dist
+  dist="$(make_dist collision)"
+  if FAKE_GRYPE_MODE=collision RELEASE_GRYPE_BIN="${fake_grype}" RELEASE_GOVULNCHECK_BIN="${fake_govuln}" \
+    "${repo_root}/scripts/release_security_scan.sh" "${dist}" "${dist}/scan-root"; then
+    echo "generic freshness-marker collision was incorrectly accepted" >&2
+    exit 1
+  fi
+  if [[ -e "${dist}/scan/govulncheck.log" ]]; then
+    echo "generic freshness-marker collision incorrectly used fallback" >&2
+    exit 1
+  fi
+
+  dist="$(make_dist scan-collision)"
+  if FAKE_GRYPE_MODE=scan-collision RELEASE_GRYPE_BIN="${fake_grype}" RELEASE_GOVULNCHECK_BIN="${fake_govuln}" \
+    "${repo_root}/scripts/release_security_scan.sh" "${dist}" "${dist}/scan-root"; then
+    echo "generic scan freshness-marker collision was incorrectly accepted" >&2
+    exit 1
+  fi
+  if [[ -e "${dist}/scan/govulncheck.log" ]]; then
+    echo "generic scan freshness-marker collision incorrectly used fallback" >&2
+    exit 1
+  fi
+}
+
 run_success_case
 run_archive_extraction_case
 run_vulnerability_case
 run_stale_case
 run_stale_success_case
 run_generic_update_case
+run_stale_marker_collision_case
 echo "release security scan contract checks passed"

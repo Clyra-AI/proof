@@ -6,7 +6,9 @@ DIST_DIR="${1:-dist}"
 SCAN_ROOT="${2:-}"
 GRYPE_BIN="${RELEASE_GRYPE_BIN:-grype}"
 GOVULNCHECK_BIN="${RELEASE_GOVULNCHECK_BIN:-}"
-STALE_MARKER="max allowed age"
+# Keep this anchored to Grype's complete freshness diagnostic. A loose phrase
+# match would let unrelated tool/database errors reach the fallback path.
+STALE_DB_PATTERN='^\[[0-9]{4}\][[:space:]]+(WARN current database is invalid error=the vulnerability database was built [^()[:cntrl:]]+ \(max allowed age is [^()[:cntrl:]]+\)|ERROR failed to load vulnerability db: the vulnerability database was built [^()[:cntrl:]]+ \(max allowed age is [^()[:cntrl:]]+\))$'
 
 if [[ -z "${DIST_DIR}" || ! -d "${DIST_DIR}" ]]; then
   echo "release security scan requires an existing dist directory: ${DIST_DIR}" >&2
@@ -59,7 +61,7 @@ set -e
 stale_db=0
 if [[ ${db_update_status} -ne 0 ]]; then
   cat "${scan_dir}/grype-db-update.log" >&2
-  if ! grep -Fq "${STALE_MARKER}" "${scan_dir}/grype-db-update.log"; then
+  if ! grep -Eiq "${STALE_DB_PATTERN}" "${scan_dir}/grype-db-update.log"; then
     echo "grype database update failed without the specific stale-database freshness error" >&2
     exit "${db_update_status}"
   fi
@@ -103,7 +105,7 @@ if [[ ${high_status} -eq 0 ]]; then
 fi
 
 cat "${scan_dir}/grype-high.log" >&2
-if grep -Fq "${STALE_MARKER}" "${scan_dir}/grype-high.log" && ! grep -Eiq 'CVE-[0-9]{4}-[0-9]+|[0-9]+[[:space:]]+vulnerabilit(y|ies)[[:space:]]+found' "${scan_dir}/grype-high.log"; then
+if grep -Eiq "${STALE_DB_PATTERN}" "${scan_dir}/grype-high.log" && ! grep -Eiq 'CVE-[0-9]{4}-[0-9]+|[0-9]+[[:space:]]+vulnerabilit(y|ies)[[:space:]]+found' "${scan_dir}/grype-high.log"; then
   run_govuln_fallback
   exit $?
 fi

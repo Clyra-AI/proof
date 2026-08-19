@@ -41,6 +41,8 @@ jobs:
       - run: ./scripts/test_acceptance.sh
       - run: ./scripts/test_release_security_scan.sh
       - run: ./scripts/test_release_workflow_contract.sh
+      - run: ./scripts/test_release_publish.sh
+      - run: ./scripts/test_release_identity.sh
 
   build:
     runs-on: ubuntu-latest
