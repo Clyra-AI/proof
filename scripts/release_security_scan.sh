@@ -8,7 +8,7 @@ GRYPE_BIN="${RELEASE_GRYPE_BIN:-grype}"
 GOVULNCHECK_BIN="${RELEASE_GOVULNCHECK_BIN:-}"
 # Keep this anchored to Grype's complete freshness diagnostic. A loose phrase
 # match would let unrelated tool/database errors reach the fallback path.
-STALE_DB_PATTERN='^\[[0-9]{4}\][[:space:]]+(WARN current database is invalid error=the vulnerability database was built [^()[:cntrl:]]+ \(max allowed age is [^()[:cntrl:]]+\)|ERROR failed to load vulnerability db: the vulnerability database was built [^()[:cntrl:]]+ \(max allowed age is [^()[:cntrl:]]+\))$'
+STALE_DB_PATTERN='(^\[[0-9]{4}\][[:space:]]+(WARN current database is invalid error=the vulnerability database was built [^()[:cntrl:]]+ \(max allowed age is [^()[:cntrl:]]+\)|ERROR failed to load vulnerability db: the vulnerability database was built [^()[:cntrl:]]+ \(max allowed age is [^()[:cntrl:]]+\))$|^db could not be loaded: the vulnerability database was built [^()[:cntrl:]]+ \(max allowed age is [^()[:cntrl:]]+\)$)'
 
 if [[ -z "${DIST_DIR}" || ! -d "${DIST_DIR}" ]]; then
   echo "release security scan requires an existing dist directory: ${DIST_DIR}" >&2

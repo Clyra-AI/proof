@@ -14,7 +14,7 @@ set -eu
 mode="${FAKE_GRYPE_MODE:?}"
 if [[ "$1" == "db" && "$2" == "update" ]]; then
   case "$mode" in
-    success|vulnerability|scan-collision) echo "database refresh complete"; exit 0 ;;
+    success|vulnerability|scan-collision|stale-simple) echo "database refresh complete"; exit 0 ;;
     stale|stale-success) echo "[0000]  WARN current database is invalid error=the vulnerability database was built 22 weeks ago (max allowed age is 5 days)"; exit 1 ;;
     generic) echo "network unavailable"; exit 42 ;;
     collision) echo "fatal: max allowed age parser configuration is invalid"; exit 41 ;;
@@ -26,6 +26,7 @@ if [[ "$1" == dir:* ]]; then
     scan-collision) echo "fatal: max allowed age parser configuration is invalid"; exit 41 ;;
     vulnerability) echo "1 vulnerability found: CVE-2099-0001"; exit 1 ;;
     stale) echo "[0000] ERROR failed to load vulnerability db: the vulnerability database was built 22 weeks ago (max allowed age is 5 days)"; exit 1 ;;
+    stale-simple) echo "db could not be loaded: the vulnerability database was built 23 weeks ago (max allowed age is 5 days)"; exit 1 ;;
     generic) echo "should not scan after generic update failure"; exit 99 ;;
     collision) echo "fatal: max allowed age parser configuration is invalid"; exit 41 ;;
   esac
@@ -118,6 +119,15 @@ run_stale_success_case() {
   [[ -s "${log}" ]] || { echo "stale refresh failure must still trigger fallback after a zero scan" >&2; exit 1; }
 }
 
+run_stale_simple_case() {
+  local dist log
+  dist="$(make_dist stale-simple)"
+  log="${dist}/govuln-invocations.log"
+  FAKE_GRYPE_MODE=stale-simple FAKE_GOVULN_LOG="${log}" RELEASE_GRYPE_BIN="${fake_grype}" RELEASE_GOVULNCHECK_BIN="${fake_govuln}" \
+    "${repo_root}/scripts/release_security_scan.sh" "${dist}" "${dist}/scan-root"
+  [[ -s "${log}" ]] || { echo "exact db-could-not-be-loaded freshness diagnostic did not trigger fallback" >&2; exit 1; }
+}
+
 run_generic_update_case() {
   local dist
   dist="$(make_dist generic)"
@@ -162,6 +172,7 @@ run_archive_extraction_case
 run_vulnerability_case
 run_stale_case
 run_stale_success_case
+run_stale_simple_case
 run_generic_update_case
 run_stale_marker_collision_case
 echo "release security scan contract checks passed"
