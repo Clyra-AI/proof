@@ -59,6 +59,16 @@ def main() -> int:
         action="store_true",
         help="allow missing expected assets while rejecting extras and partial signatures",
     )
+    parser.add_argument(
+        "--metadata-only",
+        action="store_true",
+        help="validate release metadata without checking local asset files",
+    )
+    parser.add_argument(
+        "--require-published",
+        action="store_true",
+        help="require a published, non-draft, non-prerelease release",
+    )
     parser.add_argument("--missing-output")
     args = parser.parse_args()
 
@@ -76,6 +86,18 @@ def main() -> int:
     assets = data.get("assets")
     if not isinstance(assets, list):
         fail("release JSON assets must be an array")
+
+    if args.require_published:
+        if data.get("isDraft") is not False:
+            fail("release must not be a draft")
+        if data.get("isPrerelease") is not False:
+            fail("release must not be a prerelease")
+        if not isinstance(data.get("publishedAt"), str) or not data["publishedAt"]:
+            fail("release must already be published")
+
+    if args.metadata_only:
+        print("release metadata verified")
+        return 0
 
     expected = expected_assets(args.version)
     by_name: dict[str, dict[str, object]] = {}

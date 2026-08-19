@@ -61,10 +61,10 @@ if [[ ${api_status} -ne 0 ]]; then
     --title "${RELEASE_TAG}" \
     --generate-notes
 else
-  gh release view "${RELEASE_TAG}" --repo "${REPOSITORY}" --json assets >"${release_json}"
+  gh release view "${RELEASE_TAG}" --repo "${REPOSITORY}" --json isDraft,isPrerelease,publishedAt,assets >"${release_json}"
   python3 "${SCRIPT_DIR}/check_release_asset_set.py" \
     "${release_json}" "${DIST_DIR}" "${version}" \
-    --allow-missing --missing-output "${missing_assets}"
+    --allow-missing --require-published --missing-output "${missing_assets}"
 
   missing=()
   while IFS= read -r name; do
@@ -79,6 +79,6 @@ else
   fi
 fi
 
-gh release view "${RELEASE_TAG}" --repo "${REPOSITORY}" --json assets >"${release_json}"
+gh release view "${RELEASE_TAG}" --repo "${REPOSITORY}" --json isDraft,isPrerelease,publishedAt,assets >"${release_json}"
 python3 "${SCRIPT_DIR}/check_release_asset_set.py" \
-  "${release_json}" "${DIST_DIR}" "${version}"
+  "${release_json}" "${DIST_DIR}" "${version}" --require-published

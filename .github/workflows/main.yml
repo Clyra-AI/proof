@@ -43,6 +43,7 @@ jobs:
       - run: ./scripts/test_release_workflow_contract.sh
       - run: ./scripts/test_release_publish.sh
       - run: ./scripts/test_release_identity.sh
+      - run: ./scripts/test_release_signatures.sh
 
   build:
     runs-on: ubuntu-latest

@@ -24,6 +24,8 @@ line_for() {
 require_pattern "${workflow}" "args: release --clean --skip=publish"
 require_pattern "${workflow}" "run: ./scripts/verify_release_artifacts.sh dist"
 require_pattern "${workflow}" "run: ./scripts/release_security_scan.sh dist"
+require_pattern "${workflow}" "run: ./scripts/prepare_release_signatures.sh dist"
+require_pattern "${workflow}" "if: steps.checksum_signatures.outputs.mode == 'sign'"
 require_pattern "${workflow}" 'RELEASE_TAG: ${{ github.ref_name }}'
 require_pattern "${workflow}" 'COSIGN_CERT_IDENTITY: https://github.com/${{ github.workflow_ref }}'
 require_pattern "${workflow}" "actions/attest-build-provenance@v2"
@@ -33,6 +35,7 @@ require_pattern "${publish_script}" "gh api --include"
 require_pattern "${publish_script}" "HTTP/[0-9.]+"
 require_pattern "${publish_script}" "refusing to create or overwrite"
 require_pattern "${publish_script}" "check_release_asset_set.py"
+require_pattern "${publish_script}" "--require-published"
 if grep -Fq -- "--clobber" "${workflow}" || grep -Fq -- "--clobber" "${publish_script}"; then
   echo "normal release publication must not clobber assets" >&2
   exit 1

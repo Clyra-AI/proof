@@ -26,7 +26,11 @@ missing_json="${test_root}/missing.json"
 partial_json="${test_root}/partial.json"
 extra_json="${test_root}/extra.json"
 mismatch_json="${test_root}/mismatch.json"
-python3 - "${dist}" "${complete_json}" "${missing_json}" "${partial_json}" "${extra_json}" "${mismatch_json}" <<'PY'
+different_json="${test_root}/different.json"
+draft_json="${test_root}/draft.json"
+prerelease_json="${test_root}/prerelease.json"
+unpublished_json="${test_root}/unpublished.json"
+python3 - "${dist}" "${complete_json}" "${missing_json}" "${partial_json}" "${extra_json}" "${mismatch_json}" "${different_json}" "${draft_json}" "${prerelease_json}" "${unpublished_json}" <<'PY'
 import hashlib
 import json
 import pathlib
@@ -39,7 +43,12 @@ assets = [
     for path in paths
 ]
 def write(path, selected):
-    pathlib.Path(path).write_text(json.dumps({"assets": selected}, sort_keys=True), encoding="utf-8")
+    pathlib.Path(path).write_text(json.dumps({
+        "isDraft": False,
+        "isPrerelease": False,
+        "publishedAt": "2026-08-19T00:00:00Z",
+        "assets": selected,
+    }, sort_keys=True), encoding="utf-8")
 
 write(sys.argv[2], assets)
 write(sys.argv[3], [asset for asset in assets if not asset["name"].endswith((".sig", ".pem"))])
@@ -49,6 +58,17 @@ write(sys.argv[5], extra)
 wrong = [dict(asset) for asset in assets]
 wrong[0]["digest"] = "sha256:" + "f" * 64
 write(sys.argv[6], wrong)
+different = [dict(asset) for asset in assets]
+for asset in different:
+    if asset["name"] in {"checksums.txt.sig", "checksums.txt.pem"}:
+        asset["digest"] = "sha256:" + "0" * 64
+write(sys.argv[7], different)
+draft = {"isDraft": True, "isPrerelease": False, "publishedAt": None, "assets": assets}
+prerelease = {"isDraft": False, "isPrerelease": True, "publishedAt": "2026-08-19T00:00:00Z", "assets": assets}
+unpublished = {"isDraft": False, "isPrerelease": False, "publishedAt": None, "assets": assets}
+pathlib.Path(sys.argv[8]).write_text(json.dumps(draft, sort_keys=True), encoding="utf-8")
+pathlib.Path(sys.argv[9]).write_text(json.dumps(prerelease, sort_keys=True), encoding="utf-8")
+pathlib.Path(sys.argv[10]).write_text(json.dumps(unpublished, sort_keys=True), encoding="utf-8")
 PY
 
 fake_gh="${test_root}/gh"
@@ -133,6 +153,10 @@ run_publish existing "${missing_json}" upload
 run_publish existing "${extra_json}" no-create
 run_publish existing "${mismatch_json}" no-create
 run_publish existing "${partial_json}" no-create
+run_publish existing "${different_json}" no-create
+run_publish existing "${draft_json}" no-create
+run_publish existing "${prerelease_json}" no-create
+run_publish existing "${unpublished_json}" no-create
 run_publish api-error "${complete_json}" no-create
 
 echo "release publication contract checks passed"

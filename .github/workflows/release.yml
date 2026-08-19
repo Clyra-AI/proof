@@ -46,11 +46,20 @@ jobs:
       - name: Vulnerability scan (verified release contents)
         run: ./scripts/release_security_scan.sh dist
       - uses: sigstore/cosign-installer@v3
+      - name: Prepare checksum signatures
+        id: checksum_signatures
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          COSIGN_CERT_IDENTITY: https://github.com/${{ github.workflow_ref }}
+          COSIGN_CERT_ISSUER: https://token.actions.githubusercontent.com
+        run: ./scripts/prepare_release_signatures.sh dist "${RELEASE_TAG}" "${GITHUB_REPOSITORY}"
       - name: Sign checksums
+        if: steps.checksum_signatures.outputs.mode == 'sign'
         env:
           COSIGN_EXPERIMENTAL: "1"
         run: |
-          [[ ! -e dist/checksums.txt.sig && ! -e dist/checksums.txt.pem ]] || {
+          [[ ! -e dist/checksums.txt.sig && ! -L dist/checksums.txt.sig && ! -e dist/checksums.txt.pem && ! -L dist/checksums.txt.pem ]] || {
             echo "checksum signature assets already exist; refusing to overwrite" >&2
             exit 1
           }
