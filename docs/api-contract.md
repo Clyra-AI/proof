@@ -52,6 +52,11 @@ verification. The versioned `record-types.json` manifest uses `version: "1"` and
 schema. `record-types.json` and every referenced schema must be members of a strict bundle manifest; strict verification
 loads them into a call-local registry and does not mutate the legacy `RegisterCustomType` registry.
 
+Portable custom schemas must declare `$id` equal to `schema_id` and
+`x-proof-schema-version` equal to `schema_version`. Relative `$ref` values
+must target another schema listed in the same strict bundle; file, HTTP, and
+escaping references are rejected.
+
 The legacy `RegisterCustomType`, `RegisterCustomTypeSchema`, and `ResetCustomTypes` functions remain supported for
 source compatibility. New code that may verify concurrent or untrusted bundles should use scoped registries.
 
@@ -69,6 +74,8 @@ they do not establish enforcement, containment, telemetry authenticity, or produ
 embedded schema is `schemas/v1/control-containment-telemetry-v1.schema.json`; use
 `ValidateControlContainmentTelemetryProfile` and `CanonicalizeControlContainmentTelemetry` for deterministic API
 validation and RFC 8785 JSON canonicalization.
+The compatibility schema name `v1/control-containment-telemetry-profile-v1.schema.json` is kept in parity with the
+canonical telemetry schema, including binding, identifier, and redaction constraints.
 
 ## Deprecation Policy
 

@@ -127,3 +127,41 @@ func TestControlContainmentTelemetrySchemaRejectsBadDigestAndMode(t *testing.T) 
 	require.NoError(t, err)
 	require.Error(t, coreschema.ValidateAgainstSchema(raw, "v1/control-containment-telemetry-v1.schema.json"))
 }
+
+func TestControlContainmentTelemetrySchemaRejectsZeroIDsAndMatchesAlias(t *testing.T) {
+	invalid := map[string]any{
+		"profile_version": "1.0",
+		"binding_mode":    BindingModeIdentifierOnly,
+		"trace_id":        "00000000000000000000000000000000",
+		"event_ref":       map[string]any{"kind": "event", "id": "event:1"},
+	}
+	raw, err := json.Marshal(invalid)
+	require.NoError(t, err)
+	require.Error(t, coreschema.ValidateAgainstSchema(raw, "v1/control-containment-telemetry-v1.schema.json"))
+	require.Error(t, coreschema.ValidateAgainstSchema(raw, "v1/control-containment-telemetry-profile-v1.schema.json"))
+
+	invalid["trace_id"] = "0123456789abcdef0123456789abcdef"
+	invalid["redaction"] = map[string]any{"applied": true, "reason": ""}
+	raw, err = json.Marshal(invalid)
+	require.NoError(t, err)
+	require.Error(t, coreschema.ValidateAgainstSchema(raw, "v1/control-containment-telemetry-v1.schema.json"))
+
+	uppercase := &ControlContainmentTelemetryProfile{ProfileVersion: "1.0", BindingMode: BindingModeDigestBound, ContentDigest: "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
+	require.ErrorContains(t, uppercase.Validate(), "SHA-256")
+
+	badMetadata := &ControlContainmentTelemetryProfile{ProfileVersion: "1.0", BindingMode: BindingModeIdentifierOnly, EventRef: &RelationshipRef{Kind: "event", ID: "event:1", SchemaID: " "}}
+	require.ErrorContains(t, badMetadata.Validate(), "schema_id")
+}
+
+func TestControlContainmentTelemetryValidationErrorsUseFixedReferenceOrder(t *testing.T) {
+	p := &ControlContainmentTelemetryProfile{
+		ProfileVersion: "1.0", BindingMode: BindingModeIdentifierOnly,
+		ProofRef: &RelationshipRef{Kind: "", ID: ""},
+		EventRef: &RelationshipRef{Kind: "", ID: ""},
+	}
+	first := p.Validate()
+	require.Error(t, first)
+	for i := 0; i < 20; i++ {
+		require.EqualError(t, p.Validate(), first.Error())
+	}
+}

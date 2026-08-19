@@ -88,6 +88,7 @@ Custom types validate against the base proof record schema plus your type-specif
 
 Portable bundles can carry a scoped custom type registry in `record-types.json`. The manifest version is `1` and each
 entry records `record_type`, `schema_id`, `schema_version`, a safe relative `schema_path`, and its SHA-256 digest.
+Portable schema files declare matching `$id` and `x-proof-schema-version` metadata.
 Strict bundle verification requires the manifest and every referenced schema to be listed and hash-covered by the
 bundle manifest. Verification loads these definitions into a call-local `schema.Registry`; they never leak into the
 legacy process-global registration API. Use `proof.NewSchemaRegistry` and `proof.ValidateRecordWithRegistry` when

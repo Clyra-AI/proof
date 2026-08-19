@@ -103,7 +103,8 @@ func (p *ControlContainmentTelemetryProfile) Validate() error {
 	if p.ContentDigest != "" && normalizeProfileDigest(p.ContentDigest) == "" {
 		return coreerr.New(coreerr.KindValidation, "record.profile.content_digest_invalid", "content_digest must be a SHA-256 digest", coreerr.WithField("content_digest"))
 	}
-	for field, ref := range p.references() {
+	for _, reference := range p.orderedReferences() {
+		field, ref := reference.field, reference.ref
 		if ref == nil {
 			continue
 		}
@@ -112,6 +113,15 @@ func (p *ControlContainmentTelemetryProfile) Validate() error {
 		}
 		if ref.Digest != "" && normalizeProfileDigest(ref.Digest) == "" {
 			return coreerr.New(coreerr.KindValidation, "record.profile.reference_digest_invalid", fmt.Sprintf("%s digest must be a SHA-256 digest", field), coreerr.WithField(field))
+		}
+		if ref.SchemaID != "" && strings.TrimSpace(ref.SchemaID) == "" {
+			return coreerr.New(coreerr.KindValidation, "record.profile.reference_schema_id_invalid", fmt.Sprintf("%s schema_id must not be empty", field), coreerr.WithField(field+".schema_id"))
+		}
+		if ref.SchemaVersion != "" && strings.TrimSpace(ref.SchemaVersion) == "" {
+			return coreerr.New(coreerr.KindValidation, "record.profile.reference_schema_version_invalid", fmt.Sprintf("%s schema_version must not be empty", field), coreerr.WithField(field+".schema_version"))
+		}
+		if ref.SourceProduct != "" && strings.TrimSpace(ref.SourceProduct) == "" {
+			return coreerr.New(coreerr.KindValidation, "record.profile.reference_source_product_invalid", fmt.Sprintf("%s source_product must not be empty", field), coreerr.WithField(field+".source_product"))
 		}
 	}
 	for _, redaction := range []*RedactionMetadata{p.Redaction, p.RedactionMetadata} {
@@ -128,6 +138,12 @@ func (p *ControlContainmentTelemetryProfile) Validate() error {
 				return coreerr.New(coreerr.KindValidation, "record.profile.redaction_field_duplicate", fmt.Sprintf("redaction field %d is duplicated", i), coreerr.WithField("redaction.fields"))
 			}
 			seenFields[field] = struct{}{}
+		}
+		if redaction.Reason != "" && strings.TrimSpace(redaction.Reason) == "" {
+			return coreerr.New(coreerr.KindValidation, "record.profile.redaction_reason_invalid", "redaction reason must not be empty", coreerr.WithField("redaction.reason"))
+		}
+		if redaction.Method != "" && strings.TrimSpace(redaction.Method) == "" {
+			return coreerr.New(coreerr.KindValidation, "record.profile.redaction_method_invalid", "redaction method must not be empty", coreerr.WithField("redaction.method"))
 		}
 	}
 	return nil
@@ -157,19 +173,24 @@ func CanonicalizeControlContainmentTelemetry(p *ControlContainmentTelemetryProfi
 	return p.CanonicalJSON()
 }
 
-func (p *ControlContainmentTelemetryProfile) references() map[string]*RelationshipRef {
-	return map[string]*RelationshipRef{
-		"event_ref": p.EventRef, "action_ref": p.ActionRef, "contract_ref": p.ContractRef,
-		"run_ref": p.RunRef, "session_ref": p.SessionRef, "policy_ref": p.PolicyRef,
-		"decision_ref": p.DecisionRef, "proof_ref": p.ProofRef, "causal_ref": p.CausalRef,
-		"containment_ref": p.ContainmentRef, "boundary_ref": p.BoundaryRef,
-		"revocation_ref": p.RevocationRef, "acknowledgement_ref": p.AcknowledgementRef,
+type profileReference struct {
+	field string
+	ref   *RelationshipRef
+}
+
+func (p *ControlContainmentTelemetryProfile) orderedReferences() []profileReference {
+	return []profileReference{
+		{"event_ref", p.EventRef}, {"action_ref", p.ActionRef}, {"contract_ref", p.ContractRef},
+		{"run_ref", p.RunRef}, {"session_ref", p.SessionRef}, {"policy_ref", p.PolicyRef},
+		{"decision_ref", p.DecisionRef}, {"proof_ref", p.ProofRef}, {"causal_ref", p.CausalRef},
+		{"containment_ref", p.ContainmentRef}, {"boundary_ref", p.BoundaryRef},
+		{"revocation_ref", p.RevocationRef}, {"acknowledgement_ref", p.AcknowledgementRef},
 	}
 }
 
 func profileHasReferenceDigest(p *ControlContainmentTelemetryProfile) bool {
-	for _, ref := range p.references() {
-		if ref != nil && ref.Digest != "" {
+	for _, reference := range p.orderedReferences() {
+		if reference.ref != nil && reference.ref.Digest != "" {
 			return true
 		}
 	}
@@ -177,7 +198,11 @@ func profileHasReferenceDigest(p *ControlContainmentTelemetryProfile) bool {
 }
 
 func normalizeProfileDigest(value string) string {
-	value = strings.TrimPrefix(strings.ToLower(strings.TrimSpace(value)), "sha256:")
+	value = strings.TrimSpace(value)
+	if value != strings.ToLower(value) {
+		return ""
+	}
+	value = strings.TrimPrefix(value, "sha256:")
 	if len(value) != sha256.Size*2 {
 		return ""
 	}

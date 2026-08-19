@@ -6,8 +6,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -109,6 +112,10 @@ var builtins = []RecordType{
 	{Name: "compiled_action", Description: "A compound agent action was compiled for execution", SchemaPath: "v1/types/compiled-action.schema.json"},
 }
 
+var recordTypeNamePattern = regexp.MustCompile(`^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$`)
+
+const portableSchemaVersionKeyword = "x-proof-schema-version"
+
 var customMu sync.RWMutex
 var customTypes = map[string]RecordType{}
 var customSchemas = map[string]*jsonschema.Schema{}
@@ -161,12 +168,35 @@ func (r *Registry) Register(def RecordTypeDefinition, data []byte) error {
 	if want == "" || want != digest {
 		return coreerr.New(coreerr.KindVerification, "schema.custom.digest_mismatch", fmt.Sprintf("schema digest mismatch for %s", def.SchemaPath), coreerr.WithPath(def.SchemaPath))
 	}
+	if err := r.checkExistingDefinition(def, digest); err != nil {
+		return err
+	}
+	if err := validatePortableSchemaIdentity(def, data); err != nil {
+		return err
+	}
 	def.SHA256 = digest
 	def.Digest = digest
 	compiled, err := compileSchema(def.SchemaPath, data)
 	if err != nil {
 		return coreerr.Wrap(coreerr.KindValidation, "schema.custom.compile_failed", fmt.Sprintf("compile custom schema %s", filepath.Base(def.SchemaPath)), err, coreerr.WithPath(def.SchemaPath))
 	}
+	return r.registerCompiled(def, digest, compiled)
+}
+
+func (r *Registry) checkExistingDefinition(def RecordTypeDefinition, digest string) error {
+	r.mu.RLock()
+	existing, ok := r.defs[def.RecordType]
+	r.mu.RUnlock()
+	if !ok {
+		return nil
+	}
+	if existing.SchemaID != def.SchemaID || existing.SchemaVersion != def.SchemaVersion || existing.SchemaPath != def.SchemaPath || normalizeSHA256(existing.SHA256) != digest {
+		return coreerr.New(coreerr.KindValidation, "schema.custom.conflicting_definition", fmt.Sprintf("conflicting definition for record type %s", def.RecordType), coreerr.WithField("record_type"))
+	}
+	return nil
+}
+
+func (r *Registry) registerCompiled(def RecordTypeDefinition, digest string, compiled *jsonschema.Schema) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if existing, ok := r.defs[def.RecordType]; ok {
@@ -296,12 +326,24 @@ func ParseRecordTypeManifest(raw []byte) (RecordTypeManifest, error) {
 // schema bytes keyed by their canonical safe manifest paths. It performs no
 // process-global registration.
 func LoadRecordTypeManifest(raw []byte, schemaFiles map[string][]byte) (*Registry, error) {
+	return LoadRecordTypeManifestWithResources(raw, schemaFiles)
+}
+
+// LoadRecordTypeManifestWithResources builds a scoped registry from a
+// manifest and an allowlisted resource set. Portable schemas must declare an
+// exact $id and x-proof-schema-version matching their manifest definition;
+// relative refs may resolve only to another resource in schemaFiles.
+func LoadRecordTypeManifestWithResources(raw []byte, schemaFiles map[string][]byte) (*Registry, error) {
 	manifest, err := ParseRecordTypeManifest(raw)
 	if err != nil {
 		return nil, err
 	}
 	registry := NewRegistry()
 	seen := make(map[string]struct{}, len(manifest.RecordTypes))
+	seenPaths := make(map[string]struct{}, len(manifest.RecordTypes))
+	resources := make(map[string][]byte, len(manifest.RecordTypes))
+	resourceIDs := make(map[string]struct{}, len(manifest.RecordTypes))
+	definitions := make([]RecordTypeDefinition, 0, len(manifest.RecordTypes))
 	for _, def := range manifest.RecordTypes {
 		if _, ok := seen[def.RecordType]; ok {
 			return nil, coreerr.New(coreerr.KindValidation, "schema.custom.conflicting_definition", fmt.Sprintf("duplicate definition for record type %s", def.RecordType), coreerr.WithField("record_type"))
@@ -318,11 +360,69 @@ func LoadRecordTypeManifest(raw []byte, schemaFiles map[string][]byte) (*Registr
 		if !ok {
 			return nil, coreerr.New(coreerr.KindVerification, "schema.custom.schema_missing", fmt.Sprintf("schema file is missing: %s", def.SchemaPath), coreerr.WithPath(def.SchemaPath))
 		}
-		if err := registry.Register(def, data); err != nil {
+		if _, exists := seenPaths[key]; exists {
+			return nil, coreerr.New(coreerr.KindValidation, "schema.custom.conflicting_definition", fmt.Sprintf("duplicate schema path %s", def.SchemaPath), coreerr.WithPath(def.SchemaPath))
+		}
+		sum := sha256.Sum256(data)
+		if normalizeSHA256(def.SHA256) != hex.EncodeToString(sum[:]) {
+			return nil, coreerr.New(coreerr.KindVerification, "schema.custom.digest_mismatch", fmt.Sprintf("schema digest mismatch for %s", def.SchemaPath), coreerr.WithPath(def.SchemaPath))
+		}
+		if err := validatePortableSchemaIdentity(def, data); err != nil {
+			return nil, err
+		}
+		seenPaths[key] = struct{}{}
+		resources[key] = data
+		resourceIDs[def.SchemaID] = struct{}{}
+		definitions = append(definitions, def)
+	}
+	// Validate refs after the complete path/id allowlist is known.
+	for _, def := range definitions {
+		key, _ := structure.ValidatePath(def.SchemaPath)
+		if err := validatePortableSchemaRefs(def.SchemaPath, resources[key], seenPaths, resourceIDs); err != nil {
+			return nil, err
+		}
+	}
+	compiler := jsonschema.NewCompiler()
+	for _, def := range definitions {
+		key, _ := structure.ValidatePath(def.SchemaPath)
+		data, err := portableSchemaCompileBytes(resources[key])
+		if err != nil {
+			return nil, coreerr.Wrap(coreerr.KindValidation, "schema.custom.compile_resource_failed", "prepare custom schema resource", err, coreerr.WithPath(def.SchemaPath))
+		}
+		if err := compiler.AddResource(def.SchemaPath, strings.NewReader(string(data))); err != nil {
+			return nil, coreerr.Wrap(coreerr.KindValidation, "schema.custom.compile_resource_failed", "compile custom schema resource", err, coreerr.WithPath(def.SchemaPath))
+		}
+		if err := compiler.AddResource(def.SchemaID, strings.NewReader(string(data))); err != nil {
+			return nil, coreerr.Wrap(coreerr.KindValidation, "schema.custom.compile_resource_failed", "compile custom schema identity resource", err, coreerr.WithPath(def.SchemaID))
+		}
+	}
+	for _, def := range definitions {
+		key, _ := structure.ValidatePath(def.SchemaPath)
+		compiled, compileErr := compiler.Compile(def.SchemaPath)
+		if compileErr != nil {
+			return nil, coreerr.Wrap(coreerr.KindValidation, "schema.custom.compile_failed", fmt.Sprintf("compile custom schema %s", filepath.Base(def.SchemaPath)), compileErr, coreerr.WithPath(def.SchemaPath))
+		}
+		sum := sha256.Sum256(resources[key])
+		def.SHA256 = hex.EncodeToString(sum[:])
+		def.Digest = def.SHA256
+		if err := registry.registerCompiled(def, def.SHA256, compiled); err != nil {
 			return nil, err
 		}
 	}
 	return registry, nil
+}
+
+// portableSchemaCompileBytes keeps manifest identity metadata bound by
+// validatePortableSchemaIdentity while letting the canonical manifest path
+// provide the relative-reference base to the compiler. The original bytes
+// remain the digest-covered artifact bytes.
+func portableSchemaCompileBytes(data []byte) ([]byte, error) {
+	var document map[string]any
+	if err := json.Unmarshal(data, &document); err != nil {
+		return nil, err
+	}
+	delete(document, "$id")
+	return json.Marshal(document)
 }
 
 // LoadRecordTypeManifestFile loads a portable manifest from a local root.
@@ -530,6 +630,9 @@ func validateDefinition(def RecordTypeDefinition) error {
 	if def.RecordType == "" {
 		return coreerr.New(coreerr.KindInvalidInput, "schema.custom.record_type_required", "record type is required", coreerr.WithField("record_type"))
 	}
+	if !recordTypeNamePattern.MatchString(def.RecordType) {
+		return coreerr.New(coreerr.KindValidation, "schema.custom.record_type_invalid", fmt.Sprintf("invalid record type: %s", def.RecordType), coreerr.WithField("record_type"))
+	}
 	if def.SchemaID == "" {
 		return coreerr.New(coreerr.KindInvalidInput, "schema.custom.schema_id_required", "schema id is required", coreerr.WithField("schema_id"))
 	}
@@ -545,6 +648,99 @@ func validateDefinition(def RecordTypeDefinition) error {
 	}
 	if normalizeSHA256(def.SHA256) == "" {
 		return coreerr.New(coreerr.KindValidation, "schema.custom.digest_invalid", "schema digest must be a SHA-256 hex digest", coreerr.WithField("sha256"))
+	}
+	return nil
+}
+
+func validatePortableSchemaIdentity(def RecordTypeDefinition, data []byte) error {
+	var document struct {
+		ID      string `json:"$id"`
+		Version string `json:"x-proof-schema-version"`
+	}
+	if err := json.Unmarshal(data, &document); err != nil {
+		return coreerr.Wrap(coreerr.KindInvalidInput, "schema.custom.invalid_json", "parse portable custom schema", err, coreerr.WithPath(def.SchemaPath))
+	}
+	if strings.TrimSpace(document.ID) == "" {
+		return coreerr.New(coreerr.KindValidation, "schema.custom.schema_id_missing", "portable custom schema must declare $id", coreerr.WithPath(def.SchemaPath))
+	}
+	if document.ID != def.SchemaID {
+		return coreerr.New(coreerr.KindValidation, "schema.custom.schema_id_mismatch", fmt.Sprintf("schema $id mismatch: expected %s got %s", def.SchemaID, document.ID), coreerr.WithPath(def.SchemaPath))
+	}
+	if strings.TrimSpace(document.Version) == "" {
+		return coreerr.New(coreerr.KindValidation, "schema.custom.schema_version_missing", fmt.Sprintf("portable custom schema must declare %s", portableSchemaVersionKeyword), coreerr.WithPath(def.SchemaPath))
+	}
+	if document.Version != def.SchemaVersion {
+		return coreerr.New(coreerr.KindValidation, "schema.custom.schema_version_mismatch", fmt.Sprintf("schema version mismatch: expected %s got %s", def.SchemaVersion, document.Version), coreerr.WithPath(def.SchemaPath))
+	}
+	return nil
+}
+
+func validatePortableSchemaRefs(basePath string, data []byte, resourcePaths, resourceIDs map[string]struct{}) error {
+	var document any
+	if err := json.Unmarshal(data, &document); err != nil {
+		return coreerr.Wrap(coreerr.KindInvalidInput, "schema.custom.invalid_json", "parse portable custom schema", err, coreerr.WithPath(basePath))
+	}
+	return walkPortableSchemaRefs(document, basePath, resourcePaths, resourceIDs)
+}
+
+func walkPortableSchemaRefs(value any, basePath string, resourcePaths, resourceIDs map[string]struct{}) error {
+	switch typed := value.(type) {
+	case map[string]any:
+		keys := make([]string, 0, len(typed))
+		for key := range typed {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for _, key := range keys {
+			child := typed[key]
+			if key == "$ref" || key == "$dynamicRef" {
+				ref, ok := child.(string)
+				if !ok {
+					return coreerr.New(coreerr.KindValidation, "schema.custom.ref_invalid", "schema reference must be a string", coreerr.WithPath(basePath))
+				}
+				if err := validatePortableSchemaRef(basePath, ref, resourcePaths, resourceIDs); err != nil {
+					return err
+				}
+				continue
+			}
+			if err := walkPortableSchemaRefs(child, basePath, resourcePaths, resourceIDs); err != nil {
+				return err
+			}
+		}
+	case []any:
+		for _, child := range typed {
+			if err := walkPortableSchemaRefs(child, basePath, resourcePaths, resourceIDs); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validatePortableSchemaRef(basePath, ref string, resourcePaths, resourceIDs map[string]struct{}) error {
+	parsed, err := url.Parse(ref)
+	if err != nil {
+		return coreerr.Wrap(coreerr.KindValidation, "schema.custom.ref_invalid", "parse schema reference", err, coreerr.WithPath(basePath))
+	}
+	if parsed.Scheme == "http" || parsed.Scheme == "https" || parsed.Scheme == "file" || parsed.Host != "" {
+		return coreerr.New(coreerr.KindValidation, "schema.custom.ref_external", fmt.Sprintf("external schema reference is not allowed: %s", ref), coreerr.WithPath(basePath))
+	}
+	if parsed.Scheme != "" {
+		if _, ok := resourceIDs[parsed.Scheme+":"+parsed.Opaque]; !ok {
+			return coreerr.New(coreerr.KindValidation, "schema.custom.ref_unlisted", fmt.Sprintf("schema reference is not in the bundle resource set: %s", ref), coreerr.WithPath(basePath))
+		}
+		return nil
+	}
+	if parsed.Path == "" {
+		return nil // fragment-only local reference
+	}
+	resolved := path.Join(path.Dir(basePath), parsed.Path)
+	key, err := structure.ValidatePath(resolved)
+	if err != nil {
+		return coreerr.Wrap(coreerr.KindValidation, "schema.custom.ref_escape", "schema reference escapes the bundle resource root", err, coreerr.WithPath(basePath))
+	}
+	if _, ok := resourcePaths[key]; !ok {
+		return coreerr.New(coreerr.KindValidation, "schema.custom.ref_unlisted", fmt.Sprintf("schema reference is not in the bundle resource set: %s", ref), coreerr.WithPath(basePath))
 	}
 	return nil
 }

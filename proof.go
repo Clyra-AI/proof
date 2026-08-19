@@ -175,6 +175,10 @@ func LoadRecordTypeManifest(raw []byte, schemaFiles map[string][]byte) (*SchemaR
 	return schema.LoadRecordTypeManifest(raw, schemaFiles)
 }
 
+func LoadRecordTypeManifestWithResources(raw []byte, schemaFiles map[string][]byte) (*SchemaRegistry, error) {
+	return schema.LoadRecordTypeManifestWithResources(raw, schemaFiles)
+}
+
 func ValidateControlContainmentTelemetryProfile(p *ControlContainmentTelemetryProfile) error {
 	return record.ValidateControlContainmentTelemetryProfile(p)
 }

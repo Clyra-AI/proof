@@ -17,7 +17,7 @@ import (
 
 func TestValidateStrictRecordFilesChainAndJSONLBranches(t *testing.T) {
 	dir := t.TempDir()
-	rawSchema := []byte(`{"type":"object","required":["record_type"],"properties":{"record_type":{"const":"vendor.strict"}}}`)
+	rawSchema := []byte(`{"$id":"urn:test:strict","x-proof-schema-version":"1","type":"object","required":["record_type"],"properties":{"record_type":{"const":"vendor.strict"}}}`)
 	sum := sha256.Sum256(rawSchema)
 	registry := schema.NewRegistry()
 	require.NoError(t, registry.Register(schema.RecordTypeDefinition{RecordType: "vendor.strict", SchemaID: "urn:test:strict", SchemaVersion: "1", SchemaPath: "schemas/strict.json", SHA256: hex.EncodeToString(sum[:])}, rawSchema))
@@ -55,7 +55,7 @@ func TestLoadStrictRecordTypeRegistryBranches(t *testing.T) {
 	_, err = loadStrictRecordTypeRegistry(dir, manifest)
 	require.Error(t, err)
 
-	rawSchema := []byte(`{"type":"object"}`)
+	rawSchema := []byte(`{"$id":"urn:test","x-proof-schema-version":"1","type":"object"}`)
 	schemaSum := sha256.Sum256(rawSchema)
 	typesRaw, err := json.Marshal(schema.RecordTypeManifest{Version: schema.RecordTypeManifestVersion, RecordTypes: []schema.RecordTypeDefinition{{RecordType: "vendor.bad", SchemaID: "urn:test", SchemaVersion: "1", SchemaPath: "schemas/bad.json", SHA256: hex.EncodeToString(schemaSum[:])}}})
 	require.NoError(t, err)
@@ -74,4 +74,27 @@ func TestLoadStrictRecordTypeRegistryBranches(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "schemas", "bad.json"), wrong, 0o644))
 	_, err = loadStrictRecordTypeRegistry(dir, manifest)
 	require.ErrorContains(t, err, "digest mismatch")
+}
+
+func TestReadStrictBundleFileRejectsSymlinkAndNonRegularPaths(t *testing.T) {
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "regular.json"), []byte("ok"), 0o644))
+	data, err := readStrictBundleFile(dir, "regular.json")
+	require.NoError(t, err)
+	require.Equal(t, []byte("ok"), data)
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "nested"), 0o755))
+	_, err = readStrictBundleFile(dir, "nested")
+	require.Error(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "notdir"), []byte("x"), 0o644))
+	_, err = readStrictBundleFile(dir, "notdir/child.json")
+	require.Error(t, err)
+	require.NoError(t, os.Symlink("regular.json", filepath.Join(dir, "link.json")))
+	_, err = readStrictBundleFile(dir, "link.json")
+	require.Error(t, err)
+	_, err = readStrictBundleFile(dir, "missing.json")
+	require.Error(t, err)
+	rootLink := filepath.Join(t.TempDir(), "root-link")
+	require.NoError(t, os.Symlink(dir, rootLink))
+	_, err = readStrictBundleFile(rootLink, "regular.json")
+	require.Error(t, err)
 }

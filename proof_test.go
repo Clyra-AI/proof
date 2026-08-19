@@ -405,7 +405,7 @@ func TestRegisterCustomTypeInline(t *testing.T) {
 }
 
 func TestScopedRegistryAndCorrelationProfileAPIs(t *testing.T) {
-	customSchema := []byte(`{"type":"object","required":["record_type"],"properties":{"record_type":{"const":"vendor.root"}}}`)
+	customSchema := []byte(`{"$id":"urn:test:root","x-proof-schema-version":"1","type":"object","required":["record_type"],"properties":{"record_type":{"const":"vendor.root"}}}`)
 	sum := sha256.Sum256(customSchema)
 	def := RecordTypeDefinition{RecordType: "vendor.root", SchemaID: "urn:test:root", SchemaVersion: "1", SchemaPath: "schemas/vendor-root.json", SHA256: hex.EncodeToString(sum[:])}
 	registry := NewSchemaRegistry()

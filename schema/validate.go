@@ -31,6 +31,9 @@ func ParseRecordTypeManifest(raw []byte) (RecordTypeManifest, error) {
 func LoadRecordTypeManifest(raw []byte, schemaFiles map[string][]byte) (*Registry, error) {
 	return coreschema.LoadRecordTypeManifest(raw, schemaFiles)
 }
+func LoadRecordTypeManifestWithResources(raw []byte, schemaFiles map[string][]byte) (*Registry, error) {
+	return coreschema.LoadRecordTypeManifestWithResources(raw, schemaFiles)
+}
 
 // ValidateJSONFile validates a JSON file against a JSON schema file.
 func ValidateJSONFile(schemaPath, jsonPath string) error {

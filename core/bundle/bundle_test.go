@@ -344,7 +344,7 @@ func TestVerifyStrictLoadsPortableRecordTypesWithoutGlobalLeak(t *testing.T) {
 	schema.ResetCustomTypes()
 	t.Cleanup(schema.ResetCustomTypes)
 	dir := t.TempDir()
-	customSchema := []byte(`{"type":"object","required":["record_type"],"properties":{"record_type":{"const":"vendor.bundle"}}}`)
+	customSchema := []byte(`{"$id":"urn:test:bundle","x-proof-schema-version":"1.0","type":"object","required":["record_type"],"properties":{"record_type":{"const":"vendor.bundle"}}}`)
 	schemaSum := sha256.Sum256(customSchema)
 	typesManifest := schema.RecordTypeManifest{
 		Version: schema.RecordTypeManifestVersion,
@@ -397,6 +397,62 @@ func TestVerifyStrictRejectsPortableSchemaNotCoveredByManifest(t *testing.T) {
 	_, err = Verify(dir, VerifyOpts{Strict: true})
 	require.ErrorContains(t, err, "unlisted file")
 }
+
+func TestManifestUnknownFieldsRemainDigestAndSignatureCovered(t *testing.T) {
+	dir := t.TempDir()
+	payload := []byte("{}\n")
+	recordPath := filepath.Join(dir, "records.jsonl")
+	require.NoError(t, os.WriteFile(recordPath, payload, 0o644))
+	hash := sha256.Sum256(payload)
+	manifest := Manifest{
+		Files: []ManifestEntry{{
+			Path: "records.jsonl", SHA256: hex.EncodeToString(hash[:]),
+			Extra: map[string]json.RawMessage{"path": json.RawMessage(`"ignored"`), "entry_extension": json.RawMessage(`true`)},
+		}},
+		Extra: map[string]json.RawMessage{"vendor_extension": json.RawMessage(`{"tenant":"one"}`), "files": json.RawMessage(`[]`)},
+	}
+	key, err := signing.GenerateKey()
+	require.NoError(t, err)
+	signed, err := SignManifest(manifest, key)
+	require.NoError(t, err)
+	raw, err := json.Marshal(signed)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, manifestFilename), raw, 0o644))
+	parsed, err := ReadManifest(dir)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"tenant":"one"}`, string(parsed.Extra["vendor_extension"]))
+	_, err = Verify(dir, VerifyOpts{VerifySignatures: true, PublicKey: signing.PublicKey{Public: key.Public}})
+	require.NoError(t, err)
+
+	mutated := parsed
+	mutated.Extra = map[string]json.RawMessage{"vendor_extension": json.RawMessage(`{"tenant":"two"}`)}
+	mutatedRaw, err := json.Marshal(mutated)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, manifestFilename), mutatedRaw, 0o644))
+	_, err = Verify(dir, VerifyOpts{VerifySignatures: true, PublicKey: signing.PublicKey{Public: key.Public}})
+	require.Error(t, err)
+}
+
+func TestVerifyStrictRejectsInvalidSignatureBeforeCustomSchemaCompile(t *testing.T) {
+	dir := t.TempDir()
+	records := []byte("{}\n")
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "records.jsonl"), records, 0o644))
+	badSchema := []byte(`{"$id":"urn:test:bad","x-proof-schema-version":"1","$ref":"file:///definitely/not/allowed.json"}`)
+	require.NoError(t, os.MkdirAll(filepath.Join(dir, "schemas"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "schemas", "bad.json"), badSchema, 0o644))
+	types := schema.RecordTypeManifest{Version: schema.RecordTypeManifestVersion, RecordTypes: []schema.RecordTypeDefinition{{RecordType: "vendor.bad", SchemaID: "urn:test:bad", SchemaVersion: "1", SchemaPath: "schemas/bad.json", SHA256: hashBytes(badSchema)}}}
+	typesRaw, err := json.Marshal(types)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "record-types.json"), typesRaw, 0o644))
+	manifest := Manifest{Files: []ManifestEntry{{Path: "record-types.json", SHA256: hashBytes(typesRaw)}, {Path: "schemas/bad.json", SHA256: hashBytes(badSchema)}, {Path: "records.jsonl", SHA256: hashBytes(records)}}, Signatures: []signing.Signature{{Alg: "ed25519", KeyID: "bad", Sig: "bad", SignedDigest: "bad"}}}
+	raw, err := json.Marshal(manifest)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(dir, manifestFilename), raw, 0o644))
+	_, err = Verify(dir, VerifyOpts{Strict: true, VerifySignatures: true, PublicKey: signing.PublicKey{Public: make([]byte, 32)}})
+	require.ErrorContains(t, err, "signed digest mismatch")
+}
+
+func hashBytes(raw []byte) string { sum := sha256.Sum256(raw); return hex.EncodeToString(sum[:]) }
 
 func writeFakeCosign(t *testing.T) string {
 	t.Helper()

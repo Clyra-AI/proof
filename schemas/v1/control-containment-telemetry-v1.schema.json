@@ -475,15 +475,18 @@
     },
     "trace_id": {
       "type": "string",
-      "pattern": "^[0-9a-f]{32}$"
+      "pattern": "^[0-9a-f]{32}$",
+      "not": {"const": "00000000000000000000000000000000"}
     },
     "span_id": {
       "type": "string",
-      "pattern": "^[0-9a-f]{16}$"
+      "pattern": "^[0-9a-f]{16}$",
+      "not": {"const": "0000000000000000"}
     },
     "parent_span_id": {
       "type": "string",
-      "pattern": "^[0-9a-f]{16}$"
+      "pattern": "^[0-9a-f]{16}$",
+      "not": {"const": "0000000000000000"}
     },
     "content_digest": {
       "$ref": "#/$defs/digest"
