@@ -23,7 +23,7 @@ jobs:
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: v2.13.3
-          args: release --clean
+          args: release --clean --skip=publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
@@ -32,33 +32,61 @@ jobs:
       - uses: anchore/sbom-action@v0
         with:
           artifact-name: sbom.spdx.json
-          output-file: sbom.spdx.json
+          output-file: dist/sbom.spdx.json
       - name: Install grype
         uses: anchore/scan-action/download-grype@v4
-      - name: Refresh grype database
-        run: grype db update
-      - name: Vulnerability scan (dist)
-        run: grype dir:dist --fail-on high || grype dir:dist --fail-on critical
+      - name: Vulnerability scan (verified release contents)
+        run: ./scripts/release_security_scan.sh dist
       - uses: sigstore/cosign-installer@v3
       - name: Sign checksums
+        env:
+          COSIGN_EXPERIMENTAL: "1"
         run: |
-          cosign sign-blob --yes --output-signature dist/checksums.txt.sig --output-certificate dist/checksums.txt.pem dist/checksums.txt
+          signing_dir="$(mktemp -d dist/.signing.XXXXXX)"
+          trap 'rm -rf -- "${signing_dir}"' EXIT
+          cosign sign-blob --yes \
+            --output-signature "${signing_dir}/checksums.txt.sig" \
+            --output-certificate "${signing_dir}/checksums.txt.pem" \
+            dist/checksums.txt
+          test -s "${signing_dir}/checksums.txt.sig"
+          test -s "${signing_dir}/checksums.txt.pem"
+          mv "${signing_dir}/checksums.txt.sig" dist/checksums.txt.sig
+          mv "${signing_dir}/checksums.txt.pem" dist/checksums.txt.pem
       - name: Verify signed checksums
         run: ./scripts/verify_release_artifacts.sh dist
-      - name: Upload checksum signature assets to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload "${{ github.ref_name }}" \
-            dist/checksums.txt.sig \
-            dist/checksums.txt.pem \
-            --repo "${{ github.repository }}" \
-            --clobber
       - name: Generate build provenance
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
-            dist/*
+            dist/checksums.txt
+            dist/checksums.txt.sig
+            dist/checksums.txt.pem
+            dist/*.tar.gz
+            dist/*.zip
+            dist/sbom.spdx.json
+      - name: Publish verified release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          assets=(dist/checksums.txt dist/checksums.txt.sig dist/checksums.txt.pem dist/sbom.spdx.json)
+          shopt -s nullglob
+          assets+=(dist/*.tar.gz dist/*.zip)
+          shopt -u nullglob
+          if [[ ${#assets[@]} -ne 10 ]]; then
+            echo "expected exactly six release archives plus checksum/SBOM assets in dist/" >&2
+            exit 1
+          fi
+          if gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "${{ github.ref_name }}" "${assets[@]}" \
+              --repo "${{ github.repository }}" \
+              --clobber
+          else
+            gh release create "${{ github.ref_name }}" "${assets[@]}" \
+              --repo "${{ github.repository }}" \
+              --verify-tag \
+              --title "${{ github.ref_name }}" \
+              --generate-notes
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: release-security-artifacts
@@ -66,4 +94,5 @@ jobs:
             dist/checksums.txt
             dist/checksums.txt.sig
             dist/checksums.txt.pem
-            sbom.spdx.json
+            dist/sbom.spdx.json
+            dist/scan/*.log

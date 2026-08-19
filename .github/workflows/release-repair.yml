@@ -122,82 +122,10 @@ jobs:
           PY
       - name: Verify downloaded release checksums
         run: ./scripts/verify_release_artifacts.sh dist
-      - name: Extract verified release archives for scanning
-        run: |
-          rm -rf dist/scan-root
-          mkdir -p dist/scan-root
-          shopt -s nullglob
-          for archive in dist/proof_*.tar.gz; do
-            out_dir="dist/scan-root/$(basename "${archive}" .tar.gz)"
-            mkdir -p "${out_dir}"
-            tar -xzf "${archive}" -C "${out_dir}"
-          done
-          for archive in dist/proof_*.zip; do
-            out_dir="dist/scan-root/$(basename "${archive}" .zip)"
-            mkdir -p "${out_dir}"
-            unzip -q "${archive}" -d "${out_dir}"
-          done
-          mapfile -t extracted_binaries < <(find dist/scan-root -type f \( -name 'proof' -o -name 'proof.exe' \) | sort)
-          if [[ ${#extracted_binaries[@]} -ne 6 ]]; then
-            echo "expected 6 extracted release binaries, found ${#extracted_binaries[@]}" >&2
-            printf '%s\n' "${extracted_binaries[@]}"
-            exit 1
-          fi
       - name: Install grype
         uses: anchore/scan-action/download-grype@v4
       - name: Vulnerability scan (verified release contents)
-        run: |
-          mkdir -p dist/scan
-          set +e
-          grype db update > dist/scan/grype-db-update.log 2>&1
-          db_update_status=$?
-          set -e
-          if [[ ${db_update_status} -ne 0 ]]; then
-            echo "grype db update did not complete successfully; proceeding to scan and requiring an explicit freshness failure before fallback"
-            cat dist/scan/grype-db-update.log
-          fi
-
-          set +e
-          grype dir:dist/scan-root --fail-on high > dist/scan/grype-high.log 2>&1
-          high_status=$?
-          set -e
-          if [[ ${high_status} -eq 0 ]]; then
-            cat dist/scan/grype-high.log
-            exit 0
-          fi
-
-          if grep -q "max allowed age" dist/scan/grype-high.log; then
-            echo "grype DB freshness gate still failed after refresh; using govulncheck fallback on extracted binaries"
-            : > dist/scan/govulncheck.log
-            while IFS= read -r binary_path; do
-              echo "==> ${binary_path}" | tee -a dist/scan/govulncheck.log
-              go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 -mode=binary "${binary_path}" 2>&1 | tee -a dist/scan/govulncheck.log
-            done < <(find dist/scan-root -type f \( -name 'proof' -o -name 'proof.exe' \) | sort)
-            exit 0
-          fi
-
-          set +e
-          grype dir:dist/scan-root --fail-on critical > dist/scan/grype-critical.log 2>&1
-          critical_status=$?
-          set -e
-          cat dist/scan/grype-high.log
-          if [[ ${critical_status} -eq 0 ]]; then
-            cat dist/scan/grype-critical.log
-            exit 0
-          fi
-
-          cat dist/scan/grype-critical.log
-          if grep -q "max allowed age" dist/scan/grype-critical.log; then
-            echo "grype DB freshness gate still failed after refresh; using govulncheck fallback on extracted binaries"
-            : > dist/scan/govulncheck.log
-            while IFS= read -r binary_path; do
-              echo "==> ${binary_path}" | tee -a dist/scan/govulncheck.log
-              go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 -mode=binary "${binary_path}" 2>&1 | tee -a dist/scan/govulncheck.log
-            done < <(find dist/scan-root -type f \( -name 'proof' -o -name 'proof.exe' \) | sort)
-            exit 0
-          fi
-
-          exit ${critical_status}
+        run: ./scripts/release_security_scan.sh dist
       - uses: sigstore/cosign-installer@v3
       - name: Determine checksum signature pair state
         id: signature_pair
@@ -322,7 +250,4 @@ jobs:
             dist/checksums.txt.sig
             dist/checksums.txt.pem
             dist/sbom.spdx.json
-            dist/scan/grype-db-update.log
-            dist/scan/grype-high.log
-            dist/scan/grype-critical.log
-            dist/scan/govulncheck.log
+            dist/scan/*.log
