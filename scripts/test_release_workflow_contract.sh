@@ -52,6 +52,7 @@ require_pattern "${repair_workflow}" "git -C release-source rev-parse HEAD"
 require_pattern "${repair_workflow}" "git -C trusted-source rev-parse HEAD"
 require_pattern "${repair_workflow}" "trusted-source/scripts/release_security_scan.sh dist"
 require_pattern "${repair_workflow}" "trusted-source/scripts/check_release_asset_set.py"
+require_pattern "${repair_workflow}" "--json isDraft,isPrerelease,publishedAt,assets"
 require_pattern "${repair_workflow}" "COSIGN_CERT_IDENTITY: https://github.com/Clyra-AI/proof/.github/workflows/release.yml@refs/tags/v0.5.0"
 require_pattern "${repair_workflow}" "refusing to overwrite"
 if [[ "$(grep -Fc -- "--require-published" "${repair_workflow}")" -ne 2 ]]; then

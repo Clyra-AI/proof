@@ -118,7 +118,7 @@ jobs:
           release_json_path="$(mktemp)"
           gh release view "${RELEASE_TAG}" \
             --repo "${REPOSITORY_FULL_NAME}" \
-            --json assets > "${release_json_path}"
+            --json isDraft,isPrerelease,publishedAt,assets > "${release_json_path}"
           python3 trusted-source/scripts/check_release_asset_set.py \
             "${release_json_path}" dist 0.5.0 --allow-missing --require-published
       - name: Verify downloaded release checksums
@@ -203,7 +203,7 @@ jobs:
           release_json_path="$(mktemp)"
           gh release view "${RELEASE_TAG}" \
             --repo "${REPOSITORY_FULL_NAME}" \
-            --json assets > "${release_json_path}"
+            --json isDraft,isPrerelease,publishedAt,assets > "${release_json_path}"
           python3 trusted-source/scripts/check_release_asset_set.py \
             "${release_json_path}" dist 0.5.0 --require-published
       - name: Generate build provenance
