@@ -42,6 +42,43 @@ Strict verification is opt-in so existing verification calls remain source- and 
 paths, unlisted files, symbolic-link ambiguity, and inconsistent chain counts or head hashes. These failures use stable
 `structure.*` and `chain.*` structured error codes.
 
+## Portable Custom Type Registries
+
+`core/schema.Registry` (also available as `proof.SchemaRegistry`) is the scoped custom record-type API. Register a
+`RecordTypeDefinition` with its schema bytes, or use `RegisterCustomType(recordType, schemaID, schemaVersion,
+schemaPath, data)`. Definitions are additive: built-in names cannot be replaced and conflicting definitions are
+rejected. Schema paths are relative, canonical, and validated with the same strict path primitives used by bundle
+verification. The versioned `record-types.json` manifest uses `version: "1"` and requires a SHA-256 digest for each
+schema. `record-types.json` and every referenced schema must be members of a strict bundle manifest; strict verification
+loads them into a call-local registry and does not mutate the legacy `RegisterCustomType` registry.
+
+Portable custom schemas must declare `$id` equal to `schema_id` and
+`x-proof-schema-version` equal to `schema_version`. Relative `$ref` values
+must target another schema listed in the same strict bundle; file, HTTP, and
+escaping references are rejected. Direct single-schema `Registry.Register`
+calls allow only fragments or the schema's own `$id`; use
+`LoadRecordTypeManifestWithResources` for allowlisted sibling schemas.
+
+The legacy `RegisterCustomType`, `RegisterCustomTypeSchema`, and `ResetCustomTypes` functions remain supported for
+source compatibility. New code that may verify concurrent or untrusted bundles should use scoped registries.
+
+`EvaluateFrameworkCoverage` is retained for compatibility and is deprecated as a compliance interpretation boundary:
+it reports deterministic evidence-path coverage only. Regulatory applicability, scope, gap scoring, and compliance
+decisions belong to product-owned consumers and are not inferred by Proof.
+
+## Control, Containment, and Telemetry Correlation Profile
+
+`ControlContainmentTelemetryProfile` is a versioned, product-neutral structure whose refs cover event, action, contract,
+run, session, policy, decision, proof, causal, containment, boundary, revocation, and acknowledgement relationships.
+It validates OpenTelemetry identifier shapes, optional SHA-256 content/reference digests, redaction metadata, and the
+`identifier_only`/`digest_bound` binding mode. Identifier-only references establish only that identifiers were recorded;
+they do not establish enforcement, containment, telemetry authenticity, or product meaning. The normative public and
+embedded schema is `schemas/v1/control-containment-telemetry-v1.schema.json`; use
+`ValidateControlContainmentTelemetryProfile` and `CanonicalizeControlContainmentTelemetry` for deterministic API
+validation and RFC 8785 JSON canonicalization.
+The compatibility schema name `v1/control-containment-telemetry-profile-v1.schema.json` is kept in parity with the
+canonical telemetry schema, including binding, identifier, and redaction constraints.
+
 ## Deprecation Policy
 
 - Compatibility shims are not scheduled for removal in major version `1`.

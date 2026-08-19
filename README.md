@@ -86,6 +86,23 @@ if err := proof.RegisterCustomTypeSchema("vendor.custom_event", "./custom.schema
 
 Custom types validate against the base proof record schema plus your type-specific schema. They chain and sign identically to built-in types.
 
+Portable bundles can carry a scoped custom type registry in `record-types.json`. The manifest version is `1` and each
+entry records `record_type`, `schema_id`, `schema_version`, a safe relative `schema_path`, and its SHA-256 digest.
+Portable schema files declare matching `$id` and `x-proof-schema-version` metadata.
+Strict bundle verification requires the manifest and every referenced schema to be listed and hash-covered by the
+bundle manifest. Verification loads these definitions into a call-local `schema.Registry`; they never leak into the
+legacy process-global registration API. Use `proof.NewSchemaRegistry` and `proof.ValidateRecordWithRegistry` when
+validating records from an explicitly scoped registry.
+
+### Control, Containment, and Telemetry Correlation
+
+`ControlContainmentTelemetryProfile` is a versioned, product-neutral envelope for event, action, contract, run, session,
+policy, decision, proof, causal, containment, boundary, revocation, and acknowledgement references, along with
+OpenTelemetry `trace_id`/`span_id`/`parent_span_id` fields. `binding_mode` is either `identifier_only` or `digest_bound`.
+Identifier-only references prove only that identifiers were recorded; Proof does not infer enforcement, containment,
+telemetry authenticity, or product semantics. Digest-bound references use the same SHA-256 `RelationshipRef` fields and
+canonicalization rules as the rest of Proof. See `schemas/v1/control-containment-telemetry-v1.schema.json`.
+
 ### Read Paths
 
 - `proof.ReadRecord(path)` parses JSON into a `Record` without schema validation.

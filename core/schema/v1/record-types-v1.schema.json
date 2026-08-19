@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Clyra-AI/proof/schemas/v1/record-types-v1.schema.json",
+  "title": "Proof portable custom record type manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "record_types"],
+  "properties": {
+    "version": { "type": "string", "enum": ["1", "1.0"] },
+    "record_types": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["record_type", "schema_id", "schema_version", "schema_path", "sha256"],
+        "properties": {
+          "record_type": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+          },
+          "schema_id": { "type": "string", "minLength": 1 },
+          "schema_version": { "type": "string", "minLength": 1 },
+          "schema_path": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9._/-]+$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^(sha256:)?[a-f0-9]{64}$"
+          }
+        }
+      }
+    }
+  }
+}

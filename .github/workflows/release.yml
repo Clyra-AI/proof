@@ -17,13 +17,21 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Validate release tag
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          [[ "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "invalid release tag format: ${RELEASE_TAG}" >&2
+            exit 1
+          }
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
       - uses: goreleaser/goreleaser-action@v6
         with:
           version: v2.13.3
-          args: release --clean
+          args: release --clean --skip=publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
@@ -32,33 +40,59 @@ jobs:
       - uses: anchore/sbom-action@v0
         with:
           artifact-name: sbom.spdx.json
-          output-file: sbom.spdx.json
+          output-file: dist/sbom.spdx.json
       - name: Install grype
         uses: anchore/scan-action/download-grype@v4
-      - name: Refresh grype database
-        run: grype db update
-      - name: Vulnerability scan (dist)
-        run: grype dir:dist --fail-on high || grype dir:dist --fail-on critical
+      - name: Vulnerability scan (verified release contents)
+        run: ./scripts/release_security_scan.sh dist
       - uses: sigstore/cosign-installer@v3
-      - name: Sign checksums
-        run: |
-          cosign sign-blob --yes --output-signature dist/checksums.txt.sig --output-certificate dist/checksums.txt.pem dist/checksums.txt
-      - name: Verify signed checksums
-        run: ./scripts/verify_release_artifacts.sh dist
-      - name: Upload checksum signature assets to release
+      - name: Prepare checksum signatures
+        id: checksum_signatures
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          COSIGN_CERT_IDENTITY: https://github.com/${{ github.workflow_ref }}
+          COSIGN_CERT_ISSUER: https://token.actions.githubusercontent.com
+        run: ./scripts/prepare_release_signatures.sh dist "${RELEASE_TAG}" "${GITHUB_REPOSITORY}"
+      - name: Sign checksums
+        if: steps.checksum_signatures.outputs.mode == 'sign'
+        env:
+          COSIGN_EXPERIMENTAL: "1"
         run: |
-          gh release upload "${{ github.ref_name }}" \
-            dist/checksums.txt.sig \
-            dist/checksums.txt.pem \
-            --repo "${{ github.repository }}" \
-            --clobber
+          [[ ! -e dist/checksums.txt.sig && ! -L dist/checksums.txt.sig && ! -e dist/checksums.txt.pem && ! -L dist/checksums.txt.pem ]] || {
+            echo "checksum signature assets already exist; refusing to overwrite" >&2
+            exit 1
+          }
+          signing_dir="$(mktemp -d dist/.signing.XXXXXX)"
+          trap 'rm -rf -- "${signing_dir}"' EXIT
+          cosign sign-blob --yes \
+            --output-signature "${signing_dir}/checksums.txt.sig" \
+            --output-certificate "${signing_dir}/checksums.txt.pem" \
+            dist/checksums.txt
+          test -s "${signing_dir}/checksums.txt.sig"
+          test -s "${signing_dir}/checksums.txt.pem"
+          mv "${signing_dir}/checksums.txt.sig" dist/checksums.txt.sig
+          mv "${signing_dir}/checksums.txt.pem" dist/checksums.txt.pem
+      - name: Verify signed checksums
+        env:
+          COSIGN_CERT_IDENTITY: https://github.com/${{ github.workflow_ref }}
+          COSIGN_CERT_ISSUER: https://token.actions.githubusercontent.com
+        run: ./scripts/verify_release_artifacts.sh dist
       - name: Generate build provenance
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: |
-            dist/*
+            dist/checksums.txt
+            dist/checksums.txt.sig
+            dist/checksums.txt.pem
+            dist/*.tar.gz
+            dist/*.zip
+            dist/sbom.spdx.json
+      - name: Publish verified release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: ./scripts/publish_release_assets.sh dist "${RELEASE_TAG}" "${GITHUB_REPOSITORY}"
       - uses: actions/upload-artifact@v4
         with:
           name: release-security-artifacts
@@ -66,4 +100,5 @@ jobs:
             dist/checksums.txt
             dist/checksums.txt.sig
             dist/checksums.txt.pem
-            sbom.spdx.json
+            dist/sbom.spdx.json
+            dist/scan/*.log

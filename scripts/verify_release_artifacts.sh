@@ -24,13 +24,6 @@ if [[ -f "${DIST_DIR}/checksums.txt.sig" && -f "${DIST_DIR}/checksums.txt.pem" ]
     cert_identity="${COSIGN_CERT_IDENTITY:-}"
     cert_issuer="${COSIGN_CERT_ISSUER:-}"
 
-    if [[ -z "${cert_identity}" && -n "${GITHUB_WORKFLOW_REF:-}" ]]; then
-      cert_identity="https://github.com/${GITHUB_WORKFLOW_REF}"
-    fi
-    if [[ -z "${cert_issuer}" && -n "${GITHUB_ACTIONS:-}" ]]; then
-      cert_issuer="https://token.actions.githubusercontent.com"
-    fi
-
     if [[ -n "${cert_identity}" ]]; then
       verify_args+=(--certificate-identity "${cert_identity}")
     fi

@@ -8,8 +8,32 @@ import (
 	"os"
 	"strings"
 
+	coreschema "github.com/Clyra-AI/proof/core/schema"
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v5"
 )
+
+// Portable custom record type APIs are re-exported from the compatibility
+// schema package for callers that historically imported proof/schema.
+type RecordTypeDefinition = coreschema.RecordTypeDefinition
+type RecordTypeManifest = coreschema.RecordTypeManifest
+type Registry = coreschema.Registry
+
+const (
+	RecordTypeManifestVersion = coreschema.RecordTypeManifestVersion
+	RecordTypeManifestPath    = coreschema.RecordTypeManifestPath
+)
+
+func NewRegistry() *Registry       { return coreschema.NewRegistry() }
+func NewScopedRegistry() *Registry { return coreschema.NewScopedRegistry() }
+func ParseRecordTypeManifest(raw []byte) (RecordTypeManifest, error) {
+	return coreschema.ParseRecordTypeManifest(raw)
+}
+func LoadRecordTypeManifest(raw []byte, schemaFiles map[string][]byte) (*Registry, error) {
+	return coreschema.LoadRecordTypeManifest(raw, schemaFiles)
+}
+func LoadRecordTypeManifestWithResources(raw []byte, schemaFiles map[string][]byte) (*Registry, error) {
+	return coreschema.LoadRecordTypeManifestWithResources(raw, schemaFiles)
+}
 
 // ValidateJSONFile validates a JSON file against a JSON schema file.
 func ValidateJSONFile(schemaPath, jsonPath string) error {

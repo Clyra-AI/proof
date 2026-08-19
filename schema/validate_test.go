@@ -58,3 +58,15 @@ func TestValidateSchemaAndFileErrorBranches(t *testing.T) {
 	require.NoError(t, os.WriteFile(invalidSchemaPath, []byte(`{bad`), 0o600))
 	require.Error(t, ValidateJSON(invalidSchemaPath, []byte(`{"id":"x"}`)))
 }
+
+func TestPortableRegistryCompatibilityExports(t *testing.T) {
+	registry := NewRegistry()
+	require.NotNil(t, registry)
+	require.NotNil(t, NewScopedRegistry())
+	manifest, err := ParseRecordTypeManifest([]byte(`{"version":"1","record_types":[]}`))
+	require.NoError(t, err)
+	require.Equal(t, "1", manifest.Version)
+	loaded, err := LoadRecordTypeManifest([]byte(`{"version":"1","record_types":[]}`), map[string][]byte{})
+	require.NoError(t, err)
+	require.Empty(t, loaded.Definitions())
+}

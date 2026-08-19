@@ -17,9 +17,15 @@ The format is inspired by Keep a Changelog and this project follows semantic ver
 - Validated namespaced relationship entity/edge kinds and stable typed validation reason codes.
 - Opt-in strict structural verification for bundles, chains, and Gait packs/runpacks, with stable typed errors for
   ambiguous/duplicate paths, unlisted files, symlinks, and inconsistent chain metadata.
+- Scoped portable custom record-type registries with versioned `record-types.json` manifests, SHA-256 schema
+  membership, safe paths, conflict checks, and strict bundle auto-loading without process-global state leakage.
+- Added the product-neutral Control, Containment, and Telemetry Correlation Profile with OpenTelemetry identifier
+  validation, optional redaction/digest binding, deterministic canonicalization, and explicit identifier-only limits.
 
 ### Changed
 
+- Go toolchain baseline raised to Go 1.26.6 for current standard-library security fixes.
+- Normal release publication now reuses and verifies existing checksum signatures and rejects draft or prerelease targets.
 - Public `proof` package now aliases bundle types from `core/bundle`.
 - Added `ReadAndValidateRecord` to make validated read behavior explicit.
 - `SignBundle` and `SignBundleCosign` kept as deprecated wrappers over explicit file-mutating variants.
