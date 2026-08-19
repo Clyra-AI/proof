@@ -121,6 +121,38 @@ func TestPortableManifestSchemaIdentityAndLocalRefs(t *testing.T) {
 	require.ErrorContains(t, err, "schema $id mismatch")
 }
 
+func TestScopedRegistryRejectsExternalAndRelativeRefsButAllowsFragments(t *testing.T) {
+	hash := func(raw []byte) string { sum := sha256.Sum256(raw); return hex.EncodeToString(sum[:]) }
+	baseDef := func(raw []byte) RecordTypeDefinition {
+		return RecordTypeDefinition{RecordType: "vendor.direct", SchemaID: "urn:test:direct", SchemaVersion: "1", SchemaPath: "schemas/direct.json", SHA256: hash(raw)}
+	}
+	for name, raw := range map[string][]byte{
+		"file":     []byte(`{"$id":"urn:test:direct","x-proof-schema-version":"1","type":"object","properties":{"event":{"$ref":"file:///definitely/not/allowed.json"}}}`),
+		"http":     []byte(`{"$id":"urn:test:direct","x-proof-schema-version":"1","type":"object","properties":{"event":{"$ref":"https://example.invalid/schema.json"}}}`),
+		"relative": []byte(`{"$id":"urn:test:direct","x-proof-schema-version":"1","type":"object","properties":{"event":{"$ref":"shared.json"}}}`),
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := NewRegistry().Register(baseDef(raw), raw)
+			require.Error(t, err)
+			typed, ok := coreerr.As(err)
+			require.True(t, ok)
+			if name == "relative" {
+				require.Equal(t, "schema.custom.ref_unlisted", typed.Code)
+			} else {
+				require.Equal(t, "schema.custom.ref_external", typed.Code)
+			}
+		})
+	}
+
+	fragment := []byte(`{"$id":"urn:test:direct","x-proof-schema-version":"1","type":"object","required":["record_type","event"],"properties":{"record_type":{"const":"vendor.direct"},"event":{"$ref":"#/$defs/event"}},"$defs":{"event":{"type":"object","required":["value"],"properties":{"value":{"type":"string"}}}}}`)
+	registry := NewRegistry()
+	require.NoError(t, registry.Register(baseDef(fragment), fragment))
+	require.NoError(t, registry.ValidateRecord(scopedRecord("vendor.direct", `{"value":"ok"}`), "vendor.direct"))
+
+	canonicalID := []byte(`{"$id":"urn:test:direct","x-proof-schema-version":"1","type":"object","required":["record_type","event"],"properties":{"record_type":{"const":"vendor.direct"},"event":{"$ref":"urn:test:direct#/$defs/event"}},"$defs":{"event":{"type":"object","required":["value"],"properties":{"value":{"type":"string"}}}}}`)
+	require.NoError(t, NewRegistry().Register(baseDef(canonicalID), canonicalID))
+}
+
 func TestLegacyCustomRegistrationRemainsCompatible(t *testing.T) {
 	ResetCustomTypes()
 	t.Cleanup(ResetCustomTypes)

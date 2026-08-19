@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"path"
@@ -174,9 +175,15 @@ func (r *Registry) Register(def RecordTypeDefinition, data []byte) error {
 	if err := validatePortableSchemaIdentity(def, data); err != nil {
 		return err
 	}
+	// Direct registrations have no sibling resource set. Permit only local
+	// fragments and references back to this schema's exact in-memory $id;
+	// relative, file, and network references fail before compilation.
+	if err := validatePortableSchemaRefs(def.SchemaPath, data, nil, map[string]struct{}{def.SchemaID: {}}); err != nil {
+		return err
+	}
 	def.SHA256 = digest
 	def.Digest = digest
-	compiled, err := compileSchema(def.SchemaPath, data)
+	compiled, err := compilePortableSchemaSingle(def.SchemaPath, def.SchemaID, data)
 	if err != nil {
 		return coreerr.Wrap(coreerr.KindValidation, "schema.custom.compile_failed", fmt.Sprintf("compile custom schema %s", filepath.Base(def.SchemaPath)), err, coreerr.WithPath(def.SchemaPath))
 	}
@@ -383,6 +390,7 @@ func LoadRecordTypeManifestWithResources(raw []byte, schemaFiles map[string][]by
 		}
 	}
 	compiler := jsonschema.NewCompiler()
+	compiler.LoadURL = portableSchemaFailClosedLoader
 	for _, def := range definitions {
 		key, _ := structure.ValidatePath(def.SchemaPath)
 		data, err := portableSchemaCompileBytes(resources[key])
@@ -423,6 +431,26 @@ func portableSchemaCompileBytes(data []byte) ([]byte, error) {
 	}
 	delete(document, "$id")
 	return json.Marshal(document)
+}
+
+func compilePortableSchemaSingle(schemaPath, schemaID string, data []byte) (*jsonschema.Schema, error) {
+	compiler := jsonschema.NewCompiler()
+	compiler.LoadURL = portableSchemaFailClosedLoader
+	compiledBytes, err := portableSchemaCompileBytes(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := compiler.AddResource(schemaPath, strings.NewReader(string(compiledBytes))); err != nil {
+		return nil, err
+	}
+	if err := compiler.AddResource(schemaID, strings.NewReader(string(compiledBytes))); err != nil {
+		return nil, err
+	}
+	return compiler.Compile(schemaPath)
+}
+
+func portableSchemaFailClosedLoader(ref string) (io.ReadCloser, error) {
+	return nil, coreerr.New(coreerr.KindValidation, "schema.custom.ref_unlisted", fmt.Sprintf("schema reference is not in the in-memory resource set: %s", ref))
 }
 
 // LoadRecordTypeManifestFile loads a portable manifest from a local root.
@@ -722,14 +750,17 @@ func validatePortableSchemaRef(basePath, ref string, resourcePaths, resourceIDs 
 	if err != nil {
 		return coreerr.Wrap(coreerr.KindValidation, "schema.custom.ref_invalid", "parse schema reference", err, coreerr.WithPath(basePath))
 	}
-	if parsed.Scheme == "http" || parsed.Scheme == "https" || parsed.Scheme == "file" || parsed.Host != "" {
+	if parsed.Scheme != "" {
+		resourceID := parsed
+		resourceID.Fragment = ""
+		resourceID.RawFragment = ""
+		if _, ok := resourceIDs[resourceID.String()]; ok {
+			return nil
+		}
 		return coreerr.New(coreerr.KindValidation, "schema.custom.ref_external", fmt.Sprintf("external schema reference is not allowed: %s", ref), coreerr.WithPath(basePath))
 	}
-	if parsed.Scheme != "" {
-		if _, ok := resourceIDs[parsed.Scheme+":"+parsed.Opaque]; !ok {
-			return coreerr.New(coreerr.KindValidation, "schema.custom.ref_unlisted", fmt.Sprintf("schema reference is not in the bundle resource set: %s", ref), coreerr.WithPath(basePath))
-		}
-		return nil
+	if parsed.Host != "" {
+		return coreerr.New(coreerr.KindValidation, "schema.custom.ref_external", fmt.Sprintf("external schema reference is not allowed: %s", ref), coreerr.WithPath(basePath))
 	}
 	if parsed.Path == "" {
 		return nil // fragment-only local reference

@@ -55,7 +55,9 @@ loads them into a call-local registry and does not mutate the legacy `RegisterCu
 Portable custom schemas must declare `$id` equal to `schema_id` and
 `x-proof-schema-version` equal to `schema_version`. Relative `$ref` values
 must target another schema listed in the same strict bundle; file, HTTP, and
-escaping references are rejected.
+escaping references are rejected. Direct single-schema `Registry.Register`
+calls allow only fragments or the schema's own `$id`; use
+`LoadRecordTypeManifestWithResources` for allowlisted sibling schemas.
 
 The legacy `RegisterCustomType`, `RegisterCustomTypeSchema`, and `ResetCustomTypes` functions remain supported for
 source compatibility. New code that may verify concurrent or untrusted bundles should use scoped registries.
