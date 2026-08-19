@@ -120,7 +120,7 @@ jobs:
             --repo "${REPOSITORY_FULL_NAME}" \
             --json assets > "${release_json_path}"
           python3 trusted-source/scripts/check_release_asset_set.py \
-            "${release_json_path}" dist 0.5.0 --allow-missing
+            "${release_json_path}" dist 0.5.0 --allow-missing --require-published
       - name: Verify downloaded release checksums
         env:
           COSIGN_CERT_IDENTITY: https://github.com/Clyra-AI/proof/.github/workflows/release.yml@refs/tags/v0.5.0
@@ -205,7 +205,7 @@ jobs:
             --repo "${REPOSITORY_FULL_NAME}" \
             --json assets > "${release_json_path}"
           python3 trusted-source/scripts/check_release_asset_set.py \
-            "${release_json_path}" dist 0.5.0
+            "${release_json_path}" dist 0.5.0 --require-published
       - name: Generate build provenance
         uses: actions/attest-build-provenance@v2
         with:

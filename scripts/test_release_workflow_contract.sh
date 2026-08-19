@@ -54,6 +54,10 @@ require_pattern "${repair_workflow}" "trusted-source/scripts/release_security_sc
 require_pattern "${repair_workflow}" "trusted-source/scripts/check_release_asset_set.py"
 require_pattern "${repair_workflow}" "COSIGN_CERT_IDENTITY: https://github.com/Clyra-AI/proof/.github/workflows/release.yml@refs/tags/v0.5.0"
 require_pattern "${repair_workflow}" "refusing to overwrite"
+if [[ "$(grep -Fc -- "--require-published" "${repair_workflow}")" -ne 2 ]]; then
+  echo "all later repair asset checkpoints must require published release state" >&2
+  exit 1
+fi
 if grep -Fq -- "--clobber" "${repair_workflow}"; then
   echo "repair workflow must not clobber downloaded or published assets" >&2
   exit 1
