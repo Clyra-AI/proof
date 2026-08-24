@@ -165,8 +165,28 @@ func runScenario(t *testing.T, binary, dir string) {
 		require.Equal(t, "succeeded", gaitResult["gait_execution"])
 		require.Equal(t, "validated", gaitResult["gait_effect"])
 		require.Equal(t, "completed", gaitResult["containment_status"])
-		require.NotEmpty(t, gaitResult["source_artifact_digests"])
-		require.NotEmpty(t, gaitResult["derived_evidence_digests"])
+		expectedSourceDigests := []string{"sha256:fcb0085b5af73b8a42aa09c25c09f6510d4eb39b8c06a0eb4e16bcbded4fffa2"}
+		expectedDerivedDigests := []string{
+			"sha256:16eba08f5e0d07d87311a873bc34d61134cdc65f55caa6c5545c59a5094d01f1",
+			"sha256:1b4c0014496970235536a0ff5524630a8a09fa3fe436dc988ccc1ce150299796",
+			"sha256:1ca2ddf402ec82c40c669ea8c96df8a8cbe0e01502119f0f158a217360e6d5a3",
+			"sha256:2175abc2005cd520280f32bb4d5fffa063e81f95d357b6ec9069fa44cd27b321",
+			"sha256:238bd43efbf9567e6453a72f5680e36b11a16bccdb46d22357613819f5f8c49c",
+			"sha256:2c126b9af89ef9719c325781e3b048439b0171209dd53f1324b69c442ca84873",
+			"sha256:4169029f4868a9bbeb57776ea104cef9c008cea8ca3d4bd9c8aacf88bdafdff6",
+			"sha256:48f30dc734a2be931d4384c9d0bc76eeb78e684a9602d7e7fc89406a406cc51d",
+			"sha256:53753e5a8b409836a9d77565e0becb4bf7718c78cd2228e0aa540d8e7bf90037",
+			"sha256:558793eec57b717857f9d0f02bc937b15f6cff2a069f415495dcc4cd4573a57c",
+			"sha256:56341bd700fb0d357ef4d3a3280e4839d7a38802462085822d9e8a5eab7e7898",
+			"sha256:63e67b832ce84478cdfa4e2280a4d8abfe8eb101d83c29ba5f418c5927116a9a",
+			"sha256:68602742f8064bf50bb9fa363c21c870ce678b972ea1f891736076dc98c86471",
+			"sha256:6f30424fb911e580e3c0aff3e8cc536dc423f5ca52118c7ba96cb55de7aedc56",
+			"sha256:783d733f6f8dc3713a8ec5f8cbc184096029ebf054da669a3b6240bf0fa98805",
+			"sha256:80a62dce6d21798114efc63fe00e60dc1341d5e159750cbc16c9393a6f849519",
+			"sha256:94509c208a8751dae4512a96f2fab92fca81adbc0990e2c0db1382680973c8ab",
+		}
+		require.Equal(t, expectedSourceDigests, stringSlice(gaitResult["source_artifact_digests"]))
+		require.Equal(t, expectedDerivedDigests, stringSlice(gaitResult["derived_evidence_digests"]))
 		require.NotEmpty(t, gaitResult["evidence_refs"])
 		metadata := records[1].Metadata
 		require.Equal(t, "gait_lifecycle", metadata["evidence_kind"])
@@ -174,6 +194,8 @@ func runScenario(t *testing.T, binary, dir string) {
 		require.Equal(t, true, metadata["gait_fixture_only"])
 		require.Equal(t, "verified", metadata["gait_verification_state"])
 		require.Equal(t, "fixture_quarantine", metadata["gait_projection"])
+		require.Equal(t, expectedSourceDigests, stringSlice(metadata["gait_source_artifact_digests"]))
+		require.Equal(t, expectedDerivedDigests, stringSlice(metadata["gait_derived_evidence_digests"]))
 		require.False(t, records[1].Controls.PermissionsEnforced)
 		axymAssessment := records[2].Event
 		require.Equal(t, "cross_product_fixture_conformance", axymAssessment["assessment"])
@@ -353,4 +375,20 @@ func readJSONLRecords(t *testing.T, path string) []proof.Record {
 	}
 	require.NoError(t, scanner.Err())
 	return records
+}
+
+func stringSlice(value any) []string {
+	raw, ok := value.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		text, ok := item.(string)
+		if !ok {
+			return nil
+		}
+		out = append(out, text)
+	}
+	return out
 }
