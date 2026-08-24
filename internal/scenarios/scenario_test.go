@@ -229,6 +229,8 @@ func runScenario(t *testing.T, binary, dir string) {
 		require.Equal(t, "sha256:"+hex.EncodeToString(sum[:]), manifest.Records.SHA256)
 		require.Equal(t, "a889ad545ddef68eaaa52edbabdbc6961e74b726", manifest.ProofCommit)
 		require.Equal(t, "gait_lifecycle_v1:fcb0085b5af73b8a", manifest.EvidenceSetID)
+		require.Equal(t, manifest.EvidenceSetID, gaitResult["evidence_set_id"])
+		require.Equal(t, manifest.EvidenceSetID, axymAssessment["evidence_set_id"])
 		require.Equal(t, "1.0", manifest.RecordSchemaVersion)
 		require.Equal(t, "1.0", manifest.CorrelationProfileVersion)
 		require.True(t, manifest.FixtureOnly)

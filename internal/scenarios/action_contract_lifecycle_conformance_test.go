@@ -166,7 +166,7 @@ func strictLifecycleBindings(records []proof.Record) bool {
 	if !eventRefEquals(records[0], "contract_ref", contract) || records[0].Relationship == nil || len(records[0].Relationship.EntityRefs) != 1 || !sameRef(records[0].Relationship.EntityRefs[0], contract) {
 		return false
 	}
-	if !eventRefEquals(records[1], "contract_ref", contract) || !eventRefEquals(records[1], "activation_ref", activation) || records[1].Event["source_artifact_digest"] != lifecycleDigest || records[1].Relationship == nil || !hasRef(records[1].Relationship.EntityRefs, contract) || !hasRef(records[1].Relationship.EntityRefs, activation) {
+	if records[1].Event["evidence_set_id"] != lifecycle.ID || !eventRefEquals(records[1], "contract_ref", contract) || !eventRefEquals(records[1], "activation_ref", activation) || records[1].Event["source_artifact_digest"] != lifecycleDigest || records[1].Relationship == nil || !hasRef(records[1].Relationship.EntityRefs, contract) || !hasRef(records[1].Relationship.EntityRefs, activation) {
 		return false
 	}
 	evidenceRefs, ok := records[1].Event["evidence_refs"].([]any)
@@ -193,7 +193,7 @@ func strictLifecycleBindings(records []proof.Record) bool {
 		}
 	}
 	aggregate := proof.RelationshipRef{Kind: "proof.record", ID: records[1].RecordID, Digest: records[1].Integrity.RecordHash, SchemaID: "https://github.com/Clyra-AI/proof/schemas/v1/proof-record-v1.schema.json", SchemaVersion: "1.0", SourceProduct: "gait"}
-	if !eventRefEquals(records[2], "contract_ref", contract) || !eventRefEquals(records[2], "activation_ref", activation) || !eventRefEquals(records[2], "lifecycle_ref", lifecycle) || !eventRefEquals(records[2], "gait_aggregate_record_ref", aggregate) || records[2].Relationship == nil || len(records[2].Relationship.EntityRefs) != 4 || !hasRef(records[2].Relationship.EntityRefs, contract) || !hasRef(records[2].Relationship.EntityRefs, activation) || !hasRef(records[2].Relationship.EntityRefs, lifecycle) || !hasRef(records[2].Relationship.EntityRefs, aggregate) {
+	if records[2].Event["evidence_set_id"] != lifecycle.ID || !eventRefEquals(records[2], "contract_ref", contract) || !eventRefEquals(records[2], "activation_ref", activation) || !eventRefEquals(records[2], "lifecycle_ref", lifecycle) || !eventRefEquals(records[2], "gait_aggregate_record_ref", aggregate) || records[2].Relationship == nil || len(records[2].Relationship.EntityRefs) != 4 || !hasRef(records[2].Relationship.EntityRefs, contract) || !hasRef(records[2].Relationship.EntityRefs, activation) || !hasRef(records[2].Relationship.EntityRefs, lifecycle) || !hasRef(records[2].Relationship.EntityRefs, aggregate) {
 		return false
 	}
 	return true
