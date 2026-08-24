@@ -8,6 +8,7 @@ The format is inspired by Keep a Changelog and this project follows semantic ver
 
 ### Added
 
+- Added an exact, fixture-only Action Contract lifecycle conformance scenario pinned to Wrkr v1.15.1, Gait v1.5.0, and Axym commit `7fa4244`, with strict digest-bound lineage, tamper, authority-quarantine, and evidence-set determinism coverage.
 - API contract documentation (`docs/api-contract.md`) and Python integration guide (`docs/python-integration.md`).
 - Structured library errors (`core/errors`) with machine-readable kind/code metadata.
 - Dedicated bundle domain package (`core/bundle`) with explicit pure and file-mutating signing APIs.

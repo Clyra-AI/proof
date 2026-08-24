@@ -4,6 +4,7 @@ package scenarios_test
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"io"
@@ -140,6 +141,90 @@ func runScenario(t *testing.T, binary, dir string) {
 			require.Truef(t, ok, "expected source %s not present", source)
 		}
 
+	case "action-contract-lifecycle-conformance":
+		require.Equal(t, "pass", expected.Verify)
+		out, code := runProof(binary, "verify", dir)
+		require.Equal(t, 0, code, out)
+		require.Contains(t, out, "Chain intact")
+		require.Contains(t, out, strconv.Itoa(expected.Total)+" records")
+		repeated, repeatedCode := runProof(binary, "verify", dir)
+		require.Equal(t, code, repeatedCode)
+		require.Equal(t, out, repeated)
+		records := readJSONLRecords(t, filepath.Join(dir, "records.jsonl"))
+		require.Len(t, records, expected.Total)
+		require.Equal(t, []string{"wrkr", "gait", "axym"}, []string{records[0].Source, records[1].Source, records[2].Source})
+		require.Equal(t, []string{"scan_finding", "test_result", "risk_assessment"}, []string{records[0].RecordType, records[1].RecordType, records[2].RecordType})
+		require.False(t, records[0].Controls.PermissionsEnforced)
+		gaitResult := records[1].Event
+		require.Equal(t, "gait_lifecycle_conformance", gaitResult["test_name"])
+		require.Equal(t, "gait", gaitResult["producer"])
+		require.Equal(t, "passed", gaitResult["status"])
+		require.Equal(t, false, gaitResult["authoritative_success"])
+		require.Equal(t, true, gaitResult["gait_fixture_expected_authoritative_success"])
+		require.Equal(t, "succeeded", gaitResult["gait_execution"])
+		require.Equal(t, "validated", gaitResult["gait_effect"])
+		require.Equal(t, "completed", gaitResult["containment_status"])
+		require.NotEmpty(t, gaitResult["source_artifact_digests"])
+		require.NotEmpty(t, gaitResult["derived_evidence_digests"])
+		require.NotEmpty(t, gaitResult["evidence_refs"])
+		metadata := records[1].Metadata
+		require.Equal(t, "gait_lifecycle", metadata["evidence_kind"])
+		require.Equal(t, false, metadata["gait_authoritative"])
+		require.Equal(t, true, metadata["gait_fixture_only"])
+		require.Equal(t, "verified", metadata["gait_verification_state"])
+		require.Equal(t, "fixture_quarantine", metadata["gait_projection"])
+		require.False(t, records[1].Controls.PermissionsEnforced)
+		axymAssessment := records[2].Event
+		require.Equal(t, "cross_product_fixture_conformance", axymAssessment["assessment"])
+		require.Equal(t, "verified_fixture_only", axymAssessment["assessment_status"])
+		require.Equal(t, true, axymAssessment["fixture_only"])
+		require.Equal(t, false, axymAssessment["authoritative"])
+		require.Equal(t, true, axymAssessment["gait_fixture_expected_authoritative_success"])
+		activationRef := records[1].Event["activation_ref"].(map[string]any)
+		require.Equal(t, "sha256:4aad73ff9f3c7e5a680dec3bc05684221f4770e6c47a58ed95bd7d6e1adbfe71", activationRef["digest"])
+		require.Equal(t, "https://gait.dev/schemas/v1/activated-action-contract-artifact.schema.json", activationRef["schema_id"])
+		require.Equal(t, "gait", activationRef["source_product"])
+		require.Equal(t, "sha256:fcb0085b5af73b8a42aa09c25c09f6510d4eb39b8c06a0eb4e16bcbded4fffa2", gaitResult["source_artifact_digest"])
+		manifestRaw, err := os.ReadFile(filepath.Join(dir, "provenance", "fixture-manifest.json"))
+		require.NoError(t, err)
+		var manifest struct {
+			Axym struct {
+				Commit                       string `json:"commit"`
+				TranslationVersion           string `json:"translation_version"`
+				LifecycleAggregateRecordID   string `json:"lifecycle_aggregate_record_id"`
+				LifecycleAggregateRecordHash string `json:"lifecycle_aggregate_record_hash"`
+			} `json:"axym"`
+			Records struct {
+				Path         string   `json:"path"`
+				SHA256       string   `json:"sha256"`
+				RecordIDs    []string `json:"record_ids"`
+				RecordHashes []string `json:"record_hashes"`
+			} `json:"records"`
+			EvidenceSetID             string `json:"evidence_set_id"`
+			ProofCommit               string `json:"proof_commit"`
+			RecordSchemaVersion       string `json:"record_schema_version"`
+			CorrelationProfileVersion string `json:"correlation_profile_version"`
+			FixtureOnly               bool   `json:"fixture_only"`
+			Authoritative             bool   `json:"authoritative"`
+		}
+		require.NoError(t, json.Unmarshal(manifestRaw, &manifest))
+		recordRaw, err := os.ReadFile(filepath.Join(dir, manifest.Records.Path))
+		require.NoError(t, err)
+		sum := sha256.Sum256(recordRaw)
+		require.Equal(t, "sha256:"+hex.EncodeToString(sum[:]), manifest.Records.SHA256)
+		require.Equal(t, "a889ad545ddef68eaaa52edbabdbc6961e74b726", manifest.ProofCommit)
+		require.Equal(t, "gait_lifecycle_v1:fcb0085b5af73b8a", manifest.EvidenceSetID)
+		require.Equal(t, "1.0", manifest.RecordSchemaVersion)
+		require.Equal(t, "1.0", manifest.CorrelationProfileVersion)
+		require.True(t, manifest.FixtureOnly)
+		require.False(t, manifest.Authoritative)
+		require.Equal(t, "7fa4244bce22d1a4a1d0267ae05bfd01a85f7e30", manifest.Axym.Commit)
+		require.Equal(t, "v1", manifest.Axym.TranslationVersion)
+		require.Equal(t, records[1].RecordID, manifest.Axym.LifecycleAggregateRecordID)
+		require.Equal(t, records[1].Integrity.RecordHash, manifest.Axym.LifecycleAggregateRecordHash)
+		require.Equal(t, []string{records[0].RecordID, records[1].RecordID, records[2].RecordID}, manifest.Records.RecordIDs)
+		require.Equal(t, []string{records[0].Integrity.RecordHash, records[1].Integrity.RecordHash, records[2].Integrity.RecordHash}, manifest.Records.RecordHashes)
+
 	default:
 		t.Fatalf("unsupported scenario: %s", name)
 	}
@@ -199,4 +284,23 @@ func readSources(t *testing.T, paths ...string) map[string]struct{} {
 		_ = f.Close()
 	}
 	return out
+}
+
+func readJSONLRecords(t *testing.T, path string) []proof.Record {
+	t.Helper()
+	f, err := os.Open(path)
+	require.NoError(t, err)
+	defer func() { _ = f.Close() }()
+	records := []proof.Record{}
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		if strings.TrimSpace(scanner.Text()) == "" {
+			continue
+		}
+		var record proof.Record
+		require.NoError(t, json.Unmarshal(scanner.Bytes(), &record))
+		records = append(records, record)
+	}
+	require.NoError(t, scanner.Err())
+	return records
 }
