@@ -225,7 +225,7 @@ func runScenario(t *testing.T, binary, dir string) {
 			RecordSchemaVersion       string   `json:"record_schema_version"`
 			CorrelationProfileVersion string   `json:"correlation_profile_version"`
 			FixtureOnly               bool     `json:"fixture_only"`
-			Authoritative             bool     `json:"authoritative"`
+			Authoritative             *bool    `json:"authoritative"`
 			Sources                   []string `json:"sources"`
 		}
 		decoder := json.NewDecoder(bytes.NewReader(manifestRaw))
@@ -246,7 +246,8 @@ func runScenario(t *testing.T, binary, dir string) {
 		require.Equal(t, "1.0", manifest.RecordSchemaVersion)
 		require.Equal(t, "1.0", manifest.CorrelationProfileVersion)
 		require.True(t, manifest.FixtureOnly)
-		require.False(t, manifest.Authoritative)
+		require.NotNil(t, manifest.Authoritative)
+		require.False(t, *manifest.Authoritative)
 		require.Equal(t, []string{"wrkr", "gait", "axym"}, manifest.Sources)
 		require.Equal(t, len(records), manifest.Records.Count)
 		require.Equal(t, "7fa4244bce22d1a4a1d0267ae05bfd01a85f7e30", manifest.Axym.Commit)

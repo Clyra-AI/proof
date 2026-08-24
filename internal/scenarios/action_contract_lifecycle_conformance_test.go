@@ -48,6 +48,12 @@ func TestActionContractLifecycleConformanceNegatives(t *testing.T) {
 		mutated[1].Relationship.EntityRefs[0].Digest = ""
 		require.False(t, strictLifecycleBindings(mutated))
 	})
+	t.Run("duplicate event evidence ref breaks bijection", func(t *testing.T) {
+		mutated := cloneProofRecords(t, records)
+		refs := mutated[1].Event["evidence_refs"].([]any)
+		refs[len(refs)-1] = refs[0]
+		require.False(t, strictLifecycleBindings(mutated))
+	})
 	t.Run("fixture-only cannot be authoritative", func(t *testing.T) {
 		mutated := cloneProofRecord(t, records[1])
 		mutated.Event["authoritative_success"] = true
@@ -173,6 +179,7 @@ func strictLifecycleBindings(records []proof.Record) bool {
 	if !ok || len(evidenceRefs) != 6 || len(records[1].Relationship.EntityRefs) != len(evidenceRefs)+2 {
 		return false
 	}
+	eventSet := make(map[string]struct{}, len(evidenceRefs))
 	for _, value := range evidenceRefs {
 		raw, err := json.Marshal(value)
 		if err != nil {
@@ -183,12 +190,31 @@ func strictLifecycleBindings(records []proof.Record) bool {
 			return false
 		}
 		ref.Kind = ref.SourceProduct + "." + ref.Kind
-		if !hasRef(records[1].Relationship.EntityRefs, ref) {
+		key := refKey(ref)
+		if _, duplicate := eventSet[key]; duplicate {
 			return false
 		}
+		eventSet[key] = struct{}{}
 	}
+	relationshipSet := make(map[string]struct{}, len(evidenceRefs))
 	for _, ref := range records[1].Relationship.EntityRefs {
 		if ref.Digest == "" || ref.SchemaID == "" || ref.SchemaVersion == "" || ref.SourceProduct == "" {
+			return false
+		}
+		if sameRef(ref, contract) || sameRef(ref, activation) {
+			continue
+		}
+		key := refKey(ref)
+		if _, duplicate := relationshipSet[key]; duplicate {
+			return false
+		}
+		relationshipSet[key] = struct{}{}
+	}
+	if len(eventSet) != len(relationshipSet) {
+		return false
+	}
+	for key := range eventSet {
+		if _, ok := relationshipSet[key]; !ok {
 			return false
 		}
 	}
@@ -230,4 +256,8 @@ func hasRef(refs []proof.RelationshipRef, want proof.RelationshipRef) bool {
 
 func sameRef(left, right proof.RelationshipRef) bool {
 	return left.Kind == right.Kind && left.ID == right.ID && left.Digest == right.Digest && left.SchemaID == right.SchemaID && left.SchemaVersion == right.SchemaVersion && left.SourceProduct == right.SourceProduct
+}
+
+func refKey(ref proof.RelationshipRef) string {
+	return strings.Join([]string{ref.Kind, ref.ID, ref.Digest, ref.SchemaID, ref.SchemaVersion, ref.SourceProduct}, "|")
 }
