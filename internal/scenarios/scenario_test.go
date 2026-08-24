@@ -231,6 +231,8 @@ func runScenario(t *testing.T, binary, dir string) {
 		decoder := json.NewDecoder(bytes.NewReader(manifestRaw))
 		decoder.DisallowUnknownFields()
 		require.NoError(t, decoder.Decode(&manifest))
+		var trailing any
+		require.ErrorIs(t, decoder.Decode(&trailing), io.EOF)
 		recordRaw, err := os.ReadFile(filepath.Join(dir, manifest.Records.Path))
 		require.NoError(t, err)
 		sum := sha256.Sum256(recordRaw)
