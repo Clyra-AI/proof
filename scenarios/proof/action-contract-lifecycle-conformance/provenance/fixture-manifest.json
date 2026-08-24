@@ -1,0 +1,52 @@
+{
+  "authoritative": false,
+  "axym": {
+    "commit": "7fa4244bce22d1a4a1d0267ae05bfd01a85f7e30",
+    "lifecycle_aggregate_record_hash": "sha256:4b19908dd85b11006dec13349aa5f0b194d0d99b41fa6c00d395e7dbac594645",
+    "lifecycle_aggregate_record_id": "prf-2026-07-19T01:00:10Z-6fe38a58",
+    "translation_version": "v1"
+  },
+  "correlation_profile_version": "1.0",
+  "evidence_set_id": "gait_lifecycle_v1:fcb0085b5af73b8a",
+  "fixture_only": true,
+  "fixture_version": "1",
+  "gait": {
+    "activation_sha256": "sha256:4aad73ff9f3c7e5a680dec3bc05684221f4770e6c47a58ed95bd7d6e1adbfe71",
+    "authoritative_success_expected": true,
+    "commit": "10f8b91b316c30c2202a580847dfdd3509bff458",
+    "fixture_manifest_sha256": "sha256:b5c26f73ad82e990b7f38b6488c74bd4aa2b1ade55f898e9314251a990ae5853",
+    "fixture_only": true,
+    "lifecycle_sha256": "sha256:fcb0085b5af73b8a42aa09c25c09f6510d4eb39b8c06a0eb4e16bcbded4fffa2",
+    "version": "v1.5.0"
+  },
+  "proof_commit": "a889ad545ddef68eaaa52edbabdbc6961e74b726",
+  "proof_version": "v0.6.1",
+  "record_schema_version": "1.0",
+  "records": {
+    "count": 3,
+    "path": "records.jsonl",
+    "record_hashes": [
+      "sha256:a79908db058fd2463b7276bba9ad23f3a1abf038a17c45ad1c2d67e7c28a040c",
+      "sha256:4b19908dd85b11006dec13349aa5f0b194d0d99b41fa6c00d395e7dbac594645",
+      "sha256:8ee86ee9c2aa4af94520350d01990ef33198744b7ccb53defc5f6902bb94188a"
+    ],
+    "record_ids": [
+      "prf-2026-07-19T01:00:00Z-76eee590",
+      "prf-2026-07-19T01:00:10Z-6fe38a58",
+      "prf-2026-07-19T01:00:11Z-a33c53ee"
+    ],
+    "sha256": "sha256:da43d8266cce75cabc13baecdbe82e2db5fd979fd6624a41eaf5f2fdf6c3d100"
+  },
+  "sources": [
+    "wrkr",
+    "gait",
+    "axym"
+  ],
+  "wrkr": {
+    "commit": "6b8db233e33f92fe502aecf250a6ddeb3c3e1497",
+    "fixture_manifest_sha256": "sha256:fe0473c17f1abc7fcadfabe041e16da3e99d01a5e8f9f5c4d4d3ffe39ae4bdba",
+    "proposal_canonical_digest": "sha256:d3a371d51af5af30c4c4b8e2694b40cb16791c4e8c469bd53a483a99fb3c88cf",
+    "proposal_sha256": "sha256:bfb32cdce650b2ea969059ae0816df2637f7345e70b08a67d4c23684489bf154",
+    "version": "v1.15.1"
+  }
+}

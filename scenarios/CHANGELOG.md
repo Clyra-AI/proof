@@ -1,5 +1,9 @@
 # Scenario Changelog
 
+## 2026-08-24
+
+- Added: action-contract-lifecycle-conformance (validates pinned Wrkr/Gait/Axym lifecycle integrity, fixture-authority quarantine, and evidence-set determinism)
+
 ## 2026-02-20
 
 - Added: compiled-action-chain-round-trip (validates compiled_action record verification in chain mode)
