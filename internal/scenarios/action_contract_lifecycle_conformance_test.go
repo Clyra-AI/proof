@@ -78,16 +78,26 @@ func TestActionContractLifecycleEvidenceSetAlternatives(t *testing.T) {
 	framework.Framework.Version = "1"
 	framework.Controls = []proofframework.Control{{ID: "lifecycle", Title: "Lifecycle", EvidenceSets: []proofframework.EvidenceSet{
 		{ID: "a_incomplete", SourceProducts: []string{"gait"}, RequiredRecordTypes: []string{"test_result", "risk_assessment"}, RequiredFields: []string{"record_id", "event.test_name"}, MinimumFrequency: "continuous"},
-		{ID: "b_complete", SourceProducts: []string{"gait"}, RequiredRecordTypes: []string{"test_result"}, RequiredFields: []string{"record_id", "event.test_name", "event.gait_fixture_expected_authoritative_success", "metadata.gait_fixture_only"}, MinimumFrequency: "continuous"},
+		{ID: "b_production", SourceProducts: []string{"gait"}, RequiredRecordTypes: []string{"test_result"}, RequiredFields: []string{"record_id", "event.test_name", "metadata.gait_production_authority_attested"}, MinimumFrequency: "continuous"},
 	}}}
-	coverage, err := proof.EvaluateFrameworkCoverage(framework, records)
+	fixtureCoverage, err := proof.EvaluateFrameworkCoverage(framework, records)
 	require.NoError(t, err)
-	require.Equal(t, []string{"b_complete"}, coverage.Controls[0].MatchedEvidenceSetIDs)
-	require.False(t, coverage.Controls[0].EvidenceSets[0].Covered)
-	require.Equal(t, []string{"risk_assessment"}, coverage.Controls[0].EvidenceSets[0].MissingRecordTypes)
+	require.False(t, fixtureCoverage.Controls[0].Covered)
+	require.Empty(t, fixtureCoverage.Controls[0].MatchedEvidenceSetIDs)
+	require.False(t, fixtureCoverage.Controls[0].EvidenceSets[0].Covered)
+	require.Equal(t, []string{"risk_assessment"}, fixtureCoverage.Controls[0].EvidenceSets[0].MissingRecordTypes)
+
+	production := cloneProofRecord(t, records[1])
+	production.RecordID = "synthetic-production-gait-lifecycle"
+	production.Metadata["gait_fixture_only"] = false
+	production.Metadata["gait_authoritative"] = true
+	production.Metadata["gait_production_authority_attested"] = true
+	coverage, err := proof.EvaluateFrameworkCoverage(framework, append(records, production))
+	require.NoError(t, err)
+	require.Equal(t, []string{"b_production"}, coverage.Controls[0].MatchedEvidenceSetIDs)
 	first, err := json.Marshal(coverage)
 	require.NoError(t, err)
-	reversed := []proof.Record{records[2], records[1], records[0]}
+	reversed := []proof.Record{production, records[2], records[1], records[0]}
 	secondCoverage, err := proof.EvaluateFrameworkCoverage(framework, reversed)
 	require.NoError(t, err)
 	second, err := json.Marshal(secondCoverage)

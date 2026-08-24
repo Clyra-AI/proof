@@ -194,6 +194,21 @@ func runScenario(t *testing.T, binary, dir string) {
 				LifecycleAggregateRecordID   string `json:"lifecycle_aggregate_record_id"`
 				LifecycleAggregateRecordHash string `json:"lifecycle_aggregate_record_hash"`
 			} `json:"axym"`
+			Gait struct {
+				Version               string `json:"version"`
+				Commit                string `json:"commit"`
+				FixtureManifestSHA256 string `json:"fixture_manifest_sha256"`
+				LifecycleSHA256       string `json:"lifecycle_sha256"`
+				ActivationSHA256      string `json:"activation_sha256"`
+				FixtureOnly           bool   `json:"fixture_only"`
+			} `json:"gait"`
+			Wrkr struct {
+				Version                 string `json:"version"`
+				Commit                  string `json:"commit"`
+				FixtureManifestSHA256   string `json:"fixture_manifest_sha256"`
+				ProposalSHA256          string `json:"proposal_sha256"`
+				ProposalCanonicalDigest string `json:"proposal_canonical_digest"`
+			} `json:"wrkr"`
 			Records struct {
 				Path         string   `json:"path"`
 				SHA256       string   `json:"sha256"`
@@ -222,6 +237,19 @@ func runScenario(t *testing.T, binary, dir string) {
 		require.Equal(t, "v1", manifest.Axym.TranslationVersion)
 		require.Equal(t, records[1].RecordID, manifest.Axym.LifecycleAggregateRecordID)
 		require.Equal(t, records[1].Integrity.RecordHash, manifest.Axym.LifecycleAggregateRecordHash)
+		require.Equal(t, "v1.15.1", manifest.Wrkr.Version)
+		require.Equal(t, "6b8db233e33f92fe502aecf250a6ddeb3c3e1497", manifest.Wrkr.Commit)
+		require.Equal(t, "sha256:fe0473c17f1abc7fcadfabe041e16da3e99d01a5e8f9f5c4d4d3ffe39ae4bdba", manifest.Wrkr.FixtureManifestSHA256)
+		require.Equal(t, "sha256:bfb32cdce650b2ea969059ae0816df2637f7345e70b08a67d4c23684489bf154", manifest.Wrkr.ProposalSHA256)
+		require.Equal(t, "sha256:d3a371d51af5af30c4c4b8e2694b40cb16791c4e8c469bd53a483a99fb3c88cf", manifest.Wrkr.ProposalCanonicalDigest)
+		require.Equal(t, "v1.5.0", manifest.Gait.Version)
+		require.Equal(t, "10f8b91b316c30c2202a580847dfdd3509bff458", manifest.Gait.Commit)
+		require.Equal(t, "sha256:b5c26f73ad82e990b7f38b6488c74bd4aa2b1ade55f898e9314251a990ae5853", manifest.Gait.FixtureManifestSHA256)
+		require.Equal(t, "sha256:fcb0085b5af73b8a42aa09c25c09f6510d4eb39b8c06a0eb4e16bcbded4fffa2", manifest.Gait.LifecycleSHA256)
+		require.Equal(t, "sha256:4aad73ff9f3c7e5a680dec3bc05684221f4770e6c47a58ed95bd7d6e1adbfe71", manifest.Gait.ActivationSHA256)
+		require.True(t, manifest.Gait.FixtureOnly)
+		require.Equal(t, manifest.Gait.Version, gaitResult["producer_version"])
+		require.Equal(t, manifest.Gait.Commit, gaitResult["source_commit"])
 		require.Equal(t, []string{records[0].RecordID, records[1].RecordID, records[2].RecordID}, manifest.Records.RecordIDs)
 		require.Equal(t, []string{records[0].Integrity.RecordHash, records[1].Integrity.RecordHash, records[2].Integrity.RecordHash}, manifest.Records.RecordHashes)
 
