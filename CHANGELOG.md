@@ -6,9 +6,24 @@ The format is inspired by Keep a Changelog and this project follows semantic ver
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [0.6.2] - 2026-08-25
+
 ### Added
 
-- Added an exact, fixture-only Action Contract lifecycle conformance scenario pinned to Wrkr v1.15.1, Gait v1.5.0, and Axym commit `7fa4244`, with strict digest-bound lineage, tamper, authority-quarantine, and evidence-set determinism coverage.
+- Added fixture-only Action Contract lifecycle conformance coverage with 16 pinned Gait lifecycle cases, including the Wrkr v1.15.1 proposal, Gait v1.5.0 compatibility base, synthetic control extensions, and Axym commit `7fa4244`.
+- Added a signed 16-artifact Gait approval/delegation gate corpus covering exact, expired, tightened-delegation, expansion, wrong-parent/origin, and revoked-ancestor cases.
+- Added offline deterministic fixture generators and drift tests for source bytes, public keys, normalized records, provenance manifests, and orphan detection.
+
+### Changed
+
+- Fixture generators now verify source artifact and public-key digests before normalization or copying, and recompute every normalized projection during `--check`.
+
+## [0.6.1] - 2026-08-19
+
+### Added
+
 - API contract documentation (`docs/api-contract.md`) and Python integration guide (`docs/python-integration.md`).
 - Structured library errors (`core/errors`) with machine-readable kind/code metadata.
 - Dedicated bundle domain package (`core/bundle`) with explicit pure and file-mutating signing APIs.
