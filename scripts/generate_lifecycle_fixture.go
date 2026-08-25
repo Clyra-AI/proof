@@ -185,6 +185,49 @@ func statusFor(s scenarioManifest) string {
 	}
 	return "failed"
 }
+
+func normalizedLifecycleRecord(lifeBytes []byte, s scenarioManifest, m manifest) ([]byte, error) {
+	var life map[string]any
+	if err := json.Unmarshal(lifeBytes, &life); err != nil {
+		return nil, err
+	}
+	refs := []proofrecord.RelationshipRef{}
+	collectRefs(life, &refs)
+	seen := map[string]bool{}
+	uniq := refs[:0]
+	for _, r := range refs {
+		k := r.Kind + "|" + r.ID + "|" + r.Digest
+		if !seen[k] {
+			seen[k] = true
+			uniq = append(uniq, r)
+		}
+	}
+	refs = append(uniq, proofrecord.RelationshipRef{Kind: "evidence", ID: s.ScenarioID, Digest: s.SHA256, SchemaID: "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json", SchemaVersion: "1", SourceProduct: "gait"})
+	sort.Slice(refs, func(i, j int) bool { return refs[i].ID < refs[j].ID })
+	event, metadata, tm := normalizeLifecycle(life, s, m, refs)
+	rec, err := proofrecord.New(proofrecord.RecordOpts{Timestamp: tm, Source: "gait", SourceProduct: "gait", AgentID: "gait:fixture", Type: "test_result", Event: event, Metadata: metadata, Relationship: &proofrecord.Relationship{EntityRefs: refs}})
+	if err != nil {
+		return nil, err
+	}
+	raw, err := json.Marshal(rec)
+	if err != nil {
+		return nil, err
+	}
+	return append(raw, '\n'), nil
+}
+
+func digestMatches(actual, expected string) bool {
+	return strings.TrimPrefix(strings.ToLower(strings.TrimSpace(actual)), "sha256:") == strings.TrimPrefix(strings.ToLower(strings.TrimSpace(expected)), "sha256:")
+}
+
+func compareBytes(path string, want []byte) error {
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != string(want) {
+		return fmt.Errorf("normalized fixture drift: %s", path)
+	}
+	return nil
+}
+
 func main() {
 	source := flag.String("source", "/Users/tr/Clyra/gait-doc-completion/testdata/action-contract-evidence/v1", "released Gait fixture source")
 	dest := flag.String("dest", "scenarios/proof/action-contract-lifecycle-conformance/source/gait-v1.5.0", "Proof fixture destination")
@@ -230,11 +273,32 @@ func run(source, dest string, update bool) error {
 		if err = os.WriteFile(filepath.Join(dest, "upstream-manifest.json"), raw, 0600); err != nil {
 			return err
 		}
-		for _, s := range m.Scenarios {
-			b, e := os.ReadFile(filepath.Join(source, s.Path))
-			if e != nil {
-				return e
-			}
+	}
+	pub := m.Signing.PublicKeyPath
+	keyPath := filepath.Join(source, filepath.Base(pub))
+	if !update {
+		keyPath = filepath.Join(dest, "fixture-signing-key.public.b64")
+	}
+	keyBytes, e := os.ReadFile(keyPath)
+	if e != nil {
+		return e
+	}
+	if !digestMatches(digest(keyBytes), m.Signing.PublicKeySHA256) {
+		return fmt.Errorf("lifecycle public key digest mismatch")
+	}
+	for _, s := range m.Scenarios {
+		sourcePath := filepath.Join(source, s.Path)
+		if !update {
+			sourcePath = filepath.Join(dest, filepath.Base(filepath.Dir(s.Path)), "lifecycle.json")
+		}
+		b, e := os.ReadFile(sourcePath)
+		if e != nil {
+			return e
+		}
+		if !digestMatches(digest(b), s.SHA256) {
+			return fmt.Errorf("lifecycle source digest mismatch: %s", s.ScenarioID)
+		}
+		if update {
 			p := filepath.Join(dest, filepath.Base(filepath.Dir(s.Path)), "lifecycle.json")
 			if e = os.MkdirAll(filepath.Dir(p), 0700); e != nil {
 				return e
@@ -242,47 +306,25 @@ func run(source, dest string, update bool) error {
 			if e = os.WriteFile(p, b, 0600); e != nil {
 				return e
 			}
-			var life map[string]any
-			if e = json.Unmarshal(b, &life); e != nil {
-				return e
-			}
-			refs := []proofrecord.RelationshipRef{}
-			collectRefs(life, &refs)
-			seen := map[string]bool{}
-			uniq := refs[:0]
-			for _, r := range refs {
-				k := r.Kind + "|" + r.ID + "|" + r.Digest
-				if !seen[k] {
-					seen[k] = true
-					uniq = append(uniq, r)
-				}
-			}
-			refs = uniq
-			refs = append(refs, proofrecord.RelationshipRef{Kind: "evidence", ID: s.ScenarioID, Digest: s.SHA256, SchemaID: "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json", SchemaVersion: "1", SourceProduct: "gait"})
-			sort.Slice(refs, func(i, j int) bool { return refs[i].ID < refs[j].ID })
-			event, metadata, tm := normalizeLifecycle(life, s, m, refs)
-			rec, e := proofrecord.New(proofrecord.RecordOpts{Timestamp: tm, Source: "gait", SourceProduct: "gait", AgentID: "gait:fixture", Type: "test_result", Event: event, Metadata: metadata, Relationship: &proofrecord.Relationship{EntityRefs: refs}})
-			if e != nil {
-				return e
-			}
-			nb, e := json.Marshal(rec)
-			if e != nil {
-				return e
-			}
-			np := filepath.Join(dest, "normalized", s.ScenarioID, "records.jsonl")
-			if e = os.MkdirAll(filepath.Dir(np), 0700); e != nil {
-				return e
-			}
-			if e = os.WriteFile(np, append(nb, '\n'), 0600); e != nil {
-				return e
-			}
 		}
-		pub := m.Signing.PublicKeyPath
-		b, e := os.ReadFile(filepath.Join(source, filepath.Base(pub)))
+		normalized, e := normalizedLifecycleRecord(b, s, m)
 		if e != nil {
 			return e
 		}
-		if e = os.WriteFile(filepath.Join(dest, "fixture-signing-key.public.b64"), b, 0600); e != nil {
+		np := filepath.Join(dest, "normalized", s.ScenarioID, "records.jsonl")
+		if update {
+			if e = os.MkdirAll(filepath.Dir(np), 0700); e != nil {
+				return e
+			}
+			if e = os.WriteFile(np, normalized, 0600); e != nil {
+				return e
+			}
+		} else if e = compareBytes(np, normalized); e != nil {
+			return e
+		}
+	}
+	if update {
+		if e = os.WriteFile(filepath.Join(dest, "fixture-signing-key.public.b64"), keyBytes, 0600); e != nil {
 			return e
 		}
 	}
@@ -304,12 +346,6 @@ func run(source, dest string, update bool) error {
 	sort.Strings(files)
 	if len(files) != len(m.Scenarios) {
 		return fmt.Errorf("scenario count drift: got %d want %d", len(files), len(m.Scenarios))
-	}
-	for _, s := range m.Scenarios {
-		np := filepath.Join(dest, "normalized", s.ScenarioID, "records.jsonl")
-		if _, e := os.Stat(np); e != nil {
-			return fmt.Errorf("normalized fixture missing: %s", s.ScenarioID)
-		}
 	}
 	var normalized []string
 	for _, s := range m.Scenarios {

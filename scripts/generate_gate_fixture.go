@@ -58,6 +58,9 @@ func main() {
 }
 func fatal(format string, args ...any) { fmt.Fprintf(os.Stderr, format+"\n", args...); os.Exit(1) }
 func digest(raw []byte) string         { s := sha256.Sum256(raw); return "sha256:" + hex.EncodeToString(s[:]) }
+func digestMatches(actual, expected string) bool {
+	return strings.TrimPrefix(strings.ToLower(strings.TrimSpace(actual)), "sha256:") == strings.TrimPrefix(strings.ToLower(strings.TrimSpace(expected)), "sha256:")
+}
 func ref(kind, id, dig, schema, version, source string) proofrecord.RelationshipRef {
 	if dig != "" && !strings.HasPrefix(dig, "sha256:") {
 		dig = "sha256:" + dig
@@ -104,12 +107,18 @@ func run(source, dest string, update bool) error {
 	if err != nil {
 		return err
 	}
+	if !digestMatches(digest(key), sm.PublicKeySHA256) {
+		return fmt.Errorf("gate public key digest mismatch")
+	}
 	files := map[string][]byte{}
 	records := []*proofrecord.Record{}
 	for _, entry := range sm.Files {
 		b, e := os.ReadFile(filepath.Join(artifactRoot, entry.Path))
 		if e != nil {
 			return e
+		}
+		if !digestMatches(digest(b), entry.SHA256) {
+			return fmt.Errorf("gate source digest mismatch: %s", entry.Path)
 		}
 		files[entry.Path] = b
 		var obj map[string]any
@@ -130,6 +139,24 @@ func run(source, dest string, update bool) error {
 			if err != nil {
 				return err
 			}
+		}
+	}
+	for _, r := range records {
+		normalized, e := json.Marshal(r)
+		if e != nil {
+			return e
+		}
+		normalized = append(normalized, '\n')
+		normalizedPath := filepath.Join(dest, "normalized", r.Event["artifact_path"].(string), "records.jsonl")
+		if update {
+			if e := os.MkdirAll(filepath.Dir(normalizedPath), 0750); e != nil {
+				return e
+			}
+			if e := os.WriteFile(normalizedPath, normalized, 0600); e != nil {
+				return e
+			}
+		} else if e := compareFile(normalizedPath, normalized); e != nil {
+			return e
 		}
 	}
 	chainRaw := []byte{}
@@ -159,16 +186,6 @@ func run(source, dest string, update bool) error {
 		}
 		if e := os.MkdirAll(filepath.Join(dest, "normalized"), 0750); e != nil {
 			return e
-		}
-		for _, r := range records {
-			b, _ := json.Marshal(r)
-			p := filepath.Join(dest, "normalized", r.Event["artifact_path"].(string), "records.jsonl")
-			if e := os.MkdirAll(filepath.Dir(p), 0750); e != nil {
-				return e
-			}
-			if e := os.WriteFile(p, append(b, '\n'), 0600); e != nil {
-				return e
-			}
 		}
 		if e := os.WriteFile(filepath.Join(dest, "records.jsonl"), chainRaw, 0600); e != nil {
 			return e
