@@ -13,3 +13,12 @@ used as production execution authority or control coverage.
 The exact provenance manifest is kept under `provenance/fixture-manifest.json`
 so the chain directory remains a plain Proof JSONL fixture. No private keys or
 verification configuration are included.
+
+The checked-in `source/gait-v1.5.0/` corpus is offline and self-contained. It
+contains the released v1.5.0 compatibility base plus explicitly labelled
+`unreleased-control-extension` stop, revocation, invalidation, and
+out-of-scope cases. Those extensions are synthetic, quarantined, and never
+treated as released or authoritative. `go run
+./scripts/generate_lifecycle_fixture.go --update --source <gait-fixtures>`
+imports source bytes; `--check` uses only checked-in Proof files and fails on
+byte drift or orphaned scenarios.

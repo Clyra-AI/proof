@@ -1,0 +1,56 @@
+{
+  "approval_schema_sha256": "sha256:d95b9920068d16041e1871eaa5e94163d949a5e0e899a589171e415fb2727118",
+  "authoritative": false,
+  "base_commit": "eb4c599a5c1a24dbb270c39a5a513d78f253506d",
+  "delegation_schema_sha256": "sha256:ba89960f37fd48a948f6976098fa0b3087772537c8947e061afa1eafe5b87e53",
+  "fixture_test_only": true,
+  "fixture_version": "1",
+  "generator_sha256": "sha256:0601f41490f9e213f5b538f65779b21be920ad57717d7b47a83e23422df7df1e",
+  "public_key_sha256": "sha256:ecd40e8a5fbcd1e73bfbd4bac1ad7693f1cacc1cb2ef8d51844fa675e61b78ee",
+  "quarantine": true,
+  "records": {
+    "count": 16,
+    "path": "records.jsonl",
+    "record_hashes": [
+      "sha256:ab13c5a3504cd6f70a985f87e055142ec9476b2a1a6e645dcf6cec2f75c6543e",
+      "sha256:25df4f234d33c68e2cec14b100e023378760c93ce36d17837ee2aa455743b7f1",
+      "sha256:ae74176a73913c3ded2416058580fe8ca5a4155bd9ec9e10c2e22dccde323f3b",
+      "sha256:6425afdfa74ceaad2da2be71079bafa947db681f1b92c03177e1d9f1ec88d103",
+      "sha256:5d2cbc4e5a7561c3a103a7f679f3bf11567f632bbff1a766b5efd3b45aab067e",
+      "sha256:2ec823e56c5c59fbb76506340d36bc63a3d771835cb3bf01c9c60e37bd76c681",
+      "sha256:a9e70e2cb3abb0476b23222ada3f248ddebc7329b5884deaf47b3e37a2a3f5c8",
+      "sha256:7fde34e209d25ad0d7564408e342e9048933eef5a4cd554e0a896e626e289a2a",
+      "sha256:5a7a38e5cbb46247e65f6d3c2cbd50eedf9f69a1bd8721778329177296f2c176",
+      "sha256:fa039f14556b1e61162cf8264657de6b35d59d189e34f3a643c0d8717b5f8638",
+      "sha256:e0ebd26fdc72b38f106de8af3a2cf2ac6760ae1ca2617bfcf605531de2e2e4cf",
+      "sha256:d811237da4cc455f7f12749e303df33a3a9a10c847b02d94176b4eb1ece91510",
+      "sha256:a7829b1c4703183ee2740de5ff4900db592590afdc6aa69d67cda3e3407496a1",
+      "sha256:549a7a4f2d0f4fc09ee816e44de00dc4ee7208d7915e1c5769965bfebabbaffc",
+      "sha256:1c90df107be7a8d62a13e469460017c66f076e41fb74fb46b3faceb2df665add",
+      "sha256:c876d7ce0420bdddb6d52ba9ccec5d551adb1f1c2ea4f6f33e9ef03796f42d7d"
+    ],
+    "record_ids": [
+      "prf-2026-08-01T12:00:00Z-0271d77d",
+      "prf-2026-08-01T12:00:00Z-3774d857",
+      "prf-2026-08-01T12:00:00Z-3bac7a02",
+      "prf-2026-08-01T12:00:00Z-4e00c225",
+      "prf-2026-08-01T12:00:00Z-4ecc3573",
+      "prf-2026-08-01T12:00:00Z-5b7e3991",
+      "prf-2026-08-01T12:00:00Z-642f543c",
+      "prf-2026-08-01T12:00:00Z-848ad4c7",
+      "prf-2026-08-01T12:00:00Z-9be64b04",
+      "prf-2026-08-01T12:00:00Z-a1d0ee24",
+      "prf-2026-08-01T12:00:00Z-b929f7e9",
+      "prf-2026-08-01T12:00:00Z-ca943653",
+      "prf-2026-08-01T12:00:00Z-dc6c3409",
+      "prf-2026-08-01T12:00:00Z-e20c3c9e",
+      "prf-2026-08-01T12:00:00Z-e41821ad",
+      "prf-2026-08-01T12:00:00Z-fcd7f390"
+    ],
+    "sha256": "sha256:8c6a18d63b87c576ee3fe82d7ccece6bca305c67d8b14d3bc1abfb3208fa0847"
+  },
+  "sources": [
+    "gait"
+  ],
+  "upstream_manifest_sha256": "sha256:b67ef12d315ebba6f727d9962f5e1b9897b2fe7c3918a4f9b0e0e4907a289aba"
+}

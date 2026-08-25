@@ -5,6 +5,7 @@ package scenarios_test
 import (
 	"bufio"
 	"bytes"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/Clyra-AI/proof"
 	"github.com/Clyra-AI/proof/internal/testutil"
+	proofsign "github.com/Clyra-AI/proof/signing"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -299,9 +301,63 @@ func runScenario(t *testing.T, binary, dir string) {
 		require.Equal(t, []string{records[0].RecordID, records[1].RecordID, records[2].RecordID}, manifest.Records.RecordIDs)
 		require.Equal(t, []string{records[0].Integrity.RecordHash, records[1].Integrity.RecordHash, records[2].Integrity.RecordHash}, manifest.Records.RecordHashes)
 
+	case "action-contract-gate-conformance":
+		require.Equal(t, "pass", expected.Verify)
+		gateDir := filepath.Join(dir, "source", "gait-gate-v1")
+		out, code := runProof(binary, "verify", gateDir)
+		require.Equal(t, 0, code, out)
+		require.Contains(t, out, "Chain intact")
+		require.Contains(t, out, strconv.Itoa(expected.Total)+" records")
+		records := readJSONLRecords(t, filepath.Join(gateDir, "records.jsonl"))
+		require.Len(t, records, expected.Total)
+		publicKey, err := proofsign.LoadPublicKeyBase64(filepath.Join(gateDir, "fixture-signing-key.public.b64"))
+		require.NoError(t, err)
+		manifestRaw, err := os.ReadFile(filepath.Join(gateDir, "provenance", "upstream-manifest.json"))
+		require.NoError(t, err)
+		var gateManifest struct {
+			Files []struct {
+				Path   string `json:"path"`
+				Signed bool   `json:"signed"`
+			} `json:"files"`
+		}
+		require.NoError(t, json.Unmarshal(manifestRaw, &gateManifest))
+		require.NotEmpty(t, gateManifest.Files)
+		for _, file := range gateManifest.Files {
+			require.True(t, file.Signed, file.Path)
+			verifyGateFixtureSignature(t, filepath.Join(gateDir, "source", filepath.FromSlash(file.Path)), publicKey)
+		}
+		for _, record := range records {
+			require.Equal(t, "gait", record.SourceProduct)
+			require.False(t, record.Controls.PermissionsEnforced)
+			require.Equal(t, true, record.Event["fixture_only"])
+			require.Equal(t, true, record.Event["quarantine"])
+			require.Equal(t, false, record.Event["authoritative"])
+			require.Equal(t, "integrity_only", record.Metadata["projection"])
+			require.NotNil(t, record.Relationship)
+			require.NotEmpty(t, record.Relationship.EntityRefs)
+		}
+
 	default:
 		t.Fatalf("unsupported scenario: %s", name)
 	}
+}
+
+func verifyGateFixtureSignature(t *testing.T, path string, publicKey ed25519.PublicKey) {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var object map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(raw, &object))
+	signatureRaw, ok := object["signature"]
+	require.True(t, ok, path)
+	var signature proofsign.Signature
+	require.NoError(t, json.Unmarshal(signatureRaw, &signature))
+	delete(object, "signature")
+	signable, err := json.Marshal(object)
+	require.NoError(t, err)
+	verified, err := proofsign.VerifyJSON(publicKey, signature, signable)
+	require.NoError(t, err)
+	require.True(t, verified, path)
 }
 
 func loadExpected(t *testing.T, path string) expectedScenario {
