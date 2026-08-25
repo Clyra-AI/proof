@@ -1,0 +1,215 @@
+{
+  "fixture_version": "1",
+  "foundation_commit": "4177f1e575441975b5a8979e6350e988c2f71d70",
+  "source_commit": "eb4c599a5c1a24dbb270c39a5a513d78f253506d",
+  "producer": {
+    "name": "gait",
+    "version": "v1.5.0"
+  },
+  "signing": {
+    "mode": "fixture_only_deterministic_development_key",
+    "fixture_test_only": true,
+    "development_signing": true,
+    "non_authoritative": true,
+    "public_key_path": "testdata/action-contract-evidence/v1/fixture-signing-key.public.b64",
+    "public_key_sha256": "sha256:4244369efbbbe9c1bea2f6eca00ba26d5a5a968e212788813558590089d28d24",
+    "key_id": "42571c8843a10df565fd17a97a236c3552e8e4b7ff2a0b48bf524409279771d9",
+    "derivation": "sha256(gait-action-contract-activation-development-key-v1) as Ed25519 seed; never used by production/default lifecycle signing"
+  },
+  "bindings": {
+    "activation_path": "testdata/action-contract-interop/v1/expected/compensation/activated-action-contract.json",
+    "activation_sha256": "sha256:5d4e7a8386ca3ea87b3426c04baf87e2303e709870b572dfa0b01087fc06ad6f",
+    "proposal_path": "testdata/action-contract-interop/v1/expected/compensation/pac-4b7f1402784256ce.json",
+    "proposal_sha256": "sha256:bfb32cdce650b2ea969059ae0816df2637f7345e70b08a67d4c23684489bf154",
+    "readiness_validator_key_path": "testdata/runtime-goldens/fixture-signing-key.public.b64",
+    "readiness_validator_key_sha256": "sha256:4a09d7988c00029e6da1d966c512a6a515d421b5f05155d8c87e1b734e8480fa",
+    "runtime_action_path": "testdata/action-contract-evidence/v1/runtime-action.json",
+    "runtime_action_sha256": "sha256:507daa556b2ef4c2c9a21904ec3440aaaf0d1acd45f766471a4a0a475a07c041",
+    "runtime_action_source_path": "testdata/runtime-goldens/runtime-action.json",
+    "runtime_action_source_sha256": "sha256:9b139b2071467a12b8bf2ab9e6e43dec82b93be018169faef311678bc7b8a424",
+    "runtime_readiness_path": "testdata/action-contract-evidence/v1/runtime-readiness.json",
+    "runtime_readiness_sha256": "sha256:fca36c7c629017e9f2420426f5fcfc1a1860ea4e4e89b16cc4b3305ca48abc73",
+    "runtime_readiness_source_path": "testdata/runtime-goldens/runtime-readiness.json",
+    "runtime_readiness_source_sha256": "sha256:4e8f72e42ee658be485e53c0ff09b1d7c2b5cd9000542ecaa634d462f1ff4a7a"
+  },
+  "scenarios": [
+    {
+      "scenario_id": "blocked-before-execution",
+      "path": "blocked-before-execution/lifecycle.json",
+      "sha256": "sha256:9a6a4f917a0a8bc1d91e676d4b757ce7c3184720b9593f9214124c9fdb7339ef",
+      "expected_valid": true,
+      "execution": "blocked"
+    },
+    {
+      "scenario_id": "capability-invalidation",
+      "path": "capability-invalidation/lifecycle.json",
+      "sha256": "sha256:b64bbe46da16ca61e4f071beee33d415f4d75b2d72d57e6b06ff784a9fc33016",
+      "expected_valid": true,
+      "revocation": "acknowledged",
+      "invalidation": "capability_invalidated",
+      "synthetic_extension": true,
+      "quarantine": true,
+      "authoritative": false,
+      "base_commit": "eb4c599a5c1a24dbb270c39a5a513d78f253506d",
+      "generator_sha256": "sha256:4d509fca09db65ff715c073fe84b371983d50b7962ea6be5a0061e1ebdfa5e3c",
+      "schema_sha256": "sha256:f7ec8fcba3470024f955b224474bf668380558f8ce92ddf312520585be177b45",
+      "producer_version": "unreleased-control-extension"
+    },
+    {
+      "scenario_id": "compensation-required-started-completed",
+      "path": "compensation-required-started-completed/lifecycle.json",
+      "sha256": "sha256:087367b4a021b6c80fb3894bdec3df4ec07be6fb33c47bed9bd8ded4f17f699b",
+      "expected_valid": true,
+      "execution": "succeeded",
+      "effect": "validated",
+      "containment": "completed",
+      "compensation": "completed"
+    },
+    {
+      "scenario_id": "descendant-invalidation",
+      "path": "descendant-invalidation/lifecycle.json",
+      "sha256": "sha256:dcf1c7744de12b43c018ad4e522370d702f73d9b11dc9867aa4fb88770b9dbce",
+      "expected_valid": true,
+      "revocation": "acknowledged",
+      "invalidation": "descendant_invalidated",
+      "synthetic_extension": true,
+      "quarantine": true,
+      "authoritative": false,
+      "base_commit": "eb4c599a5c1a24dbb270c39a5a513d78f253506d",
+      "generator_sha256": "sha256:4d509fca09db65ff715c073fe84b371983d50b7962ea6be5a0061e1ebdfa5e3c",
+      "schema_sha256": "sha256:f7ec8fcba3470024f955b224474bf668380558f8ce92ddf312520585be177b45",
+      "producer_version": "unreleased-control-extension"
+    },
+    {
+      "scenario_id": "external-revocation-acknowledged",
+      "path": "external-revocation-acknowledged/lifecycle.json",
+      "sha256": "sha256:cbd4d85acf8b6b65d554afc636d0fa1478e646c9b74d3c0849ccd11b9062b7b0",
+      "expected_valid": true,
+      "revocation": "acknowledged",
+      "synthetic_extension": true,
+      "quarantine": true,
+      "authoritative": false,
+      "base_commit": "eb4c599a5c1a24dbb270c39a5a513d78f253506d",
+      "generator_sha256": "sha256:4d509fca09db65ff715c073fe84b371983d50b7962ea6be5a0061e1ebdfa5e3c",
+      "schema_sha256": "sha256:f7ec8fcba3470024f955b224474bf668380558f8ce92ddf312520585be177b45",
+      "producer_version": "unreleased-control-extension"
+    },
+    {
+      "scenario_id": "external-revocation-failed",
+      "path": "external-revocation-failed/lifecycle.json",
+      "sha256": "sha256:9dab37c20b2482bf762c5a6ad3e4ff9c2f33bb6b1c38cd1b2506abd69691e881",
+      "expected_valid": true,
+      "revocation": "failed",
+      "synthetic_extension": true,
+      "quarantine": true,
+      "authoritative": false,
+      "base_commit": "eb4c599a5c1a24dbb270c39a5a513d78f253506d",
+      "generator_sha256": "sha256:4d509fca09db65ff715c073fe84b371983d50b7962ea6be5a0061e1ebdfa5e3c",
+      "schema_sha256": "sha256:f7ec8fcba3470024f955b224474bf668380558f8ce92ddf312520585be177b45",
+      "producer_version": "unreleased-control-extension"
+    },
+    {
+      "scenario_id": "failed-execution-compensation",
+      "path": "failed-execution-compensation/lifecycle.json",
+      "sha256": "sha256:4119d59c5680b02c72566d75d64db29d10bf7611584043fb69b1905dc1fcd02a",
+      "expected_valid": true,
+      "execution": "failed",
+      "compensation": "completed"
+    },
+    {
+      "scenario_id": "out-of-scope-containment",
+      "path": "out-of-scope-containment/lifecycle.json",
+      "sha256": "sha256:11bd626fad5cd084edb600c48e0d777df5741ff0fb2f8073e369020c22e6aebc",
+      "expected_valid": true,
+      "execution": "succeeded",
+      "effect": "validated",
+      "containment": "out_of_scope",
+      "synthetic_extension": true,
+      "quarantine": true,
+      "authoritative": false,
+      "base_commit": "eb4c599a5c1a24dbb270c39a5a513d78f253506d",
+      "generator_sha256": "sha256:4d509fca09db65ff715c073fe84b371983d50b7962ea6be5a0061e1ebdfa5e3c",
+      "schema_sha256": "sha256:f7ec8fcba3470024f955b224474bf668380558f8ce92ddf312520585be177b45",
+      "producer_version": "unreleased-control-extension"
+    },
+    {
+      "scenario_id": "partial-containment",
+      "path": "partial-containment/lifecycle.json",
+      "sha256": "sha256:c377ea478ee3bd97893079f598668c92b9c25fc2999652f4548e25c0360668ab",
+      "expected_valid": true,
+      "execution": "succeeded",
+      "effect": "validated",
+      "containment": "partial"
+    },
+    {
+      "scenario_id": "stop-requested-acknowledged",
+      "path": "stop-requested-acknowledged/lifecycle.json",
+      "sha256": "sha256:d90f322d902e43ed5dd04542bbdbcca99ad881c03d3ffc2d836888e9f3e39bcb",
+      "expected_valid": true,
+      "stop": "acknowledged",
+      "synthetic_extension": true,
+      "quarantine": true,
+      "authoritative": false,
+      "base_commit": "eb4c599a5c1a24dbb270c39a5a513d78f253506d",
+      "generator_sha256": "sha256:4d509fca09db65ff715c073fe84b371983d50b7962ea6be5a0061e1ebdfa5e3c",
+      "schema_sha256": "sha256:f7ec8fcba3470024f955b224474bf668380558f8ce92ddf312520585be177b45",
+      "producer_version": "unreleased-control-extension"
+    },
+    {
+      "scenario_id": "stop-requested-failed",
+      "path": "stop-requested-failed/lifecycle.json",
+      "sha256": "sha256:ff4d1eb26bb28404f4c12dcf4d2c2d3e5292a30252038cf5a8eec31329c1db82",
+      "expected_valid": true,
+      "stop": "failed",
+      "synthetic_extension": true,
+      "quarantine": true,
+      "authoritative": false,
+      "base_commit": "eb4c599a5c1a24dbb270c39a5a513d78f253506d",
+      "generator_sha256": "sha256:4d509fca09db65ff715c073fe84b371983d50b7962ea6be5a0061e1ebdfa5e3c",
+      "schema_sha256": "sha256:f7ec8fcba3470024f955b224474bf668380558f8ce92ddf312520585be177b45",
+      "producer_version": "unreleased-control-extension"
+    },
+    {
+      "scenario_id": "successful-execution-effect-containment",
+      "path": "successful-execution-effect-containment/lifecycle.json",
+      "sha256": "sha256:fcb0085b5af73b8a42aa09c25c09f6510d4eb39b8c06a0eb4e16bcbded4fffa2",
+      "expected_valid": true,
+      "execution": "succeeded",
+      "effect": "validated",
+      "containment": "completed"
+    },
+    {
+      "scenario_id": "unresolved-containment",
+      "path": "unresolved-containment/lifecycle.json",
+      "sha256": "sha256:9e5a7f3670a56fd9e8a8d3434b575a9de3ea0a190f9f9b0efc6bf603b166931f",
+      "expected_valid": true,
+      "execution": "succeeded",
+      "effect": "validated",
+      "containment": "unresolved"
+    },
+    {
+      "scenario_id": "stale-activation",
+      "path": "stale-activation/lifecycle.json",
+      "sha256": "sha256:fcb0085b5af73b8a42aa09c25c09f6510d4eb39b8c06a0eb4e16bcbded4fffa2",
+      "expected_valid": false,
+      "expected_reason": "activation_expired",
+      "evaluation_time": "2036-07-20T00:00:00Z"
+    },
+    {
+      "scenario_id": "replay-mismatched-lineage",
+      "path": "replay-mismatched-lineage/lifecycle.json",
+      "sha256": "sha256:ae405e39982570f419251e05d095fd06bc9cb22fc2eacfcce7513da36a0170ab",
+      "expected_valid": false,
+      "expected_reason": "conformance_replay",
+      "evaluation_time": "2026-07-20T00:00:00Z"
+    },
+    {
+      "scenario_id": "identifier-only-correlation",
+      "path": "identifier-only-correlation/lifecycle.json",
+      "sha256": "sha256:f5bb0a80abd5d1f4cda07c3768f8c4a7b2cd2dd81803f948606908af1c02862e",
+      "expected_valid": false,
+      "expected_reason": "conformance_identifier_only",
+      "evaluation_time": "2026-07-20T00:00:00Z"
+    }
+  ]
+}

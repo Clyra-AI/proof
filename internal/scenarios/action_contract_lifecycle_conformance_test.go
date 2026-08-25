@@ -3,6 +3,8 @@
 package scenarios_test
 
 import (
+	"bytes"
+	"crypto/ed25519"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -10,8 +12,10 @@ import (
 	"testing"
 
 	"github.com/Clyra-AI/proof"
+	proofcanon "github.com/Clyra-AI/proof/canon"
 	proofframework "github.com/Clyra-AI/proof/core/framework"
 	"github.com/Clyra-AI/proof/internal/testutil"
+	proofsign "github.com/Clyra-AI/proof/signing"
 	"github.com/stretchr/testify/require"
 )
 
@@ -77,6 +81,28 @@ func TestActionContractLifecycleConformanceNegatives(t *testing.T) {
 	})
 }
 
+func TestActionContractLifecycleIdentityAndDeterminism(t *testing.T) {
+	records := lifecycleFixtureRecords(t)
+	t.Run("schema replacement is rejected", func(t *testing.T) {
+		mutated := cloneProofRecords(t, records)
+		ref := mutated[0].Event["contract_ref"].(map[string]any)
+		ref["schema_id"] = "https://attacker.invalid/replacement"
+		require.False(t, strictLifecycleBindings(mutated))
+	})
+	t.Run("unlisted relationship ref is rejected", func(t *testing.T) {
+		mutated := cloneProofRecords(t, records)
+		mutated[1].Relationship.EntityRefs = append(mutated[1].Relationship.EntityRefs, proof.RelationshipRef{Kind: "gait.unlisted", ID: "unlisted", Digest: "sha256:" + strings.Repeat("d", 64), SchemaID: "https://gait.dev/schemas/v1/unlisted.json", SchemaVersion: "1", SourceProduct: "gait"})
+		require.False(t, strictLifecycleBindings(mutated))
+	})
+	t.Run("repeated verification output is byte stable", func(t *testing.T) {
+		first, err := json.Marshal(fixtureChain(records))
+		require.NoError(t, err)
+		second, err := json.Marshal(fixtureChain(records))
+		require.NoError(t, err)
+		require.Equal(t, string(first), string(second))
+	})
+}
+
 func TestActionContractLifecycleEvidenceSetAlternatives(t *testing.T) {
 	records := lifecycleFixtureRecords(t)
 	framework := &proofframework.Framework{}
@@ -116,6 +142,76 @@ func TestActionContractLifecycleEvidenceSetAlternatives(t *testing.T) {
 	wrkrOnly, err := proof.EvaluateFrameworkCoverage(framework, []proof.Record{records[0]})
 	require.NoError(t, err)
 	require.False(t, wrkrOnly.Controls[0].Covered)
+}
+
+func TestGeneratedGaitNormalizedCasesAreOfflineAndQuarantined(t *testing.T) {
+	root := testutil.RepoRoot(t)
+	base := filepath.Join(root, "scenarios", "proof", "action-contract-lifecycle-conformance", "source", "gait-v1.5.0", "normalized")
+	sourceBase := filepath.Dir(base)
+	publicKey, err := proofsign.LoadPublicKeyBase64(filepath.Join(sourceBase, "fixture-signing-key.public.b64"))
+	require.NoError(t, err)
+	entries, err := os.ReadDir(base)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, len(entries), 8)
+	for _, entry := range entries {
+		verifyGaitLifecycleSourceSignatures(t, filepath.Join(sourceBase, entry.Name(), "lifecycle.json"), publicKey)
+		raw, e := os.ReadFile(filepath.Join(base, entry.Name(), "records.jsonl"))
+		require.NoError(t, e)
+		var record map[string]any
+		require.NoError(t, json.Unmarshal(bytes.TrimSpace(raw), &record))
+		event := record["event"].(map[string]any)
+		require.Equal(t, true, event["fixture_only"])
+		require.Equal(t, true, event["quarantine"])
+		require.Equal(t, false, event["authoritative"])
+		require.Equal(t, "integrity_only", record["metadata"].(map[string]any)["projection"])
+		var typed proof.Record
+		require.NoError(t, json.Unmarshal(bytes.TrimSpace(raw), &typed))
+		require.NoError(t, proof.ValidateRecord(&typed))
+		require.NotEmpty(t, typed.Integrity.RecordHash)
+		if entry.Name() == "successful-execution-effect-containment" {
+			kinds := map[string]bool{}
+			for _, ref := range typed.Relationship.EntityRefs {
+				kinds[ref.Kind] = true
+				require.NotEmpty(t, ref.Digest)
+				require.NotEmpty(t, ref.SchemaID)
+				require.NotEmpty(t, ref.SchemaVersion)
+				require.NotEmpty(t, ref.SourceProduct)
+			}
+			require.True(t, kinds["wrkr.action_contract"])
+			require.True(t, kinds["gait.activated_action_contract"])
+			require.True(t, kinds["gait.execution_evidence"] || kinds["gait.execution"])
+			require.True(t, kinds["gait.effect_event"] || kinds["gait.effect"])
+		}
+	}
+}
+
+func verifyGaitLifecycleSourceSignatures(t *testing.T, path string, publicKey ed25519.PublicKey) {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var pack struct {
+		Records []map[string]json.RawMessage `json:"records"`
+	}
+	require.NoError(t, json.Unmarshal(raw, &pack))
+	require.NotEmpty(t, pack.Records)
+	for _, record := range pack.Records {
+		signatureRaw, ok := record["signature"]
+		require.True(t, ok, path)
+		var signature proofsign.Signature
+		require.NoError(t, json.Unmarshal(signatureRaw, &signature))
+		record["record_id"] = json.RawMessage(`""`)
+		zeroSignature, err := json.Marshal(proofsign.Signature{})
+		require.NoError(t, err)
+		record["signature"] = zeroSignature
+		signable, err := json.Marshal(record)
+		require.NoError(t, err)
+		digest, err := proofcanon.DigestJCS(signable)
+		require.NoError(t, err)
+		require.Equal(t, strings.TrimPrefix(digest, "sha256:"), signature.SignedDigest)
+		verified, err := proofsign.VerifyDigestHex(publicKey, signature)
+		require.NoError(t, err)
+		require.True(t, verified, path)
+	}
 }
 
 func lifecycleFixtureRecords(t *testing.T) []proof.Record {
