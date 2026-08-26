@@ -287,6 +287,11 @@ All digests carry `algo_id` (sha256 or hmac-sha256) and optional `salt_id` metad
 
 YAML files declare what regulatory controls require and which evidence paths can satisfy them. Proof evaluates deterministic evidence coverage only. It does not decide regulatory applicability, scope gating, or compliance status.
 
+The framework coverage aliases (`FrameworkCoverage`, `FrameworkControlCoverage`,
+`FrameworkEvidenceSetCoverage`) and evaluator are retained for compatibility and
+deprecated. They report evidence-path matches only; compliance interpretation
+remains product-owned.
+
 ```yaml
 controls:
   - id: article-12
@@ -324,6 +329,34 @@ Control IDs/titles for AIUC-1 and OWASP Agentic Top 10 are sourced from their pu
 
 - AIUC-1: <https://aiuc-1.com/data-and-privacy> (and linked Security/Safety/Reliability/Accountability/Society sections)
 - OWASP Agentic Top 10: <https://genai.owasp.org/resource/agentic-top-10/>
+
+## Cross-product fixture imports
+
+The checked-in `cross-product-mixed-chain` and Action Contract lifecycle scenario
+are legacy synthetic/quarantined compatibility fixtures. They are not released
+Wrkr, Gait, or Axym producer evidence and must not be described as final
+conformance.
+
+Final conformance is intentionally staged only through the explicit import
+contract. After release owners supply exact producer bytes and manifests, run:
+
+```bash
+go run ./scripts/import_cross_product_fixture.go --update \
+  --source /path/to/released-fixture-root \
+  --contract /path/to/released-fixture-root/proof-import-contract.json \
+  --dest scenarios/proof/action-contract-final-conformance
+go run ./scripts/import_cross_product_fixture.go --check \
+  --dest scenarios/proof/action-contract-final-conformance
+```
+
+The contract must pin a version, commit, tag, manifest digest, portable schema
+digests, and exact producer artifacts for each of Wrkr, Gait, and Axym. Signed
+Gait/Axym sources also pin a public-key digest; unsigned Wrkr sources use
+manifest or tagged-tree integrity. Axym must provide both its producer register
+and evidence packet. The importer fails closed for missing or synthetic substitutions,
+mutations, stale Proof self-provenance, and identifier-only integrity
+overclaims. It never creates an Axym assessment or rewrites product-native
+relationship references.
 
 ## CLI Reference
 

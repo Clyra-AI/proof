@@ -32,7 +32,7 @@ Status key:
 | AC1 4-line integration | PASS | Library usage is minimal; tested through API tests. |
 | AC2 Universal verify | PASS | Verifies records/chains/bundles/Gait pack and Gait signed JSON artifacts via one CLI surface. |
 | AC3 Chain integrity | PASS | Detects tampering and identifies break index/record. |
-| AC4 Cross-product chain | PASS | Mixed record types chain and verify correctly. |
+| AC4 Cross-product chain | PASS (legacy smoke) | Mixed record types chain and verify correctly; the hand-authored three-record fixture is quarantined and is not released producer conformance. Final conformance is pending exact Wrkr/Gait/Axym import inputs. |
 | AC5 Offline guarantee | PASS | Core verification is offline-first; cosign path is explicitly local-binary based, no mandatory network dependency in CLI flow. |
 | AC6 Schema validation | PASS | Invalid/missing fields rejected by schema and validation layers. |
 | AC7 Custom type | PASS | Runtime custom type registration is supported through CLI/API (`--custom-type-schema`, `RegisterCustomTypeSchema`), and verification validates base + custom schema. |

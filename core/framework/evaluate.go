@@ -9,6 +9,11 @@ import (
 	"github.com/Clyra-AI/proof/core/record"
 )
 
+// Coverage is the deterministic evidence-path coverage result for a framework.
+//
+// Deprecated: framework coverage is retained as a compatibility API. It must
+// not be interpreted as compliance status, regulatory applicability, or gap
+// scoring; those semantics belong to the consuming product.
 type Coverage struct {
 	FrameworkID      string            `json:"framework_id"`
 	FrameworkVersion string            `json:"framework_version"`
@@ -17,6 +22,11 @@ type Coverage struct {
 	Controls         []ControlCoverage `json:"controls"`
 }
 
+// ControlCoverage describes deterministic evidence-path matches for one
+// framework control.
+//
+// Deprecated: retained for compatibility; this type carries no compliance
+// interpretation.
 type ControlCoverage struct {
 	ID                    string                `json:"id"`
 	Title                 string                `json:"title"`
@@ -26,6 +36,11 @@ type ControlCoverage struct {
 	Children              []ControlCoverage     `json:"children,omitempty"`
 }
 
+// EvidenceSetCoverage describes deterministic record matches for one evidence
+// set.
+//
+// Deprecated: retained for compatibility; this type carries no compliance
+// interpretation.
 type EvidenceSetCoverage struct {
 	ID                  string   `json:"id"`
 	Title               string   `json:"title,omitempty"`
@@ -43,6 +58,10 @@ type indexedRecord struct {
 	raw    map[string]any
 }
 
+// EvaluateCoverage reports deterministic evidence-path coverage.
+//
+// Deprecated: use this only as a compatibility helper. It does not evaluate
+// regulatory applicability, compliance status, or gap scoring.
 func EvaluateCoverage(f *Framework, records []record.Record) (*Coverage, error) {
 	if f == nil {
 		return nil, fmt.Errorf("framework is nil")

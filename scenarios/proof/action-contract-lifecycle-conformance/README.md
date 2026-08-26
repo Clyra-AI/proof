@@ -1,7 +1,7 @@
-# action-contract-lifecycle-conformance
+# action-contract-lifecycle-conformance (legacy quarantined fixture)
 
-Validates the final Proof conformance surface for a Wrkr proposal, Gait v1.5.0
-lifecycle result, and Axym assessment. Proof verifies record integrity,
+Validates a legacy compatibility surface for a Wrkr proposal and Gait v1.5.0
+lifecycle result with a synthetic Axym projection. Proof verifies record integrity,
 relationship digests, source-qualified provenance, and framework evidence-set
 coverage; it does not reimplement Gait lifecycle reduction.
 
@@ -10,7 +10,8 @@ normalized record therefore preserves Gait's successful-scenario expectation
 while remaining `fixture_only: true` and `authoritative: false`; it cannot be
 used as production execution authority or control coverage.
 
-The exact provenance manifest is kept under `provenance/fixture-manifest.json`
+This fixture is not final released cross-product conformance. The exact
+provenance manifest is kept under `provenance/fixture-manifest.json`
 so the chain directory remains a plain Proof JSONL fixture. No private keys or
 verification configuration are included.
 

@@ -42,8 +42,23 @@ type RevocationList = signing.RevocationList
 type RevocationEntry = signing.RevocationEntry
 type CosignVerifyOpts = signing.CosignVerifyOpts
 type Framework = framework.Framework
+
+// FrameworkCoverage is retained for source compatibility.
+//
+// Deprecated: this compatibility alias reports evidence-path coverage only; it
+// is not a compliance decision or regulatory applicability result.
 type FrameworkCoverage = framework.Coverage
+
+// FrameworkControlCoverage is retained for source compatibility.
+//
+// Deprecated: use product-owned compliance evaluation for compliance meaning;
+// Proof only reports deterministic evidence-path coverage.
 type FrameworkControlCoverage = framework.ControlCoverage
+
+// FrameworkEvidenceSetCoverage is retained for source compatibility.
+//
+// Deprecated: use product-owned compliance evaluation for compliance meaning;
+// Proof only reports deterministic evidence-path coverage.
 type FrameworkEvidenceSetCoverage = framework.EvidenceSetCoverage
 type RecordType = schema.RecordType
 type RecordTypeDefinition = schema.RecordTypeDefinition
