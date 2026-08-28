@@ -6,13 +6,25 @@ The format is inspired by Keep a Changelog and this project follows semantic ver
 
 ## [Unreleased]
 
-No unreleased changes.
+### Added
+
+- Added an explicit offline final cross-product fixture import contract and staging command for exact Wrkr, Gait, and Axym producer bytes, manifests, portable schemas, and provenance.
+- Added fail-closed importer coverage for producer identity, relationship, signature, schema, synthetic-artifact, identifier-only integrity, symlink, and atomic-staging cases.
+
+### Changed
+
+- Deprecated framework coverage compatibility aliases and evaluator documentation while preserving deterministic evidence-path behavior.
+- Fixture import validation now supports unsigned Wrkr manifest/tagged-tree integrity and inline Ed25519 Gait/Axym artifacts, including released schema-version declaration variants.
+
+### Security
+
+- Final fixture checks reject missing Axym register/packet artifacts, synthetic substitutions, stale self-provenance, digest/signature mutations, and path traversal or symlink escapes.
 
 ## [0.6.2] - 2026-08-25
 
 ### Added
 
-- Added fixture-only Action Contract lifecycle conformance coverage with 16 pinned Gait lifecycle cases, including the Wrkr v1.15.1 proposal, Gait v1.5.0 compatibility base, synthetic control extensions, and Axym commit `7fa4244`.
+- Added a quarantined, fixture-only Action Contract lifecycle compatibility scenario with 16 pinned Gait lifecycle cases, including synthetic control extensions. The checked-in three-record cross-product projection is legacy test data, not released Axym producer evidence.
 - Added a signed 16-artifact Gait approval/delegation gate corpus covering exact, expired, tightened-delegation, expansion, wrong-parent/origin, and revoked-ancestor cases.
 - Added offline deterministic fixture generators and drift tests for source bytes, public keys, normalized records, provenance manifests, and orphan detection.
 

@@ -17,7 +17,8 @@ import (
 	proofrecord "github.com/Clyra-AI/proof/core/record"
 )
 
-const defaultSource = "/Users/tr/Clyra/gait-doc-completion/testdata/action-contract-gate/v1"
+// Sources are always supplied explicitly for imports. Check mode reads the
+// committed fixture tree and never consults a developer checkout.
 const defaultDest = "scenarios/proof/action-contract-gate-conformance/source/gait-gate-v1"
 
 type sourceManifest struct {
@@ -39,7 +40,7 @@ type sourceManifest struct {
 }
 
 func main() {
-	source := flag.String("source", defaultSource, "Gait gate fixture source")
+	source := flag.String("source", "", "Gait gate fixture source (required with --update)")
 	dest := flag.String("dest", defaultDest, "Proof fixture destination")
 	update := flag.Bool("update", false, "import and regenerate")
 	check := flag.Bool("check", false, "check exact bytes and orphans")
@@ -47,7 +48,10 @@ func main() {
 	flag.Parse()
 	_ = *offline
 	if *update == *check {
-		fatal("exactly one of --update or --check is required")
+		fatalCode(6, "exactly one of --update or --check is required")
+	}
+	if *update && strings.TrimSpace(*source) == "" {
+		fatalCode(6, "--source is required with --update")
 	}
 	if !*update {
 		*source = ""
@@ -56,7 +60,11 @@ func main() {
 		fatal("%v", err)
 	}
 }
-func fatal(format string, args ...any) { fmt.Fprintf(os.Stderr, format+"\n", args...); os.Exit(1) }
+func fatalCode(code int, format string, args ...any) {
+	fmt.Fprintf(os.Stderr, format+"\n", args...)
+	os.Exit(code)
+}
+func fatal(format string, args ...any) { fatalCode(1, format, args...) }
 func digest(raw []byte) string         { s := sha256.Sum256(raw); return "sha256:" + hex.EncodeToString(s[:]) }
 func digestMatches(actual, expected string) bool {
 	return strings.TrimPrefix(strings.ToLower(strings.TrimSpace(actual)), "sha256:") == strings.TrimPrefix(strings.ToLower(strings.TrimSpace(expected)), "sha256:")

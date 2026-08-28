@@ -13,7 +13,7 @@ Use this contract before refactors to avoid accidental breakage for downstream u
 | `github.com/Clyra-AI/proof/core/signing` | Low-level signing primitives | Supported (stable) | Backward compatible within major version for exported symbols. |
 | `github.com/Clyra-AI/proof/core/canon` | Low-level canonicalization primitives | Supported (stable) | Backward compatible within major version for exported symbols. |
 | `github.com/Clyra-AI/proof/core/schema` | Low-level schema/type primitives | Supported (stable) | Backward compatible within major version for exported symbols. |
-| `github.com/Clyra-AI/proof/core/framework` | Framework definitions and evidence coverage evaluation | Supported (stable) | Backward compatible within major version for exported symbols. |
+| `github.com/Clyra-AI/proof/core/framework` | Framework definitions and evidence coverage evaluation | Supported (compatibility) | Backward compatible within major version for exported symbols; coverage types/evaluator are deprecated and report evidence paths only. |
 | `github.com/Clyra-AI/proof/core/bundle` | Bundle manifest/sign/verify primitives | Supported (stable) | Backward compatible within major version for exported symbols. |
 | `github.com/Clyra-AI/proof/core/exitcode` | Exit-code constants | Supported (stable) | Exit code values `0-8` are contractually stable. |
 | `github.com/Clyra-AI/proof/signing` | Compatibility shim | Supported (compatibility) | Kept for migration compatibility. New code should prefer `github.com/Clyra-AI/proof` or `.../core/signing`. |
@@ -62,9 +62,21 @@ calls allow only fragments or the schema's own `$id`; use
 The legacy `RegisterCustomType`, `RegisterCustomTypeSchema`, and `ResetCustomTypes` functions remain supported for
 source compatibility. New code that may verify concurrent or untrusted bundles should use scoped registries.
 
-`EvaluateFrameworkCoverage` is retained for compatibility and is deprecated as a compliance interpretation boundary:
-it reports deterministic evidence-path coverage only. Regulatory applicability, scope, gap scoring, and compliance
-decisions belong to product-owned consumers and are not inferred by Proof.
+`FrameworkCoverage`, `FrameworkControlCoverage`, and `FrameworkEvidenceSetCoverage` (and the
+`core/framework` `Coverage`, `ControlCoverage`, and `EvidenceSetCoverage` types) are retained for source
+compatibility and deprecated. `EvaluateFrameworkCoverage` and `core/framework.EvaluateCoverage` report deterministic
+evidence-path coverage only. Regulatory applicability, scope, gap scoring, and compliance decisions belong to
+product-owned consumers and are not inferred by Proof.
+
+## Final cross-product fixture import
+
+Final conformance must be imported with `scripts/import_cross_product_fixture.go` using a release-owner-supplied
+contract. The contract pins exact Wrkr, Gait, and Axym producer versions, commits, tags, source manifests, portable
+schemas, artifact digests, and relationship references. Unsigned Wrkr may use manifest or tagged-tree integrity
+without a public key; signed Gait/Axym sources pin and verify an Ed25519 public key. Update mode validates all bytes
+before staging; check mode is offline and deterministic. Axym register and evidence-packet producer artifacts are mandatory. The
+importer does not synthesize assessments, infer producer provenance, or rewrite product-native references. The
+legacy synthetic three-record scenario remains quarantined and is not final released conformance.
 
 ## Control, Containment, and Telemetry Correlation Profile
 
