@@ -52,6 +52,18 @@ func TestFinalFixtureImportPreflightFailureLeavesExistingFixtureUntouched(t *tes
 	require.Equal(t, sentinel, got)
 }
 
+func TestFinalFixtureImportUpdatePreservesScenarioMetadata(t *testing.T) {
+	root, contract, raw := validSource(t)
+	dest := filepath.Join(t.TempDir(), "fixture")
+	require.NoError(t, Update(root, dest, contract, raw))
+	expected := filepath.Join(dest, "expected.yaml")
+	require.NoError(t, os.WriteFile(expected, []byte("verify: pass\n"), 0o600))
+	require.NoError(t, Update(root, dest, contract, raw))
+	got, err := os.ReadFile(expected)
+	require.NoError(t, err)
+	require.Equal(t, []byte("verify: pass\n"), got)
+}
+
 func TestFinalFixtureImportCheckTypesMissingRequiredFileAsRuntimeFailure(t *testing.T) {
 	root, contract, raw := validSource(t)
 	dest := filepath.Join(t.TempDir(), "fixture")
@@ -659,6 +671,24 @@ func TestFinalFixtureImportVerifiesPresentSignatureWithoutKnownIdentityField(t *
 	raw := []byte(`{"register_id":"register-1","schema_id":"urn:register-schema","schema_version":"1"}`)
 	signed := signTestArtifact(t, raw, private)
 	require.NoError(t, verifyInlineSignatures(signed, private.Public().(ed25519.PublicKey), true))
+}
+
+func TestFinalFixtureImportRejectsMutatedTypedEvidenceContentDigest(t *testing.T) {
+	path := filepath.Join("..", "..", "scenarios", "proof", "action-contract-final-conformance", "source", "gait", "lifecycle.json")
+	raw, err := os.ReadFile(path)
+	require.NoError(t, err)
+	keyRaw, err := os.ReadFile(filepath.Join("..", "..", "scenarios", "proof", "action-contract-final-conformance", "source", "gait", "public-key.b64"))
+	require.NoError(t, err)
+	key, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(keyRaw)))
+	require.NoError(t, err)
+	var envelope map[string]any
+	require.NoError(t, json.Unmarshal(raw, &envelope))
+	records := envelope["records"].([]any)
+	execution := records[5].(map[string]any)["execution"].(map[string]any)
+	execution["canonical_content_digest"] = "sha256:" + strings.Repeat("0", 64)
+	mutated, err := json.Marshal(execution)
+	require.NoError(t, err)
+	require.ErrorContains(t, verifyInlineSignatures(mutated, key, true), "canonical_content_digest")
 }
 
 func TestFinalFixtureImportRejectsInlineSignatureWithoutPinnedPublicKey(t *testing.T) {

@@ -180,17 +180,30 @@ type Contract struct {
 }
 
 type Source struct {
-	Product         string     `json:"product"`
-	Version         string     `json:"version"`
-	Commit          string     `json:"commit"`
-	Tag             string     `json:"tag"`
-	IntegrityMode   string     `json:"integrity_mode"`
-	ManifestPath    string     `json:"manifest_path"`
-	ManifestSHA256  string     `json:"manifest_sha256"`
-	PublicKeyPath   string     `json:"public_key_path"`
-	PublicKeySHA256 string     `json:"public_key_sha256"`
-	Schemas         []File     `json:"schemas"`
-	Artifacts       []Artifact `json:"artifacts"`
+	Product         string         `json:"product"`
+	Version         string         `json:"version"`
+	Commit          string         `json:"commit"`
+	Tag             string         `json:"tag"`
+	TagObject       string         `json:"tag_object,omitempty"`
+	PeeledCommit    string         `json:"peeled_commit,omitempty"`
+	IntegrityMode   string         `json:"integrity_mode"`
+	ManifestPath    string         `json:"manifest_path"`
+	ManifestSHA256  string         `json:"manifest_sha256"`
+	PublicKeyPath   string         `json:"public_key_path"`
+	PublicKeySHA256 string         `json:"public_key_sha256"`
+	ReleaseAssets   []ReleaseAsset `json:"release_assets,omitempty"`
+	Schemas         []File         `json:"schemas"`
+	Artifacts       []Artifact     `json:"artifacts"`
+}
+
+// ReleaseAsset pins the detached release material used to anchor an
+// extracted authoritative bundle. The bytes are copied and digest-checked
+// like every other source file; the role keeps checksum, signature,
+// certificate, attestation, provenance, and bundle inputs distinguishable.
+type ReleaseAsset struct {
+	Role   string `json:"role"`
+	Path   string `json:"path"`
+	SHA256 string `json:"sha256"`
 }
 
 type File struct {
@@ -234,17 +247,20 @@ type importedManifest struct {
 }
 
 type importedSource struct {
-	Product         string   `json:"product"`
-	Version         string   `json:"version"`
-	Commit          string   `json:"commit"`
-	Tag             string   `json:"tag"`
-	IntegrityMode   string   `json:"integrity_mode"`
-	Manifest        string   `json:"manifest"`
-	ManifestSHA256  string   `json:"manifest_sha256"`
-	PublicKey       string   `json:"public_key"`
-	PublicKeySHA256 string   `json:"public_key_sha256"`
-	Schemas         []string `json:"schemas"`
-	Artifacts       []string `json:"artifacts"`
+	Product         string         `json:"product"`
+	Version         string         `json:"version"`
+	Commit          string         `json:"commit"`
+	Tag             string         `json:"tag"`
+	TagObject       string         `json:"tag_object,omitempty"`
+	PeeledCommit    string         `json:"peeled_commit,omitempty"`
+	IntegrityMode   string         `json:"integrity_mode"`
+	Manifest        string         `json:"manifest"`
+	ManifestSHA256  string         `json:"manifest_sha256"`
+	PublicKey       string         `json:"public_key"`
+	PublicKeySHA256 string         `json:"public_key_sha256"`
+	ReleaseAssets   []ReleaseAsset `json:"release_assets,omitempty"`
+	Schemas         []string       `json:"schemas"`
+	Artifacts       []string       `json:"artifacts"`
 }
 
 // LoadContract parses and validates the shape of a contract. Byte and
@@ -315,6 +331,23 @@ func validateSourceShape(s *Source) error {
 			return fmt.Errorf("%s is required", field.name)
 		}
 	}
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{"tag_object", s.TagObject},
+		{"peeled_commit", s.PeeledCommit},
+	} {
+		if field.value == "" {
+			continue
+		}
+		if len(field.value) != 40 {
+			return fmt.Errorf("%s must be a 40-character hexadecimal object ID", field.name)
+		}
+		if _, err := hex.DecodeString(field.value); err != nil {
+			return fmt.Errorf("%s must be a 40-character hexadecimal object ID", field.name)
+		}
+	}
 	if s.IntegrityMode != "manifest_digest" && s.IntegrityMode != "tagged_tree" && s.IntegrityMode != "inline_ed25519" {
 		return fmt.Errorf("unsupported integrity_mode %q", s.IntegrityMode)
 	}
@@ -329,6 +362,27 @@ func validateSourceShape(s *Source) error {
 	}
 	if s.Product != "wrkr" && s.IntegrityMode != "inline_ed25519" {
 		return fmt.Errorf("%s source must use inline_ed25519", s.Product)
+	}
+	seenReleaseRoles := map[string]bool{}
+	seenReleasePaths := map[string]bool{}
+	for i, asset := range s.ReleaseAssets {
+		if strings.TrimSpace(asset.Role) == "" || strings.TrimSpace(asset.Path) == "" || strings.TrimSpace(asset.SHA256) == "" {
+			return fmt.Errorf("release_assets[%d] requires role, path, and sha256", i)
+		}
+		if seenReleaseRoles[asset.Role] {
+			return fmt.Errorf("release_assets contains duplicate role %q", asset.Role)
+		}
+		seenReleaseRoles[asset.Role] = true
+		if seenReleasePaths[asset.Path] {
+			return fmt.Errorf("release_assets contains duplicate path %q", asset.Path)
+		}
+		seenReleasePaths[asset.Path] = true
+		if err := safePath(asset.Path); err != nil {
+			return fmt.Errorf("release_assets[%d] path: %w", i, err)
+		}
+		if _, err := parseDigest(asset.SHA256); err != nil {
+			return fmt.Errorf("release_assets[%d] sha256: %w", i, err)
+		}
 	}
 	paths := []struct {
 		name string
@@ -576,6 +630,24 @@ func Update(sourceRoot, dest string, contract Contract, contractRaw []byte) erro
 	if err := os.WriteFile(filepath.Join(dest, ContractPath), canonicalContract, 0o600); err != nil {
 		return runtimeError(err)
 	}
+	if expectedTarget != nil {
+		// Scenario metadata is maintained alongside the managed fixture but is
+		// not part of the producer import contract. Preserve it across the
+		// atomic replacement so a documented update does not delete the
+		// scenario's expected outcome file.
+		expectedPath := filepath.Join(target, "expected.yaml")
+		if _, err := os.Lstat(expectedPath); err == nil {
+			expectedRaw, err := readSafe(target, "expected.yaml")
+			if err != nil {
+				return classifyReadFailure("read fixture expected metadata", err)
+			}
+			if err := os.WriteFile(filepath.Join(dest, "expected.yaml"), expectedRaw, 0o600); err != nil {
+				return runtimeError(err)
+			}
+		} else if !os.IsNotExist(err) {
+			return runtimeError(err)
+		}
+	}
 	for _, s := range contract.Sources {
 		for _, f := range append(sourceFiles(s), artifactFiles(s)...) {
 			if err := copyExact(filepath.Join(sourceRoot, s.Product, f.Path), filepath.Join(dest, "source", s.Product, f.Path)); err != nil {
@@ -659,6 +731,10 @@ func validateSources(root string, c Contract) error {
 		}
 		if err := validateProducerMetadata(manifestRaw, s); err != nil {
 			return fmt.Errorf("%s producer metadata: %w", s.Product, err)
+		}
+		authoritativeManifest, err := parseAuthoritativeManifest(manifestRaw, s)
+		if err != nil {
+			return fmt.Errorf("%s authoritative manifest: %w", s.Product, err)
 		}
 		var publicKey ed25519.PublicKey
 		if s.PublicKeyPath != "" {
@@ -744,6 +820,11 @@ func validateSources(root string, c Contract) error {
 			}
 			if err := validateArtifactRelationships(b, artifact.RelationshipRefs); err != nil {
 				return fmt.Errorf("%s artifact relationships %s: %w", s.Product, artifact.Path, err)
+			}
+		}
+		if authoritativeManifest != nil {
+			if err := validateAuthoritativeFileSet(authoritativeManifest, s); err != nil {
+				return fmt.Errorf("%s authoritative manifest files: %w", s.Product, err)
 			}
 		}
 	}
@@ -858,10 +939,29 @@ func verifyInlineSignatures(raw []byte, publicKey ed25519.PublicKey, required bo
 		return nil
 	}
 	count := 0
-	var walk func([]byte) error
-	walk = func(data []byte) error {
+	var walk func([]byte, bool) error
+	walk = func(data []byte, root bool) error {
 		var object map[string]json.RawMessage
 		if err := json.Unmarshal(data, &object); err == nil && object != nil {
+			// Gait typed evidence signs the containing evidence object while
+			// storing its signature under provenance.signature. Verify that
+			// containing object here and do not reinterpret provenance itself as
+			// a separately signed artifact.
+			if provenanceRaw, hasProvenance := object["provenance"]; hasProvenance {
+				var provenance map[string]json.RawMessage
+				if err := json.Unmarshal(provenanceRaw, &provenance); err == nil && provenance != nil {
+					if signatureRaw, hasSignature := provenance["signature"]; hasSignature {
+						var signature map[string]any
+						if err := json.Unmarshal(signatureRaw, &signature); err != nil || signature == nil {
+							return errors.New("inline signature must be an object")
+						}
+						count++
+						if err := verifyInlineSignature(object, signature, publicKey); err != nil {
+							return err
+						}
+					}
+				}
+			}
 			signatureRaw, hasSignature := object["signature"]
 			if hasSignature {
 				count++
@@ -872,7 +972,7 @@ func verifyInlineSignatures(raw []byte, publicKey ed25519.PublicKey, required bo
 				if err := verifyInlineSignature(object, signature, publicKey); err != nil {
 					return err
 				}
-			} else if signedObjectIdentity(object) && required {
+			} else if root && signedObjectIdentity(object) && required {
 				return errors.New("required inline signature is missing")
 			}
 			keys := make([]string, 0, len(object))
@@ -882,10 +982,10 @@ func verifyInlineSignatures(raw []byte, publicKey ed25519.PublicKey, required bo
 			sort.Strings(keys)
 			for _, key := range keys {
 				child := object[key]
-				if key == "signature" {
+				if key == "signature" || key == "provenance" {
 					continue
 				}
-				if err := walk(child); err != nil {
+				if err := walk(child, false); err != nil {
 					return err
 				}
 			}
@@ -894,14 +994,14 @@ func verifyInlineSignatures(raw []byte, publicKey ed25519.PublicKey, required bo
 		var list []json.RawMessage
 		if err := json.Unmarshal(data, &list); err == nil && list != nil {
 			for _, child := range list {
-				if err := walk(child); err != nil {
+				if err := walk(child, false); err != nil {
 					return err
 				}
 			}
 		}
 		return nil
 	}
-	if err := walk(raw); err != nil {
+	if err := walk(raw, true); err != nil {
 		return err
 	}
 	if required && count == 0 {
@@ -911,7 +1011,7 @@ func verifyInlineSignatures(raw []byte, publicKey ed25519.PublicKey, required bo
 }
 
 func signedObjectIdentity(object map[string]json.RawMessage) bool {
-	for _, key := range []string{"record_id", "artifact_id", "packet_id", "token_id", "register_id"} {
+	for _, key := range []string{"record_id", "artifact_id", "packet_id", "token_id", "register_id", "evidence_id"} {
 		if _, ok := object[key]; ok {
 			return true
 		}
@@ -943,6 +1043,9 @@ func verifyInlineSignature(object map[string]json.RawMessage, signature map[stri
 	}
 	_, packet := canonicalObject["packet_id"]
 	_, packetDigest := canonicalObject["digest"]
+	_, register := canonicalObject["contracts"]
+	_, registerDigest := canonicalObject["digest"]
+	_, evidence := canonicalObject["evidence_id"]
 	if packet && packetDigest {
 		// Axym Packet signs the content with digest cleared and omits the
 		// optional signature pointer while calculating that digest.
@@ -952,10 +1055,32 @@ func verifyInlineSignature(object map[string]json.RawMessage, signature map[stri
 		} else {
 			canonicalObject["signature"] = json.RawMessage(`{"alg":"","key_id":"","sig":""}`)
 		}
+	} else if register && registerDigest && canonicalObject["schema_id"] != nil && strings.Contains(string(canonicalObject["schema_id"]), "action-contract-register.schema.json") {
+		// Axym registers, like packets, sign the object with its digest and
+		// signature fields cleared.
+		delete(canonicalObject, "digest")
+		delete(canonicalObject, "signature")
 	} else if _, token := canonicalObject["token_id"]; token {
 		// Gait approval/delegation tokens use an omitempty signature pointer;
 		// their signable form removes signature entirely and retains token_id.
 		delete(canonicalObject, "signature")
+	} else if evidence {
+		// Gait typed evidence signs the object after removing its identity and
+		// canonical digest, plus the nested provenance signature.
+		delete(canonicalObject, "evidence_id")
+		delete(canonicalObject, "canonical_content_digest")
+		if provenance, ok := canonicalObject["provenance"]; ok {
+			var provenanceObject map[string]json.RawMessage
+			if err := json.Unmarshal(provenance, &provenanceObject); err != nil {
+				return err
+			}
+			delete(provenanceObject, "signature")
+			provenance, err = json.Marshal(provenanceObject)
+			if err != nil {
+				return err
+			}
+			canonicalObject["provenance"] = provenance
+		}
 	} else {
 		// Gait's producer canonicalization clears fields while preserving the
 		// typed Signature object shape; its optional signed_digest field is
@@ -963,6 +1088,9 @@ func verifyInlineSignature(object map[string]json.RawMessage, signature map[stri
 		canonicalObject["signature"] = json.RawMessage(`{"alg":"","key_id":"","sig":""}`)
 		if _, exists := canonicalObject["record_id"]; exists {
 			canonicalObject["record_id"] = json.RawMessage(`""`)
+		}
+		if _, exists := canonicalObject["artifact_id"]; exists {
+			canonicalObject["artifact_id"] = json.RawMessage(`""`)
 		}
 	}
 	canonicalRaw, err := json.Marshal(canonicalObject)
@@ -977,6 +1105,16 @@ func verifyInlineSignature(object map[string]json.RawMessage, signature map[stri
 		var declared string
 		if err := json.Unmarshal(object["digest"], &declared); err != nil || !digestEqualBytes(declared, "sha256:"+digestHex) {
 			return errors.New("packet declared digest does not match canonical content")
+		}
+	} else if register && registerDigest {
+		var declared string
+		if err := json.Unmarshal(object["digest"], &declared); err != nil || !digestEqualBytes(declared, "sha256:"+digestHex) {
+			return errors.New("register declared digest does not match canonical content")
+		}
+	} else if evidence {
+		var declared string
+		if err := json.Unmarshal(object["canonical_content_digest"], &declared); err != nil || strings.TrimPrefix(declared, "sha256:") != strings.TrimPrefix(digestHex, "sha256:") {
+			return errors.New("typed evidence canonical_content_digest does not match canonical content")
 		}
 	}
 	if strings.TrimPrefix(parsed.SignedDigest, "sha256:") != strings.TrimPrefix(digestHex, "sha256:") {
@@ -996,6 +1134,9 @@ func validateProducerMetadata(raw []byte, s Source) error {
 	var obj map[string]any
 	if err := json.Unmarshal(raw, &obj); err != nil {
 		return fmt.Errorf("manifest is not JSON: %w", err)
+	}
+	if authoritative, err := parseAuthoritativeManifest(raw, s); authoritative != nil || err != nil {
+		return err
 	}
 	producer, _ := obj["producer"].(map[string]any)
 	name, err := consistentStringAlias(producer, obj, "name", "product")
@@ -1028,6 +1169,130 @@ func validateProducerMetadata(raw []byte, s Source) error {
 	}
 	if _, has := obj["proof_version"]; has {
 		return errors.New("source manifest contains stale self-provenance proof_version")
+	}
+	return nil
+}
+
+type authoritativeManifest struct {
+	SchemaID        string          `json:"schema_id"`
+	SchemaVersion   string          `json:"schema_version"`
+	ReleaseTag      string          `json:"release_tag"`
+	PeeledCommit    string          `json:"peeled_commit"`
+	Authoritative   bool            `json:"authoritative"`
+	FixtureOnly     bool            `json:"fixture_only"`
+	DevelopmentSign bool            `json:"development_signing"`
+	Quarantine      bool            `json:"quarantine"`
+	Artifacts       json.RawMessage `json:"artifacts"`
+	ArtifactFiles   []File          `json:"-"`
+	Referenced      []File          `json:"referenced_schemas"`
+	ManifestVersion string          `json:"manifest_version"`
+	Producer        struct {
+		Name    string `json:"name"`
+		Version string `json:"version"`
+	} `json:"producer"`
+	Schemas []File `json:"schemas"`
+	Files   []File `json:"files"`
+	Signing struct {
+		Algorithm       string `json:"algorithm"`
+		PublicKeyPath   string `json:"public_key_path"`
+		PublicKeySHA256 string `json:"public_key_sha256"`
+		KeyID           string `json:"key_id"`
+	} `json:"signing"`
+}
+
+func parseAuthoritativeManifest(raw []byte, s Source) (*authoritativeManifest, error) {
+	var marker struct {
+		SchemaID string `json:"schema_id"`
+	}
+	if err := json.Unmarshal(raw, &marker); err != nil {
+		return nil, fmt.Errorf("authoritative manifest JSON: %w", err)
+	}
+	var markerFields struct {
+		SchemaID     string `json:"schema_id"`
+		ReleaseTag   string `json:"release_tag"`
+		PeeledCommit string `json:"peeled_commit"`
+	}
+	if err := json.Unmarshal(raw, &markerFields); err != nil {
+		return nil, fmt.Errorf("authoritative manifest JSON: %w", err)
+	}
+	if !strings.Contains(marker.SchemaID, "authoritative-evidence-bundle-manifest.schema.json") && (markerFields.ReleaseTag == "" || markerFields.PeeledCommit == "") {
+		return nil, nil
+	}
+	var manifest authoritativeManifest
+	if err := json.Unmarshal(raw, &manifest); err != nil {
+		return nil, fmt.Errorf("authoritative manifest JSON: %w", err)
+	}
+	if strings.Contains(manifest.SchemaID, "authoritative-evidence-bundle-manifest.schema.json") {
+		wantSchema := fmt.Sprintf("https://%s.dev/schemas/v1/action-contract/authoritative-evidence-bundle-manifest.schema.json", s.Product)
+		if manifest.SchemaID != wantSchema || manifest.SchemaVersion != "1" {
+			return nil, fmt.Errorf("authoritative manifest schema identity does not match %s", s.Product)
+		}
+		if err := json.Unmarshal(manifest.Artifacts, &manifest.ArtifactFiles); err != nil {
+			return nil, errors.New("authoritative manifest artifacts must be an array")
+		}
+	} else if s.Product == "axym" && manifest.ManifestVersion == "v1" {
+		if manifest.Producer.Name != "axym" || manifest.Producer.Version != s.Version {
+			return nil, errors.New("authoritative manifest producer identity does not match pinned source")
+		}
+		manifest.SchemaVersion = manifest.ManifestVersion
+		manifest.Referenced = manifest.Schemas
+		var artifacts map[string]string
+		if err := json.Unmarshal(manifest.Artifacts, &artifacts); err != nil {
+			return nil, errors.New("authoritative manifest artifacts must be an object")
+		}
+		for _, file := range manifest.Files {
+			if !strings.Contains(file.Path, ".schema.") && (strings.Contains(file.Path, "register") || strings.Contains(file.Path, "packet") || strings.Contains(file.Path, "public-key")) {
+				manifest.ArtifactFiles = append(manifest.ArtifactFiles, file)
+			}
+		}
+	}
+	if manifest.ReleaseTag != s.Tag || manifest.PeeledCommit != s.PeeledCommit {
+		return nil, errors.New("authoritative manifest release identity does not match pinned tag")
+	}
+	if !manifest.Authoritative || manifest.FixtureOnly || manifest.DevelopmentSign || manifest.Quarantine {
+		return nil, errors.New("authoritative manifest must be authoritative and non-quarantined")
+	}
+	if manifest.Signing.Algorithm != "ed25519" || manifest.Signing.PublicKeyPath != s.PublicKeyPath || manifest.Signing.PublicKeySHA256 != s.PublicKeySHA256 {
+		return nil, errors.New("authoritative manifest signing identity does not match pinned public key")
+	}
+	if len(manifest.Artifacts) == 0 || len(manifest.Referenced) == 0 {
+		return nil, errors.New("authoritative manifest must list artifacts and referenced schemas")
+	}
+	return &manifest, nil
+}
+
+func validateAuthoritativeFileSet(manifest *authoritativeManifest, s Source) error {
+	wantArtifacts := map[string]string{}
+	for _, artifact := range s.Artifacts {
+		wantArtifacts[artifact.Path] = artifact.SHA256
+	}
+	if s.PublicKeyPath != "" {
+		wantArtifacts[s.PublicKeyPath] = s.PublicKeySHA256
+	}
+	if len(manifest.ArtifactFiles) != len(wantArtifacts) {
+		return errors.New("authoritative manifest artifact set does not match contract")
+	}
+	for _, file := range manifest.ArtifactFiles {
+		if wantArtifacts[file.Path] != file.SHA256 {
+			return fmt.Errorf("authoritative manifest artifact digest is not pinned: %s", file.Path)
+		}
+		delete(wantArtifacts, file.Path)
+	}
+	if len(wantArtifacts) != 0 {
+		return errors.New("contract is missing an authoritative manifest artifact")
+	}
+	wantSchemas := map[string]string{}
+	for _, schema := range s.Schemas {
+		wantSchemas[schema.Path] = schema.SHA256
+	}
+	manifestSchemas := map[string]string{}
+	for _, file := range manifest.Referenced {
+		manifestSchemas[file.Path] = file.SHA256
+	}
+	for path, digest := range wantSchemas {
+		if manifestSchemas[path] != digest {
+			return fmt.Errorf("contract schema is not pinned by authoritative manifest: %s", path)
+		}
 	}
 	return nil
 }
@@ -1422,6 +1687,9 @@ func sourceFiles(s Source) []File {
 	if s.PublicKeyPath != "" {
 		files = append(files, File{Path: s.PublicKeyPath, SHA256: s.PublicKeySHA256})
 	}
+	for _, asset := range s.ReleaseAssets {
+		files = append(files, File{Path: asset.Path, SHA256: asset.SHA256})
+	}
 	return append(files, s.Schemas...)
 }
 
@@ -1443,7 +1711,7 @@ func buildManifest(c Contract, contractRaw []byte) ([]byte, error) {
 	}
 	manifest := importedManifest{Format: ContractFormat, FixtureID: c.FixtureID, ContractSHA: contractDigest, FixtureOnly: true}
 	for _, s := range c.Sources {
-		out := importedSource{Product: s.Product, Version: s.Version, Commit: s.Commit, Tag: s.Tag, IntegrityMode: s.IntegrityMode, Manifest: s.ManifestPath, ManifestSHA256: s.ManifestSHA256, PublicKey: s.PublicKeyPath, PublicKeySHA256: s.PublicKeySHA256}
+		out := importedSource{Product: s.Product, Version: s.Version, Commit: s.Commit, Tag: s.Tag, TagObject: s.TagObject, PeeledCommit: s.PeeledCommit, IntegrityMode: s.IntegrityMode, Manifest: s.ManifestPath, ManifestSHA256: s.ManifestSHA256, PublicKey: s.PublicKeyPath, PublicKeySHA256: s.PublicKeySHA256, ReleaseAssets: s.ReleaseAssets}
 		for _, schema := range s.Schemas {
 			out.Schemas = append(out.Schemas, schema.Path)
 		}
@@ -1783,7 +2051,7 @@ func compare(path string, want []byte) error {
 }
 
 func orphanCheck(dest string, c Contract) error {
-	allowed := map[string]bool{ManagedMarker: true, ContractPath: true, ManifestPath: true}
+	allowed := map[string]bool{ManagedMarker: true, ContractPath: true, ManifestPath: true, "expected.yaml": true}
 	for _, s := range c.Sources {
 		for _, f := range append(sourceFiles(s), artifactFiles(s)...) {
 			allowed[filepath.ToSlash(filepath.Join("source", s.Product, f.Path))] = true

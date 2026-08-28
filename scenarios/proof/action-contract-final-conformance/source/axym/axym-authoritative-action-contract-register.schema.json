@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://axym.dev/schemas/v1/governance/action-contract-register.schema.json",
+  "title": "Axym governed Action Contract register",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "contracts"],
+  "properties": {
+    "schema_id": {"const": "https://axym.dev/schemas/v1/governance/action-contract-register.schema.json"},
+    "schema_version": {"const": "v1"},
+    "source_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "signature": {"$ref": "#/$defs/signature"},
+    "contracts": {"type": "array", "items": {"$ref": "#/$defs/contract"}}
+  },
+  "$defs": {
+    "signature": {"type":"object", "additionalProperties":false, "required":["alg","key_id","sig","signed_digest"], "properties":{"alg":{"const":"ed25519"},"key_id":{"type":"string","pattern":"^[0-9a-f]{64}$"},"sig":{"type":"string","minLength":1},"signed_digest":{"type":"string","pattern":"^[0-9a-f]{64}$"}}},
+    "ref": {"type":"object", "additionalProperties":false, "required":["id","kind","digest","source","source_product","schema_id","schema_version"], "properties":{"id":{"type":"string","minLength":1},"kind":{"type":"string","minLength":1},"digest":{"type":"string","pattern":"^sha256:[0-9a-f]{64}$"},"source":{"type":"string","minLength":1},"source_product":{"type":"string","minLength":1},"schema_id":{"type":"string","minLength":1},"schema_version":{"type":"string","minLength":1}}},
+    "contract": {"type":"object", "additionalProperties":false, "required":["id","family_id","revision","action","target","environment","provenance"], "properties":{"id":{"type":"string","minLength":1},"family_id":{"type":"string","minLength":1},"revision":{"type":"integer","minimum":1},"action":{"type":"string","minLength":1},"target":{"type":"string","minLength":1},"environment":{"type":"string","minLength":1},"policy_digest":{"type":"string"},"owner":{"type":"string"},"authority_refs":{"type":"array","items":{"$ref":"#/$defs/ref"}},"authorization":{"type":"array","items":{"type":"object"}},"preconditions":{"type":"array","items":{"type":"object"}},"confirmation":{"type":"array","items":{"type":"object"}},"approval":{"type":"array","items":{"type":"object"}},"credential":{"type":"array","items":{"type":"object"}},"effect":{"type":"array","items":{"type":"object"}},"compensation":{"type":"array","items":{"type":"object"}},"outcome":{"type":"array","items":{"type":"object"}},"provenance":{"$ref":"#/$defs/ref"},"causal_ref":{"$ref":"#/$defs/ref"}}}
+  }
+}

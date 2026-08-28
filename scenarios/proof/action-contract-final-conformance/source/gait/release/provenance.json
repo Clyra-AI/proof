@@ -1,0 +1,14 @@
+{
+  "buildType": "gait.release",
+  "builder": { "id": "github.com/Clyra-AI/gait" },
+  "invocation": {
+    "configSource": {
+      "uri": "git+https://github.com/Clyra-AI/gait",
+      "digest": { "sha1": "29cb736e946c1153a9fd3f14bbc0f0b864e1b4a4" }
+    }
+  },
+  "metadata": {
+    "buildStartedOn": "2026-08-28T10:50:26Z",
+    "buildFinishedOn": "2026-08-28T10:50:26Z"
+  }
+}

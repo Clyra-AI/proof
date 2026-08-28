@@ -349,6 +349,13 @@ go run ./scripts/import_cross_product_fixture.go --check \
   --dest scenarios/proof/action-contract-final-conformance
 ```
 
+The checked-in `action-contract-final-conformance` fixture was imported from
+the immutable Wrkr `v1.15.1` tag tree and the authoritative Gait `v1.7.2` and
+Axym `v0.2.2` release bundles. Its contract records annotated tag objects,
+peeled commits, release bundle/checksum/provenance digests, exact source-byte
+digests, and cross-product relationship references. Quarantined or
+development-only producer fixtures are rejected.
+
 The contract must pin a version, commit, tag, manifest digest, portable schema
 digests, and exact producer artifacts for each of Wrkr, Gait, and Axym. Signed
 Gait/Axym sources also pin a public-key digest; unsigned Wrkr sources use
