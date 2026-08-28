@@ -1,0 +1,75 @@
+{
+  "artifacts": {
+    "bundle": "sha256:7cda6d1237237871cee8a47a2646bd5446b347f52a3665b66fe0d8421453e6b9",
+    "packet": "sha256:5c2ee867075042df8eb5796bafc6e0fca54c4d697f46b7ba31a21d827b8e9c62",
+    "register": "sha256:2d4c54b4962442a66f420c155aa6c9ba3c8521222767c5c12724a7f09628aac7"
+  },
+  "authoritative": true,
+  "files": [
+    {
+      "path": "axym-authoritative-action-contract-bundle.tar.gz",
+      "sha256": "sha256:7cda6d1237237871cee8a47a2646bd5446b347f52a3665b66fe0d8421453e6b9"
+    },
+    {
+      "path": "axym-authoritative-action-contract-evidence-packet.json",
+      "sha256": "sha256:5c2ee867075042df8eb5796bafc6e0fca54c4d697f46b7ba31a21d827b8e9c62"
+    },
+    {
+      "path": "axym-authoritative-action-contract-evidence-packet.schema.json",
+      "sha256": "sha256:7c033471fd764c093f70bf18cc89d71a313cf8bc16c176aa1d63e7f4e16d50bb"
+    },
+    {
+      "path": "axym-authoritative-action-contract-public-key.b64",
+      "sha256": "sha256:d07223905e4b47d10314d662cda96625f78b4d6a03742c4dad86762a849685d3"
+    },
+    {
+      "path": "axym-authoritative-action-contract-register.json",
+      "sha256": "sha256:2d4c54b4962442a66f420c155aa6c9ba3c8521222767c5c12724a7f09628aac7"
+    },
+    {
+      "path": "axym-authoritative-action-contract-register.schema.json",
+      "sha256": "sha256:746e3beac09b7a4f0894642c32525fd37144cc8cdc9cdc903f92ad5fab1574df"
+    }
+  ],
+  "fixture_only": false,
+  "generator": {
+    "name": "generate_authoritative_governance_release.go",
+    "version": "v1"
+  },
+  "manifest_version": "v1",
+  "non_authoritative": false,
+  "peeled_commit": "07a13659bbd2a577e565975fa38e647977427380",
+  "producer": {
+    "kind": "release_owner_authoritative_governance",
+    "name": "axym",
+    "version": "v0.2.2"
+  },
+  "quarantine": false,
+  "release_tag": "v0.2.2",
+  "schemas": [
+    {
+      "path": "axym-authoritative-action-contract-register.schema.json",
+      "schema_id": "https://axym.dev/schemas/v1/governance/action-contract-register.schema.json",
+      "schema_version": "v1",
+      "sha256": "sha256:746e3beac09b7a4f0894642c32525fd37144cc8cdc9cdc903f92ad5fab1574df"
+    },
+    {
+      "path": "axym-authoritative-action-contract-evidence-packet.schema.json",
+      "schema_id": "https://axym.dev/schemas/v1/governance/action-contract-evidence-packet.schema.json",
+      "schema_version": "v1",
+      "sha256": "sha256:7c033471fd764c093f70bf18cc89d71a313cf8bc16c176aa1d63e7f4e16d50bb"
+    }
+  ],
+  "signing": {
+    "algorithm": "ed25519",
+    "key_origin": "release_time_generated",
+    "public_key_path": "axym-authoritative-action-contract-public-key.b64",
+    "public_key_sha256": "sha256:d07223905e4b47d10314d662cda96625f78b4d6a03742c4dad86762a849685d3"
+  },
+  "workflow": {
+    "name": "release",
+    "ref": "Clyra-AI/axym/.github/workflows/release.yml@refs/tags/v0.2.2",
+    "repository": "Clyra-AI/axym",
+    "run_id": "33166780827"
+  }
+}

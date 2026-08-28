@@ -14,6 +14,12 @@ source declares:
 - exact release `version`, `commit`, and `tag` values in the contract (the
   producer manifest's commit/tag fields are optional because some released
   manifests carry only `source_commit` or no tree metadata);
+- annotated tags may additionally record `tag_object` and `peeled_commit`
+  object IDs so the imported bytes can be traced to an immutable tag object
+  and its resolved commit;
+- authoritative release bundles may pin detached `release_assets` by role
+  (`bundle`, `checksums`, `checksums_signature`, `checksums_certificate`,
+  `checksums_attestation`, and `provenance`) in addition to extracted files;
 - an `integrity_mode`: `manifest_digest` for unsigned Wrkr exports,
   `tagged_tree` when the release tag is also verified by the caller, or
   `inline_ed25519` for signed Gait/Axym artifacts;
@@ -45,6 +51,11 @@ go run ./scripts/import_cross_product_fixture.go --update \
 
 It verifies source manifests, public keys, schemas, artifact bytes, producer
 identity, relationships, and integrity-binding claims before writing anything.
+Authoritative Gait/Axym manifests must declare their release tag and peeled
+commit, set `authoritative: true`, keep quarantine/development flags false, and
+match the contract’s complete artifact and schema digest sets. Detached
+release assets are copied and digest-pinned but are never trusted without
+their checksum signature and release provenance validation.
 The offline check is:
 
 ```bash
@@ -52,6 +63,12 @@ go run ./scripts/import_cross_product_fixture.go --check \
   --dest scenarios/proof/action-contract-final-conformance
 ```
 
-No developer-absolute default path is accepted. Until the release owners
-provide the exact producer inputs, there is intentionally no final fixture
-directory, no guessed tag or commit SHA, and no generated Axym assessment.
+The repository’s final conformance fixture is imported from immutable release
+tag trees; its contract records the annotated tag object and peeled commit for
+Wrkr `v1.15.1`, Gait `v1.7.0`, and Axym `v0.2.0` alongside the exact source
+digests and cross-product relationship references.
+
+No developer-absolute default path is accepted. The importer never guesses
+tags or commit SHAs and never generates an Axym assessment; all final fixture
+bytes must remain traceable to the release-owner contract and its pinned tag
+trees.

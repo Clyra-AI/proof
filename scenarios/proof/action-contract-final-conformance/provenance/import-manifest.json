@@ -1,0 +1,146 @@
+{
+  "format": "proof.cross_product_fixture_import/v1",
+  "fixture_id": "action-contract-final-conformance-v1",
+  "contract_sha256": "sha256:07acac2a39af91aee1c43265abc80a082d6f338517ab2f65278f1ff254dfc324",
+  "fixture_only": true,
+  "sources": [
+    {
+      "product": "wrkr",
+      "version": "v1.14.0",
+      "commit": "6b8db233e33f92fe502aecf250a6ddeb3c3e1497",
+      "tag": "v1.15.1",
+      "tag_object": "efc033a58c55f8de74dc8204696301bee4e31b59",
+      "peeled_commit": "6b8db233e33f92fe502aecf250a6ddeb3c3e1497",
+      "integrity_mode": "tagged_tree",
+      "manifest": "manifest.json",
+      "manifest_sha256": "sha256:fe0473c17f1abc7fcadfabe041e16da3e99d01a5e8f9f5c4d4d3ffe39ae4bdba",
+      "public_key": "",
+      "public_key_sha256": "",
+      "schemas": [
+        "schemas/v1/proposed-action-contract-artifact.schema.json",
+        "schemas/v1/proposed-action-contract-v3.schema.json"
+      ],
+      "artifacts": [
+        "pac-4b7f1402784256ce.json"
+      ]
+    },
+    {
+      "product": "gait",
+      "version": "v1.7.2",
+      "commit": "29cb736e946c1153a9fd3f14bbc0f0b864e1b4a4",
+      "tag": "v1.7.2",
+      "tag_object": "90d41ab3a28cb511b941a034a2959fd5bbd8ac4c",
+      "peeled_commit": "29cb736e946c1153a9fd3f14bbc0f0b864e1b4a4",
+      "integrity_mode": "inline_ed25519",
+      "manifest": "manifest.json",
+      "manifest_sha256": "sha256:cd454566063eb60dc3c55c6442599c844f59c24c7dc79345fb24a39e6961eef0",
+      "public_key": "public-key.b64",
+      "public_key_sha256": "sha256:e2ce3d9ac4b07318d6b111585ea356349e5b0745187abcd64a5ff933ed6dcf32",
+      "release_assets": [
+        {
+          "role": "bundle",
+          "path": "release/action-contract-authoritative-evidence-v1.7.2.zip",
+          "sha256": "sha256:750406dd76d59dd3dacdae5df95ddaa25f93d7859fdbc039ebd6855f79e78c41"
+        },
+        {
+          "role": "checksums",
+          "path": "release/checksums.txt",
+          "sha256": "sha256:673a9b1b38d2d6a55b50d5bc79857e069609c566dcfdaa48d1e8ba2357b119c5"
+        },
+        {
+          "role": "checksums_signature",
+          "path": "release/checksums.txt.sig",
+          "sha256": "sha256:32fb9541b08050546e085fafc8653575b4972c226c3a46584234bb79ed96917b"
+        },
+        {
+          "role": "checksums_certificate",
+          "path": "release/checksums.txt.pem",
+          "sha256": "sha256:56da50226608c08b1579bc5c8fdbf0e61172c0d8e3d1307adf245d5024a8ee61"
+        },
+        {
+          "role": "checksums_attestation",
+          "path": "release/checksums.txt.intoto.jsonl",
+          "sha256": "sha256:37347bac0e5506fcfbd6949d5b1e47960cf3872b566b783bf6d96a8f7e81c9b4"
+        },
+        {
+          "role": "provenance",
+          "path": "release/provenance.json",
+          "sha256": "sha256:62e656173518de50ef864e9169211374d6abd3c14c386dc6a097f4a4cb4e4690"
+        }
+      ],
+      "schemas": [
+        "schemas/v1/action-contract/activated-action-contract-artifact.schema.json",
+        "schemas/v1/action-contract/compensation-evidence.schema.json",
+        "schemas/v1/action-contract/containment-evidence.schema.json",
+        "schemas/v1/action-contract/control-event-evidence.schema.json",
+        "schemas/v1/action-contract/effect-event.schema.json",
+        "schemas/v1/action-contract/execution-evidence.schema.json",
+        "schemas/v1/action-contract/proposed-action-contract-artifact.schema.json",
+        "schemas/v1/action-contract/proposed-action-contract-v3.schema.json",
+        "schemas/v1/action-contract/runtime-action.schema.json",
+        "schemas/v1/action-contract/runtime-lifecycle-record.schema.json",
+        "schemas/v1/action-contract/runtime-readiness.schema.json"
+      ],
+      "artifacts": [
+        "activation.json",
+        "lifecycle.json",
+        "proposal.json",
+        "runtime-action.json",
+        "runtime-readiness.json"
+      ]
+    },
+    {
+      "product": "axym",
+      "version": "v0.2.2",
+      "commit": "07a13659bbd2a577e565975fa38e647977427380",
+      "tag": "v0.2.2",
+      "tag_object": "3cf97e6b75772bf5a4be45d2332f2ab231929141",
+      "peeled_commit": "07a13659bbd2a577e565975fa38e647977427380",
+      "integrity_mode": "inline_ed25519",
+      "manifest": "manifest.json",
+      "manifest_sha256": "sha256:afcdd8901484908458bff2111260d6bf569e232cc0633d5ac6161e5a9cb75a15",
+      "public_key": "axym-authoritative-action-contract-public-key.b64",
+      "public_key_sha256": "sha256:d07223905e4b47d10314d662cda96625f78b4d6a03742c4dad86762a849685d3",
+      "release_assets": [
+        {
+          "role": "bundle",
+          "path": "release/bundle.tar.gz",
+          "sha256": "sha256:7cda6d1237237871cee8a47a2646bd5446b347f52a3665b66fe0d8421453e6b9"
+        },
+        {
+          "role": "checksums",
+          "path": "release/checksums.txt",
+          "sha256": "sha256:007a7371db78a588e8fe4a05c30f9424349badcef33782431ef48ff11b827a9c"
+        },
+        {
+          "role": "checksums_signature",
+          "path": "release/checksums.txt.sig",
+          "sha256": "sha256:784cf61fddf93cffbbffc970e21d3ef137e286eda858286da45142c7b9dc41e1"
+        },
+        {
+          "role": "checksums_certificate",
+          "path": "release/checksums.txt.pem",
+          "sha256": "sha256:5fe5415ad353840aa7ac546ae73e87ab0427e1a8568ab3621c2f35045163aee7"
+        },
+        {
+          "role": "provenance",
+          "path": "release/github-attestation.provenance.json",
+          "sha256": "sha256:5efe600d455f9d6508e0badf07858ca154d42c3a5dfe3cf6b15ffd03e7b2aa37"
+        },
+        {
+          "role": "metadata",
+          "path": "release/metadata.json",
+          "sha256": "sha256:5bc30d5c04fd1723bfe671aac3994b88c0c6749ac9fa09c628c22d3ff752dab2"
+        }
+      ],
+      "schemas": [
+        "axym-authoritative-action-contract-evidence-packet.schema.json",
+        "axym-authoritative-action-contract-register.schema.json"
+      ],
+      "artifacts": [
+        "axym-authoritative-action-contract-evidence-packet.json",
+        "axym-authoritative-action-contract-register.json"
+      ]
+    }
+  ]
+}

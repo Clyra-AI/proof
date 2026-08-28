@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/Clyra-AI/proof"
+	"github.com/Clyra-AI/proof/internal/fixtureimport"
 	"github.com/Clyra-AI/proof/internal/testutil"
 	proofsign "github.com/Clyra-AI/proof/signing"
 	"github.com/stretchr/testify/require"
@@ -335,6 +336,23 @@ func runScenario(t *testing.T, binary, dir string) {
 			require.Equal(t, "integrity_only", record.Metadata["projection"])
 			require.NotNil(t, record.Relationship)
 			require.NotEmpty(t, record.Relationship.EntityRefs)
+		}
+
+	case "action-contract-final-conformance":
+		require.Equal(t, "pass", expected.Verify)
+		require.NoError(t, fixtureimport.Check(dir))
+		contractRaw, err := os.ReadFile(filepath.Join(dir, fixtureimport.ContractPath))
+		require.NoError(t, err)
+		contract, err := fixtureimport.LoadContract(contractRaw)
+		require.NoError(t, err)
+		require.Equal(t, "action-contract-final-conformance-v1", contract.FixtureID)
+		require.Equal(t, "445a323b355e1977bf678f0a70964f4ff3f28503", contract.ProofCommit)
+		for _, source := range contract.Sources {
+			require.Len(t, source.TagObject, 40, source.Product)
+			require.Len(t, source.PeeledCommit, 40, source.Product)
+			if source.Product == "gait" || source.Product == "axym" {
+				require.Len(t, source.ReleaseAssets, 6, source.Product)
+			}
 		}
 
 	default:

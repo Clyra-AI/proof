@@ -1,0 +1,500 @@
+{
+  "format": "proof.cross_product_fixture_import/v1",
+  "fixture_id": "action-contract-final-conformance-v1",
+  "proof_commit": "445a323b355e1977bf678f0a70964f4ff3f28503",
+  "sources": [
+    {
+      "product": "wrkr",
+      "version": "v1.14.0",
+      "commit": "6b8db233e33f92fe502aecf250a6ddeb3c3e1497",
+      "tag": "v1.15.1",
+      "tag_object": "efc033a58c55f8de74dc8204696301bee4e31b59",
+      "peeled_commit": "6b8db233e33f92fe502aecf250a6ddeb3c3e1497",
+      "integrity_mode": "tagged_tree",
+      "manifest_path": "manifest.json",
+      "manifest_sha256": "sha256:fe0473c17f1abc7fcadfabe041e16da3e99d01a5e8f9f5c4d4d3ffe39ae4bdba",
+      "public_key_path": "",
+      "public_key_sha256": "",
+      "schemas": [
+        {
+          "path": "schemas/v1/proposed-action-contract-artifact.schema.json",
+          "sha256": "sha256:47399be5bb6f128a52d65f7657fb11e166fdb2009fa88daa020cdc39a2f15bfe",
+          "schema_id": "https://wrkr.dev/schemas/v1/proposed-action-contract-artifact.schema.json",
+          "schema_version": "1"
+        },
+        {
+          "path": "schemas/v1/proposed-action-contract-v3.schema.json",
+          "sha256": "sha256:853910aa7862dd444e7d4e14e84c31f7666d7b538cb909b56bebe3dc889241ce",
+          "schema_id": "https://wrkr.dev/schemas/v1/proposed-action-contract-v3.schema.json",
+          "schema_version": "3"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "pac-4b7f1402784256ce.json",
+          "sha256": "sha256:bfb32cdce650b2ea969059ae0816df2637f7345e70b08a67d4c23684489bf154",
+          "kind": "proposed_action_contract",
+          "schema_path": "schemas/v1/proposed-action-contract-artifact.schema.json",
+          "schema_sha256": "sha256:47399be5bb6f128a52d65f7657fb11e166fdb2009fa88daa020cdc39a2f15bfe",
+          "schema_id": "https://wrkr.dev/schemas/v1/proposed-action-contract-artifact.schema.json",
+          "schema_version": "1",
+          "producer_artifact": true,
+          "synthetic": false
+        }
+      ]
+    },
+    {
+      "product": "gait",
+      "version": "v1.7.2",
+      "commit": "29cb736e946c1153a9fd3f14bbc0f0b864e1b4a4",
+      "tag": "v1.7.2",
+      "tag_object": "90d41ab3a28cb511b941a034a2959fd5bbd8ac4c",
+      "peeled_commit": "29cb736e946c1153a9fd3f14bbc0f0b864e1b4a4",
+      "integrity_mode": "inline_ed25519",
+      "manifest_path": "manifest.json",
+      "manifest_sha256": "sha256:cd454566063eb60dc3c55c6442599c844f59c24c7dc79345fb24a39e6961eef0",
+      "public_key_path": "public-key.b64",
+      "public_key_sha256": "sha256:e2ce3d9ac4b07318d6b111585ea356349e5b0745187abcd64a5ff933ed6dcf32",
+      "release_assets": [
+        {
+          "role": "bundle",
+          "path": "release/action-contract-authoritative-evidence-v1.7.2.zip",
+          "sha256": "sha256:750406dd76d59dd3dacdae5df95ddaa25f93d7859fdbc039ebd6855f79e78c41"
+        },
+        {
+          "role": "checksums",
+          "path": "release/checksums.txt",
+          "sha256": "sha256:673a9b1b38d2d6a55b50d5bc79857e069609c566dcfdaa48d1e8ba2357b119c5"
+        },
+        {
+          "role": "checksums_signature",
+          "path": "release/checksums.txt.sig",
+          "sha256": "sha256:32fb9541b08050546e085fafc8653575b4972c226c3a46584234bb79ed96917b"
+        },
+        {
+          "role": "checksums_certificate",
+          "path": "release/checksums.txt.pem",
+          "sha256": "sha256:56da50226608c08b1579bc5c8fdbf0e61172c0d8e3d1307adf245d5024a8ee61"
+        },
+        {
+          "role": "checksums_attestation",
+          "path": "release/checksums.txt.intoto.jsonl",
+          "sha256": "sha256:37347bac0e5506fcfbd6949d5b1e47960cf3872b566b783bf6d96a8f7e81c9b4"
+        },
+        {
+          "role": "provenance",
+          "path": "release/provenance.json",
+          "sha256": "sha256:62e656173518de50ef864e9169211374d6abd3c14c386dc6a097f4a4cb4e4690"
+        }
+      ],
+      "schemas": [
+        {
+          "path": "schemas/v1/action-contract/activated-action-contract-artifact.schema.json",
+          "sha256": "sha256:d95a537d28d7fb2b871b99f402f6b65210f7b458e9f7205dabd3d647fd38eb8a",
+          "schema_id": "https://gait.dev/schemas/v1/activated-action-contract-artifact.schema.json",
+          "schema_version": "1"
+        },
+        {
+          "path": "schemas/v1/action-contract/compensation-evidence.schema.json",
+          "sha256": "sha256:9219ccb1bdc8504cf5153f4ad001c3da5eee30474cba201b8d31260fc0fec325",
+          "schema_id": "https://gait.dev/schemas/v1/action-contract/compensation-evidence.schema.json",
+          "schema_version": "1"
+        },
+        {
+          "path": "schemas/v1/action-contract/containment-evidence.schema.json",
+          "sha256": "sha256:733bd48fd4aebc5811f761c3f0a078f19939b16a30152397e05994498ab20078",
+          "schema_id": "https://gait.dev/schemas/v1/action-contract/containment-evidence.schema.json",
+          "schema_version": "1"
+        },
+        {
+          "path": "schemas/v1/action-contract/control-event-evidence.schema.json",
+          "sha256": "sha256:60b0e034949c7006e71072f4470a15d81e9352cff80364537f9d7a1c4febd093",
+          "schema_id": "https://gait.dev/schemas/v1/action-contract/control-event-evidence.schema.json",
+          "schema_version": "1"
+        },
+        {
+          "path": "schemas/v1/action-contract/effect-event.schema.json",
+          "sha256": "sha256:4958d1ce281cc99b6de1d28f76b679365dcb847f5f3e44fe722a58c6d07a7b17",
+          "schema_id": "https://gait.dev/schemas/v1/action-contract/effect-event.schema.json",
+          "schema_version": "1"
+        },
+        {
+          "path": "schemas/v1/action-contract/execution-evidence.schema.json",
+          "sha256": "sha256:1f32b9685d16a13f377b4ac23f873785421811a25aff2e3e1cf364a03d51ede4",
+          "schema_id": "https://gait.dev/schemas/v1/action-contract/execution-evidence.schema.json",
+          "schema_version": "1"
+        },
+        {
+          "path": "schemas/v1/action-contract/proposed-action-contract-artifact.schema.json",
+          "sha256": "sha256:47399be5bb6f128a52d65f7657fb11e166fdb2009fa88daa020cdc39a2f15bfe",
+          "schema_id": "https://wrkr.dev/schemas/v1/proposed-action-contract-artifact.schema.json",
+          "schema_version": "1"
+        },
+        {
+          "path": "schemas/v1/action-contract/proposed-action-contract-v3.schema.json",
+          "sha256": "sha256:853910aa7862dd444e7d4e14e84c31f7666d7b538cb909b56bebe3dc889241ce",
+          "schema_id": "https://wrkr.dev/schemas/v1/proposed-action-contract-v3.schema.json",
+          "schema_version": "3"
+        },
+        {
+          "path": "schemas/v1/action-contract/runtime-action.schema.json",
+          "sha256": "sha256:dc5d9951b04a8ced633fb48199030206219a9b3cc9f0effaa93eff3debd13394",
+          "schema_id": "https://gait.dev/schemas/v1/runtime-action.schema.json",
+          "schema_version": "1"
+        },
+        {
+          "path": "schemas/v1/action-contract/runtime-lifecycle-record.schema.json",
+          "sha256": "sha256:f7ec8fcba3470024f955b224474bf668380558f8ce92ddf312520585be177b45",
+          "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+          "schema_version": "1"
+        },
+        {
+          "path": "schemas/v1/action-contract/runtime-readiness.schema.json",
+          "sha256": "sha256:d44f5a6b50e8af76dd5eb977b97f78ed76869056f79c95587be3eb5046f1e20d",
+          "schema_id": "https://gait.dev/schemas/v1/runtime-readiness.schema.json",
+          "schema_version": "1"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "activation.json",
+          "sha256": "sha256:58861d2567505643e3d1311e65b372fed2fb9e6afeff6bedebb0705596907e2c",
+          "kind": "activated_action_contract",
+          "schema_path": "schemas/v1/action-contract/activated-action-contract-artifact.schema.json",
+          "schema_sha256": "sha256:d95a537d28d7fb2b871b99f402f6b65210f7b458e9f7205dabd3d647fd38eb8a",
+          "schema_id": "https://gait.dev/schemas/v1/activated-action-contract-artifact.schema.json",
+          "schema_version": "1",
+          "producer_artifact": true,
+          "synthetic": false,
+          "signature_required": true
+        },
+        {
+          "path": "lifecycle.json",
+          "sha256": "sha256:126aa62e84e6d17d72efa08aa3d9e09444bcf3d619a87490464acc44d2a61347",
+          "kind": "lifecycle",
+          "schema_path": "schemas/v1/action-contract/runtime-lifecycle-record.schema.json",
+          "schema_sha256": "sha256:f7ec8fcba3470024f955b224474bf668380558f8ce92ddf312520585be177b45",
+          "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+          "schema_version": "1",
+          "producer_artifact": true,
+          "synthetic": false,
+          "signature_required": true
+        },
+        {
+          "path": "proposal.json",
+          "sha256": "sha256:bfb32cdce650b2ea969059ae0816df2637f7345e70b08a67d4c23684489bf154",
+          "kind": "proposed_action_contract",
+          "schema_path": "schemas/v1/action-contract/proposed-action-contract-artifact.schema.json",
+          "schema_sha256": "sha256:47399be5bb6f128a52d65f7657fb11e166fdb2009fa88daa020cdc39a2f15bfe",
+          "schema_id": "https://wrkr.dev/schemas/v1/proposed-action-contract-artifact.schema.json",
+          "schema_version": "1",
+          "producer_artifact": true,
+          "synthetic": false
+        },
+        {
+          "path": "runtime-action.json",
+          "sha256": "sha256:507daa556b2ef4c2c9a21904ec3440aaaf0d1acd45f766471a4a0a475a07c041",
+          "kind": "runtime_action",
+          "schema_path": "schemas/v1/action-contract/runtime-action.schema.json",
+          "schema_sha256": "sha256:dc5d9951b04a8ced633fb48199030206219a9b3cc9f0effaa93eff3debd13394",
+          "schema_id": "https://gait.dev/schemas/v1/runtime-action.schema.json",
+          "schema_version": "1",
+          "producer_artifact": true,
+          "synthetic": false
+        },
+        {
+          "path": "runtime-readiness.json",
+          "sha256": "sha256:22ec5dc48e99fbb31bbb7fa5f8e828400afdb2d3dd763be97f9c72021b3e9b0c",
+          "kind": "readiness",
+          "schema_path": "schemas/v1/action-contract/runtime-readiness.schema.json",
+          "schema_sha256": "sha256:d44f5a6b50e8af76dd5eb977b97f78ed76869056f79c95587be3eb5046f1e20d",
+          "schema_id": "https://gait.dev/schemas/v1/runtime-readiness.schema.json",
+          "schema_version": "1",
+          "producer_artifact": true,
+          "synthetic": false
+        }
+      ]
+    },
+    {
+      "product": "axym",
+      "version": "v0.2.2",
+      "commit": "07a13659bbd2a577e565975fa38e647977427380",
+      "tag": "v0.2.2",
+      "tag_object": "3cf97e6b75772bf5a4be45d2332f2ab231929141",
+      "peeled_commit": "07a13659bbd2a577e565975fa38e647977427380",
+      "integrity_mode": "inline_ed25519",
+      "manifest_path": "manifest.json",
+      "manifest_sha256": "sha256:afcdd8901484908458bff2111260d6bf569e232cc0633d5ac6161e5a9cb75a15",
+      "public_key_path": "axym-authoritative-action-contract-public-key.b64",
+      "public_key_sha256": "sha256:d07223905e4b47d10314d662cda96625f78b4d6a03742c4dad86762a849685d3",
+      "release_assets": [
+        {
+          "role": "bundle",
+          "path": "release/bundle.tar.gz",
+          "sha256": "sha256:7cda6d1237237871cee8a47a2646bd5446b347f52a3665b66fe0d8421453e6b9"
+        },
+        {
+          "role": "checksums",
+          "path": "release/checksums.txt",
+          "sha256": "sha256:007a7371db78a588e8fe4a05c30f9424349badcef33782431ef48ff11b827a9c"
+        },
+        {
+          "role": "checksums_signature",
+          "path": "release/checksums.txt.sig",
+          "sha256": "sha256:784cf61fddf93cffbbffc970e21d3ef137e286eda858286da45142c7b9dc41e1"
+        },
+        {
+          "role": "checksums_certificate",
+          "path": "release/checksums.txt.pem",
+          "sha256": "sha256:5fe5415ad353840aa7ac546ae73e87ab0427e1a8568ab3621c2f35045163aee7"
+        },
+        {
+          "role": "provenance",
+          "path": "release/github-attestation.provenance.json",
+          "sha256": "sha256:5efe600d455f9d6508e0badf07858ca154d42c3a5dfe3cf6b15ffd03e7b2aa37"
+        },
+        {
+          "role": "metadata",
+          "path": "release/metadata.json",
+          "sha256": "sha256:5bc30d5c04fd1723bfe671aac3994b88c0c6749ac9fa09c628c22d3ff752dab2"
+        }
+      ],
+      "schemas": [
+        {
+          "path": "axym-authoritative-action-contract-register.schema.json",
+          "sha256": "sha256:746e3beac09b7a4f0894642c32525fd37144cc8cdc9cdc903f92ad5fab1574df",
+          "schema_id": "https://axym.dev/schemas/v1/governance/action-contract-register.schema.json",
+          "schema_version": "v1"
+        },
+        {
+          "path": "axym-authoritative-action-contract-evidence-packet.schema.json",
+          "sha256": "sha256:7c033471fd764c093f70bf18cc89d71a313cf8bc16c176aa1d63e7f4e16d50bb",
+          "schema_id": "https://axym.dev/schemas/v1/governance/action-contract-evidence-packet.schema.json",
+          "schema_version": "v1"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "axym-authoritative-action-contract-register.json",
+          "sha256": "sha256:2d4c54b4962442a66f420c155aa6c9ba3c8521222767c5c12724a7f09628aac7",
+          "kind": "assessment_register",
+          "schema_path": "axym-authoritative-action-contract-register.schema.json",
+          "schema_sha256": "sha256:746e3beac09b7a4f0894642c32525fd37144cc8cdc9cdc903f92ad5fab1574df",
+          "schema_id": "https://axym.dev/schemas/v1/governance/action-contract-register.schema.json",
+          "schema_version": "v1",
+          "producer_artifact": true,
+          "synthetic": false,
+          "signature_required": true,
+          "relationship_refs": [
+            {
+              "kind": "proposal",
+              "id": "paca-d3a371d51af5af30",
+              "digest": "sha256:bfb32cdce650b2ea969059ae0816df2637f7345e70b08a67d4c23684489bf154",
+              "schema_id": "https://wrkr.dev/schemas/v1/proposed-action-contract-artifact.schema.json",
+              "schema_version": "1",
+              "source_product": "wrkr"
+            },
+            {
+              "kind": "action_contract",
+              "id": "pac-4b7f1402784256ce",
+              "digest": "sha256:d3a371d51af5af30c4c4b8e2694b40cb16791c4e8c469bd53a483a99fb3c88cf",
+              "schema_id": "https://wrkr.dev/schemas/v1/proposed-action-contract-v3.schema.json",
+              "schema_version": "3",
+              "source_product": "wrkr"
+            }
+          ]
+        },
+        {
+          "path": "axym-authoritative-action-contract-evidence-packet.json",
+          "sha256": "sha256:5c2ee867075042df8eb5796bafc6e0fca54c4d697f46b7ba31a21d827b8e9c62",
+          "kind": "evidence_packet",
+          "schema_path": "axym-authoritative-action-contract-evidence-packet.schema.json",
+          "schema_sha256": "sha256:7c033471fd764c093f70bf18cc89d71a313cf8bc16c176aa1d63e7f4e16d50bb",
+          "schema_id": "https://axym.dev/schemas/v1/governance/action-contract-evidence-packet.schema.json",
+          "schema_version": "v1",
+          "producer_artifact": true,
+          "synthetic": false,
+          "signature_required": true,
+          "relationship_refs": [
+            {
+              "kind": "proposal",
+              "id": "paca-d3a371d51af5af30",
+              "digest": "sha256:bfb32cdce650b2ea969059ae0816df2637f7345e70b08a67d4c23684489bf154",
+              "schema_id": "https://wrkr.dev/schemas/v1/proposed-action-contract-artifact.schema.json",
+              "schema_version": "1",
+              "source_product": "wrkr"
+            },
+            {
+              "kind": "action_contract",
+              "id": "pac-4b7f1402784256ce",
+              "digest": "sha256:d3a371d51af5af30c4c4b8e2694b40cb16791c4e8c469bd53a483a99fb3c88cf",
+              "schema_id": "https://wrkr.dev/schemas/v1/proposed-action-contract-v3.schema.json",
+              "schema_version": "3",
+              "source_product": "wrkr"
+            },
+            {
+              "kind": "authority",
+              "id": "gact-75047662b4deef22",
+              "digest": "sha256:58861d2567505643e3d1311e65b372fed2fb9e6afeff6bedebb0705596907e2c",
+              "schema_id": "https://gait.dev/schemas/v1/activated-action-contract-artifact.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "credential",
+              "id": "gact-75047662b4deef22",
+              "digest": "sha256:58861d2567505643e3d1311e65b372fed2fb9e6afeff6bedebb0705596907e2c",
+              "schema_id": "https://gait.dev/schemas/v1/activated-action-contract-artifact.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "correlation",
+              "id": "gait-correlation",
+              "digest": "sha256:126aa62e84e6d17d72efa08aa3d9e09444bcf3d619a87490464acc44d2a61347",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "freshness",
+              "id": "gait-freshness",
+              "digest": "sha256:126aa62e84e6d17d72efa08aa3d9e09444bcf3d619a87490464acc44d2a61347",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "resource_lifecycle",
+              "id": "gait-lifecycle",
+              "digest": "sha256:126aa62e84e6d17d72efa08aa3d9e09444bcf3d619a87490464acc44d2a61347",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "containment",
+              "id": "gait-lr-03b9d7762c6a9b9d",
+              "digest": "sha256:03b9d7762c6a9b9d25a6a77c4f33b9a4e5bdd0404b9edaf3d4ebe16c859bee5a",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "compensation",
+              "id": "gait-lr-18839f598c568f4c",
+              "digest": "sha256:18839f598c568f4c280b08f2c1aa63985dc7619d3bb348037b869f22ac65b939",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "preconditions",
+              "id": "gait-lr-1cf5059b7bab9b78",
+              "digest": "sha256:1cf5059b7bab9b780af89f6d83d8a042ea25ce374eeaf8bb3cec2ccf7b9f9cb6",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "confirmation",
+              "id": "gait-lr-4e006004a6566e5f",
+              "digest": "sha256:4e006004a6566e5f866faa42de52bf7077da8672ee25875b96eb81b37ed9b648",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "effect",
+              "id": "gait-lr-5020072c7e1435dc",
+              "digest": "sha256:5020072c7e1435dcba0f9a6137b7fb5cbef75eb81516d254cda554037a4b74b0",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "readiness",
+              "id": "gait-lr-6f55443db1a856b8",
+              "digest": "sha256:6f55443db1a856b8f9f2606878e5ccae5c24ada992ff99f9dd1dd7c516857441",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "enforcement",
+              "id": "gait-lr-771bdbc7e2f13f2a",
+              "digest": "sha256:771bdbc7e2f13f2a5a2fd4c97876276c3114d329aa6adbfde4aecf479674f3d6",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "approval",
+              "id": "gait-lr-9a54256bdbbfa014",
+              "digest": "sha256:9a54256bdbbfa01411fbf623a5ce26af8fdafaee4fd33720f618e6d9dada3719",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "execution",
+              "id": "gait-lr-9ca03ef14689281b",
+              "digest": "sha256:9ca03ef14689281b0215403408016a27aa932bcb84042b677b97b0968862b63e",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "containment",
+              "id": "gait-lr-adcf2080b186b68f",
+              "digest": "sha256:adcf2080b186b68f2e2f5301475a50930a51fe2245257fd5d8b0c7cdbad21a96",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "compensation",
+              "id": "gait-lr-c77d74323ad27722",
+              "digest": "sha256:c77d74323ad27722826d1278866aef087b6db06dafc6540029b224a2c6d71fc0",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "compensation",
+              "id": "gait-lr-dd17d586b5363c26",
+              "digest": "sha256:dd17d586b5363c262cb8e2dda536b1031f1a391a51c24f34a6b8c1c8925998d0",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "effect",
+              "id": "gait-lr-eba2e3bda7784e34",
+              "digest": "sha256:eba2e3bda7784e341c41818bcc0bd4552be30bac03d2dce3e6d26ca3f16ac7d1",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "outcome",
+              "id": "gait-lr-fd1f76836e7cf9ee",
+              "digest": "sha256:fd1f76836e7cf9ee9c419c8faf60a7c8b5814ebffec507e406705f88f6bd363b",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            },
+            {
+              "kind": "proof",
+              "id": "gait-proof",
+              "digest": "sha256:126aa62e84e6d17d72efa08aa3d9e09444bcf3d619a87490464acc44d2a61347",
+              "schema_id": "https://gait.dev/schemas/v1/runtime-lifecycle-record.schema.json",
+              "schema_version": "1",
+              "source_product": "gait"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
